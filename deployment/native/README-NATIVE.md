@@ -90,7 +90,8 @@ You will be prompted to review and accept the detected settings before continuin
 output of the initialization run may be found in file `$TMS_ROOT_DIR/tms-install.out`. By default, this file
 is located at `~tms/.tms/tms-install.out`.
 
-This output file contains credentials for the default admin user `~~admin`. 
+**WARNING This output file contains credentials for the default admin user `~~admin`.** 
+
 **WARNING This is only place where these credentials are displayed. Losing this information prevents administrative
 actions and will likely make reinstallation necessary.**
 
@@ -129,16 +130,17 @@ The upgrade script will:
 - The existing `$TMS_ROOT_DIR/migrations` directory will be moved to a backup directory.
 - The new `migrations` directory will be copied into place from `~tms/tms_server/resources/migrations`.
 
-Please note that if upgrading the script will not overwrite the `tms.toml` or `log4rs.yml` files located in
-`$TMS_ROOT_DIR/config`. Any customizations will remain in place.
+Please note that if upgrading the script will not overwrite the `log4rs.yml` file located in `$TMS_ROOT_DIR/config`.
+Any customizations will remain in place. As noted above, an exisiting `tms.toml` file will be backed up and replaced.
+Customizations for `tms.toml` will need to be ported.
 
 ## Running TMSS
 Note that the installation script will not start the service after installing or upgrading.  
 
 A convenient way to run TMSS is via `systemctl`. The installation script places a service configuration file
 at `$TMS_INSTALL_DIR/lib/systemd/system/tms_server.service` which provides a starting point for a systemd unit
-definition. The configuration may be used as-is. This file (or its derivative) can be copied to `/etc/systemd/system` or
-referenced in place using a symbolic link. Here is an example of a command that can be run as root to create a
+definition. The configuration may be used as-is. This file (or its derivative) can be copied to `/etc/systemd/system`
+or referenced in place using a symbolic link. Here is an example of a command that can be run as root to create a
 symbolic link:
 ```
 sudo su -

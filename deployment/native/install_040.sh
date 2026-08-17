@@ -478,8 +478,8 @@ chown -R $INSTALL_USR:$INSTALL_USR $BAK_DIR
 #  BEGIN install/upgrade specific code
 # =====================================================================================
 DB_ENV_FILE="tms-db-env"
-DB_ENV_PATH1="$ROOT_DIR/local/${DB_ENV_FILE}"
-DB_ENV_PATH2="$ROOT_DIR/${DB_ENV_FILE}"
+DB_ENV_PATH_LOCAL="$ROOT_DIR/local/${DB_ENV_FILE}"
+DB_ENV_PATH="$ROOT_DIR/${DB_ENV_FILE}"
 if [ "$UPGRADE" == "true" ]; then
   # --------------------------------------
   # Upgrade specific steps
@@ -500,9 +500,9 @@ if [ "$UPGRADE" == "true" ]; then
   echo "========================================================================================="
   if [ -e "$ROOT_DIR/local" ]; then
     # If there is a tms-db-env in local then copy it to root
-    if [ -e "$DB_ENV_PATH1" ]; then
-      echo "Copying file ${DB_ENV_FILE} from "$DB_ENV_PATH1 to "$DB_ENV_PATH2"
-      cp -p "$DB_ENV_PATH1" "$DB_ENV_PATH2"
+    if [ -e "$DB_ENV_PATH_LOCAL" ]; then
+      echo "Copying file ${DB_ENV_FILE} from "$DB_ENV_PATH_LOCAL to "$DB_ENV_PATH"
+      cp -p "$DB_ENV_PATH_LOCAL" "$DB_ENV_PATH"
     fi
     echo "Backing local directory by moving it from $ROOT_DIR/local to ${ROOT_DIR}/local.bak_${BAK_TIMESTAMP}"
     mv "$ROOT_DIR/local" "${ROOT_DIR}/local.bak_${BAK_TIMESTAMP}"
@@ -525,7 +525,7 @@ else
   # Clean install specific steps
   # --------------------------------------
   # Create environment file for backup script
-  DB_ENV_FILE="$DB_ENV_PATH2"
+  DB_ENV_FILE="$DB_ENV_PATH"
   echo
   echo "===== Creating environment file for backup script. File path: $DB_ENV_FILE"
   echo "========================================================================================="

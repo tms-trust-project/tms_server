@@ -35,7 +35,7 @@ export TMS_DB_USER_PASSWORD=<tms_user_password>
 ```
 
 If the PostgreSQL deployment is not running on `localhost` at port `5432`, then the environment variables `TMS_DB_HOST`
-and `TMS_DB_PORT` may be used to override the settings.
+and `TMS_DB_PORT` must be used to override the settings.
 
 ## Environment variables used during installation
 
@@ -57,7 +57,7 @@ Other env variables that can be set to override defaults:
 - TMS_DB_HOST
   - Host server running PostgreSQL. default = localhost
 - TMS_DB_PORT
-  - Port at which PostgreSQL server is running. default = 5432 :
+  - Port at which PostgreSQL server is running. default = 5432
 
 Other less common env variable overrides:
 - TMS_ROOT_DIR
@@ -66,7 +66,7 @@ Other less common env variable overrides:
   - Location of install output and optional custom `tms.toml`, `log4rs.yml`. default = $HOME/tms_local
 
 NOTE: It is strongly recommended that *TMS_LOCAL_DIR* be left as the default or set to a directory
-outside of *TMS_ROOT_DIR*. This will allow you to keep custom configuration files separate which will make it easier
+outside *TMS_ROOT_DIR*. This will allow you to keep custom configuration files separate which will make it easier
 to fully remove TMSS without removing custom settings. 
 
 ## Installing TMSS
@@ -81,7 +81,8 @@ You will be prompted to review and accept the detected settings before continuin
 output of the initialization run may be found in file `$TMS_ROOT_DIR/tms-install.out`. By default, this file
 is located at `$HOME/.tms/tms-install.out`.
 
-This output file contains the administrator credentials.
+**WARNING This output file contains the administrator credentials.**
+
 **WARNING This is only place where these credentials are displayed. Losing this information prevents administrative
 actions and will likely make reinstallation necessary.**
 
