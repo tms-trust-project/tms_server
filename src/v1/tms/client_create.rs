@@ -5,12 +5,10 @@ use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
 use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
-use crate::utils::db_statements::INSERT_CLIENT;
 use crate::utils::db_types::ClientInput;
 use crate::utils::db::insert_new_client;
 use crate::utils::config::{DB_TRUE, NEW_CLIENTS_DISALLOW};
-use crate::utils::tms_utils::{self, create_hex_secret, hash_hex_secret, timestamp_utc, timestamp_utc_to_str, 
-                              RequestDebug, validate_semver};
+use crate::utils::tms_utils::{self, create_hex_secret, hash_hex_secret, timestamp_utc, RequestDebug};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;

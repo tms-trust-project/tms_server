@@ -11,7 +11,7 @@ use crate::utils::keygen::{self, KeyType};
 use crate::utils::db_types::PubkeyInput;
 use crate::utils::db::check_pubkey_dependencies;
 use crate::utils::db::insert_new_pubkey;
-use crate::utils::tms_utils::{self, timestamp_utc, timestamp_utc_to_str, calc_expires_at, RequestDebug};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
 use crate::utils::mvp::{MVPDependencyParms, create_pubkey_dependencies};
 use log::{error, info};
 
@@ -281,17 +281,17 @@ impl RespNewSshKeys {
         );
 
         // Insert the new key record.
-        insert_new_pubkey(input_record);
+        insert_new_pubkey(input_record).await;
 
         // Success! Zero key bits means a fixed key length.
-        Ok(make_http_201(Self::new("0", "success", 
-                    keyinfo.private_key, 
-                    keyinfo.public_key, 
+        Ok(make_http_201(Self::new("0", "success",
+                    keyinfo.private_key,
+                    keyinfo.public_key,
                     keyinfo.public_key_fingerprint,
                     keyinfo.key_type,
                     keyinfo.key_bits.to_string(),
                     max_uses.to_string(),
-    remaining_uses.to_string(),
+                    remaining_uses.to_string(),
                     expires_at,)))
     }
 }

@@ -17,7 +17,6 @@ use hex;
 use sha2::{Sha512, Digest};
 
 use anyhow::{Result, anyhow};
-use lazy_static::lazy_static;
 use log::{error, debug, LevelFilter};
 
 use crate::utils::db_statements::PLACEHOLDER;

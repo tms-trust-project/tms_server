@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{Result, anyhow};
-use log::{info, warn};
+use log::{info};
 use std::io::{self, Write};
 use chrono::{Utc, DateTime};
 use sqlx::Row;
 
-use crate::utils::tms_utils::{timestamp_utc, timestamp_utc_secs_to_str, timestamp_str_to_datetime, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
+use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
 use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_USER_MFA, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
@@ -24,6 +24,9 @@ use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RES
 const TEST_USER: &str = "testuser";
 const TEST_HOST: &str = "testhost";
 const TEST_HOST_ACCOUNT: &str = "testhostaccount";
+const TEST_FIXED_USER: &str  = "testuser101";
+const TEST_FIXED_FINGERPRINT: &str= "SHA256:wUKFDv4LAQo7OtMUZenzupG5DB95Dxi+n3s4rd/UQ00";
+const TEST_RECORD_CNT: i32 = 101;
 const MAX_USES: i32 = i32::MAX;
 const MAX_TTL_MINUTES: i32 = i32::MAX;
 const KEY_TYPE: KeyType = KeyType::Ed25519;
@@ -65,6 +68,9 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
 /*
  * Insert a new pubkey record if there is not at least one already associated with host+host_account
  * For testing purposes as long as there is at least one we should be good.
+ *
+ * If asked to generate for 'testuser001' use a fixed pubkey fingerprint.
+ * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
 pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String,
                                             test_host_acct: String) -> Result<u64> {
@@ -83,6 +89,10 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
         Ok(k) => k,
         Err(e) => { return Result::Err(anyhow!(e)); }
     };
+    // Determine the fingerprint.
+    let pubkey_fingerprint =
+        if test_user == TEST_FIXED_USER { String::from(TEST_FIXED_FINGERPRINT) }
+        else { keyinfo.public_key_fingerprint };
     let now  = timestamp_utc();
     let expires_at  = calc_expires_at(now, MAX_TTL_MINUTES);
     let remaining_uses = MAX_USES;
@@ -92,7 +102,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
         test_user.clone(),
         test_host.clone(),
         test_host_acct.clone(),
-        keyinfo.public_key_fingerprint.clone(),
+        pubkey_fingerprint.clone(),
         keyinfo.public_key.clone(),
         keyinfo.key_type.clone(),
         keyinfo.key_bits,
@@ -278,10 +288,11 @@ pub async fn create_test_data() -> Result<u64> {
     // Get the timestamp string.
     let now = timestamp_utc();
 
-    // Create records for 100 test users in the test client. Do this in a txn
+    // Create records for 101 test users in the test client. Do this in a txn
+    // User 101 will have a fixed pubkey fingerprint to smoke test.
     // Get a connection to the db and start a transaction.
     let mut insert_count = 0;
-    for n in 1..=100 {
+    for n in 1..=TEST_RECORD_CNT {
         let test_user = format!("{}{:03}", TEST_USER, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
@@ -338,11 +349,14 @@ pub async fn create_test_data() -> Result<u64> {
 // ---------------------------------------------------------------------------
 // create_test_keys:
 // ---------------------------------------------------------------------------
-/** This function either experiences an error or returns true (false is never returned). */
+/**
+ * This function either experiences an error or returns true (false is never returned).
+ * User 101 will have a fixed pubkey fingerprint to smoke test.
+ */
 pub async fn create_test_keys() -> Result<u64> {
     // For each test user create one pubkey entry, ignore generated private key
     let mut insert_count = 0;
-    for n in 1..=100 {
+    for n in 1..=TEST_RECORD_CNT {
         let test_user = format!("{}{:03}", TEST_USER, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);

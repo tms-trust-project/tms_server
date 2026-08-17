@@ -4,7 +4,7 @@ use poem::Request;
 use sqlx::Row;
 use anyhow::{Result, anyhow};
 
-use log::{error, debug};
+use log::{error};
 
 use crate::utils::tms_utils::hash_hex_secret;
 use crate::RUNTIME_CTX;

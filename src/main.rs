@@ -6,7 +6,6 @@
  */
 use std::time::Duration;
 use anyhow::Result;
-use clap::Parser;
 use lazy_static::lazy_static;
 use log::{info};
 use poem::listener::{Listener, OpensslTlsConfig};
@@ -197,11 +196,11 @@ async fn tms_init_data() -> Result<bool> {
     info!("Number of test clients created: {}.", inserts);
 
     // Create test delegation, user_mfa and user_host records if they do not already exist.
-    let inserts = db::create_test_data().await.expect("Error creating delegation records for test users.");;
+    let inserts = db::create_test_data().await.expect("Error creating delegation records for test users.");
     info!("Number of test delegation related records created: {}.", inserts);
 
     // Create a test pubkey for each user
-    let inserts = db::create_test_keys().await.expect("Error creating keys for test users.");;
+    let inserts = db::create_test_keys().await.expect("Error creating keys for test users.");
     info!("Number of test keys created: {}.", inserts);
     Ok(true)
 }
