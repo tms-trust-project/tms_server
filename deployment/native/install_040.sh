@@ -550,7 +550,7 @@ EOB
   chown -R $INSTALL_USR:$INSTALL_USR $ROOT_DIR/certs
   chmod 600 $ROOT_DIR/certs/*.pem
   echo
-  echo "===== Initialize server. Running tms_server --install as user: $INSTALL_USR"
+  echo "===== Initializing server. Running tms_server --install as user: $INSTALL_USR"
   echo "========================================================================================="
   # Initialize the content of the install directory.
   INSTALL_INIT_CMD="$EXEC_FILE_DST --install --root-dir $ROOT_DIR"

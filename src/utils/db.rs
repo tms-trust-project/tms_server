@@ -111,7 +111,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
         .bind(input_record.client_user_id.clone())
         .bind(input_record.host.clone())
         .bind(input_record.host_account)
-        .bind(input_record.public_key_fingerprint)
+        .bind(input_record.public_key_fingerprint.clone())
         .bind(input_record.public_key)
         .bind(input_record.key_type.clone())
         .bind(input_record.key_bits)
@@ -126,6 +126,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
     // Commit the transaction.
     tx.commit().await?;
     info!("Created keypair for user: {} host: {} host_acct {}", test_user, test_host, test_host_acct);
+    info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
 }
 /*

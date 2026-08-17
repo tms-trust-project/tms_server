@@ -45,14 +45,15 @@ appenders:
         pattern: "{{TMS_ROOT_DIR}}/logs/tms_roller{}.log"
         
 root:
-  level: info
+  level: warn
   appenders:
     - stdout
     - roller
 
-# loggers:
-#   rust-logtest2:
-#     level: trace
-#     appenders:
-#       - stdout
-#     additive: false
+loggers:
+  tms_server:
+    level: debug
+    appenders:
+      - stdout
+      - roller
+    additive: false

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Cleanup install of ver 0.3.0
+# Cleanup install of ver 0.4.0
 # Helpful for testing after failed local installs
 #
-# THIS IS SCRIPT IS UNTESTED
+# TODO Remove or move this script once testing is complete.
 #
 # Exit if a command returns status different from 0
 set -o errexit
@@ -22,21 +22,18 @@ set -xv
 #
 # NOTE: Once 0.4.0 is ready we should be able to simply remove ~/.tms
 #
-# Clean up installed directories, but not ~/.tms/local which contains a modified tms.toml
-rm -fr ~/.tms/certs
-rm -fr ~/.tms/config/
-rm -fr ~/.tms/logs/
-rm -fr ~/.tms/migrations/
+# Clean up current install
+rm -fr ~/.tms
 if [ -d "/tmp/tms_server" ]; then
   rm -fr /tmp/tms_server/
 fi
 if [ -d "/opt/tms_server" ]; then
   rm -fr /opt/tms_server/
 fi
-# Clean up files created during install that cause errors when re-installing
-/bin/rm -f ~/.tms/local/tms-db-env
-/bin/rm -f ~/.tms/local/tms-install.out
-/bin/rm -f ~/.tms/local/tms_service.env
+## Clean up files created during install that cause errors when re-installing
+#/bin/rm -f ~/.tms/local/tms-db-env
+#/bin/rm -f ~/.tms/local/tms-install.out
+#/bin/rm -f ~/.tms/local/tms_service.env
 
 # re-install
 ./deployment/native/install_040.sh --test
