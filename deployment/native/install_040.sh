@@ -12,7 +12,7 @@
 #
 # Default root directory is $HOME/.tms as the install user. May be overridden using env variable TMS_ROOT_DIR.
 #
-# User may define TMS_LOCAL_DIR for local customizations. Default is $HOME/tms_local
+# User may define TMS_LOCAL_DIR for local customizations. Default is ~tms/tms_local
 #  - Local directory may contain custom tms.toml and log4rs.yml files.
 #
 #  NOTE: It is strongly recommended that *TMS_LOCAL_DIR* be left as the default or at a minimum set to a directory
@@ -203,7 +203,7 @@ else
 fi
 
 # Set local directory. Location of optional custom tms.toml, log4rs.yml files.
-LOCAL_DEF_DIR="$HOME/tms_local"
+LOCAL_DEF_DIR="$TMS_HOME/tms_local"
 if [ -n "$TMS_LOCAL_DIR" ]; then
   LOCAL_DIR="$TMS_LOCAL_DIR"
 else
@@ -270,7 +270,7 @@ if [ "$UPGRADE" == "true" ]; then
   fi
   VERS_OLD=$(cat $VERS_FILE)
   if [ "$VERS_OLD" != "$VERS_UPG_SUPPORTED" ]; then
-    echo "Uprading from version $VERSION_OLD is not supported."
+    echo "Uprading from version $VERS_OLD is not supported."
     echo "Exiting ..."
     exit 1
   fi
@@ -510,16 +510,21 @@ if [ "$UPGRADE" == "true" ]; then
     echo "Nothing found at $ROOT_DIR/local"
   fi
 
-  # Back up the existing configuration file
+  # Back up the existing configuration files
   echo
   echo "===== Backing up configuration file from $ROOT_DIR/config/tms.toml to $LOCAL_DIR/tms.toml.bak_${BAK_TIMESTAMP}"
   echo "========================================================================================="
   cp -p "$ROOT_DIR/config/tms.toml" "$LOCAL_DIR/tms.toml.bak_${BAK_TIMESTAMP}"
-  # Copy new config file into place
   echo
-  echo "===== Copying configuration file from ${SRC_DIR}/resources/config/tms.toml to ${ROOT_DIR}/config"
+  echo "===== Backing up configuration file from $ROOT_DIR/config/log4rs.yml to $LOCAL_DIR/log4rsyml.bak_${BAK_TIMESTAMP}"
+  echo "========================================================================================="
+  cp -p "$ROOT_DIR/config/log4rs.yml" "$LOCAL_DIR/log4rs.yml.bak_${BAK_TIMESTAMP}"
+  # Copy new config files into place
+  echo
+  echo "===== Copying configuration files from ${SRC_DIR}/resources/config to ${ROOT_DIR}/config"
   echo "========================================================================================="
   cp -p "${SRC_DIR}/resources/config/tms.toml" "${ROOT_DIR}/config"
+  cp -p "${SRC_DIR}/resources/config/log4rs.yml" "${ROOT_DIR}/config"
 else
   # --------------------------------------
   # Clean install specific steps

@@ -83,7 +83,7 @@ installation script as root:
 ```
 sudo su -
 cd ~tms/tms_server
-./deployment/native/install_030.sh
+./deployment/native/install_040.sh
 ```
 
 You will be prompted to review and accept the detected settings before continuing. Once installation is complete,
@@ -118,7 +118,7 @@ installation script as root specifying the option `--upgrade`:
 ```
 sudo su -
 cd ~tms/tms_server
-./deployment/native/install_030.sh --upgrade
+./deployment/native/install_040.sh --upgrade
 ```
 
 You will be prompted to review and accept the detected settings before continuing.
