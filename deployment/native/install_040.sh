@@ -30,11 +30,12 @@
 #  - Following env variables are set at minimum:
 #    - POSTGRES_PASSWORD
 #    - TMS_DB_USER_PASSWORD
-#    - TMS_SSL_CERT_PATH    : Path to the SSL fullchain certificate file in PEM format.
-#    - TMS_SSL_KEY_PATH     : Path to the private key file in PEM format associated with the SSL certificate.
 #  - Other env variables that can be set to override defaults:
 #    - TMS_DB_HOST    default = localhost
 #    - TMS_DB_PORT    default = 5432
+#  - For a clean install the ssl cert variables must also be set
+#    - TMS_SSL_CERT_PATH    : Path to the SSL fullchain certificate file in PEM format.
+#    - TMS_SSL_KEY_PATH     : Path to the private key file in PEM format associated with the SSL certificate.
 #  - Other less common env variable overrides:
 #    - TMS_ROOT_DIR     default = $HOME/.tms
 #    - TMS_INSTALL_DIR  default = /opt/tms_server or /tmp/tms_server in test mode
@@ -117,7 +118,7 @@ fi
 
 # Check that all required env variables are set
 FAILED=false
-env_list="POSTGRES_PASSWORD TMS_DB_USER_PASSWORD TMS_SSL_CERT_PATH TMS_SSL_KEY_PATH"
+env_list="POSTGRES_PASSWORD TMS_DB_USER_PASSWORD"
 for name in $env_list
 do
   if [[ -z "${!name}" ]]; then
@@ -125,6 +126,16 @@ do
     FAILED=true
   fi
 done
+if [ "$UPGRADE" == false ]; then
+  env_list="TMS_SSL_CERT_PATH TMS_SSL_KEY_PATH"
+  for name in $env_list
+  do
+    if [[ -z "${!name}" ]]; then
+      echo "Please set env var ${name} before running this script"
+      FAILED=true
+    fi
+  done
+fi
 if [ "$FAILED" = true ]; then
   echo "Please set required environment variables"
   echo "Exiting ..."
@@ -480,6 +491,10 @@ chown -R $INSTALL_USR:$INSTALL_USR $BAK_DIR
 DB_ENV_FILE="tms-db-env"
 DB_ENV_PATH_LOCAL="$ROOT_DIR/local/${DB_ENV_FILE}"
 DB_ENV_PATH="$ROOT_DIR/${DB_ENV_FILE}"
+
+#####################################################
+################## UPGRADE ##########################
+#####################################################
 if [ "$UPGRADE" == "true" ]; then
   # --------------------------------------
   # Upgrade specific steps
@@ -494,29 +509,13 @@ if [ "$UPGRADE" == "true" ]; then
   chmod 0700 "${ROOT_DIR}/migrations"
   chown $INSTALL_USR:$INSTALL_USR "${ROOT_DIR}/migrations"
 
-  # If there is a local directory under ROOT_DIR back it up
-  echo
-  echo "===== Checking for local directory at $ROOT_DIR/local"
-  echo "========================================================================================="
-  if [ -e "$ROOT_DIR/local" ]; then
-    # If there is a tms-db-env in local then copy it to root
-    if [ -e "$DB_ENV_PATH_LOCAL" ]; then
-      echo "Copying file ${DB_ENV_FILE} from "$DB_ENV_PATH_LOCAL to "$DB_ENV_PATH"
-      cp -p "$DB_ENV_PATH_LOCAL" "$DB_ENV_PATH"
-    fi
-    echo "Backing local directory by moving it from $ROOT_DIR/local to ${ROOT_DIR}/local.bak_${BAK_TIMESTAMP}"
-    mv "$ROOT_DIR/local" "${ROOT_DIR}/local.bak_${BAK_TIMESTAMP}"
-  else
-    echo "Nothing found at $ROOT_DIR/local"
-  fi
-
   # Back up the existing configuration files
   echo
   echo "===== Backing up configuration file from $ROOT_DIR/config/tms.toml to $LOCAL_DIR/tms.toml.bak_${BAK_TIMESTAMP}"
   echo "========================================================================================="
   cp -p "$ROOT_DIR/config/tms.toml" "$LOCAL_DIR/tms.toml.bak_${BAK_TIMESTAMP}"
   echo
-  echo "===== Backing up configuration file from $ROOT_DIR/config/log4rs.yml to $LOCAL_DIR/log4rsyml.bak_${BAK_TIMESTAMP}"
+  echo "===== Backing up configuration file from $ROOT_DIR/config/log4rs.yml to $LOCAL_DIR/log4rs.yml.bak_${BAK_TIMESTAMP}"
   echo "========================================================================================="
   cp -p "$ROOT_DIR/config/log4rs.yml" "$LOCAL_DIR/log4rs.yml.bak_${BAK_TIMESTAMP}"
   # Copy new config files into place
@@ -525,6 +524,9 @@ if [ "$UPGRADE" == "true" ]; then
   echo "========================================================================================="
   cp -p "${SRC_DIR}/resources/config/tms.toml" "${ROOT_DIR}/config"
   cp -p "${SRC_DIR}/resources/config/log4rs.yml" "${ROOT_DIR}/config"
+#####################################################
+################## INSTALL ##########################
+#####################################################
 else
   # --------------------------------------
   # Clean install specific steps
@@ -614,6 +616,9 @@ fi
 #  END install/upgrade specific code
 # =====================================================================================
 
+# TODO Update template variable {{TMS_ROOT_DIR}} in file log4rs.yml
+#      basically to a gres_r operation
+# TODO
 # Update version in install dir
 echo "$VERS_NEW" > $VERS_FILE
 chown $INSTALL_USR:$INSTALL_USR $VERS_FILE

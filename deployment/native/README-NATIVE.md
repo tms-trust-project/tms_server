@@ -50,6 +50,8 @@ The following environment variables are required when installing TMSS:
   - Password for the postgresql admin user `postgres`
 - TMS_DB_USER_PASSWORD
   - Password for the TMS DB user
+
+For a clean install the ssl cert related variables are also required:
 - TMS_SSL_CERT_PATH
   - Path to the SSL full-chain certificate file in PEM format that is loaded at startup.
 - TMS_SSL_KEY_PATH
@@ -106,11 +108,10 @@ The installation script will:
 When installing or upgrading TMSS you must be running as the root user. After the installation or upgrade  all operations
 except for starting and stopping the service should be performed as the user `tms`.
 
-Note that there have been some updates to the configuration file `tms.toml`. The existing file will be backed up and
-placed under `$TMS_LOCAL_DIR`. A new configuration file will be put in place at `$TMS_ROOT_DIR/config/tms.toml`. This
-file will not have customizations. Please port any customizations from `$TMS_LOCAL_DIR/tms.toml` to
-`$TMS_ROOT_DIR/config/tms.toml`. Then save a copy of the resulting file `$TMS_ROOT_DIR/config/tms.toml` to
-`$TMS_LOCAL_DIR/tms.toml` for possible use in future upgrades.
+Note that there have been some updates to the configuration files `tms.toml` and `log4rs.yml`.
+The existing files will be backed up and placed under `$TMS_LOCAL_DIR`. New configuration files will be put in place
+at `$TMS_ROOT_DIR/config`. These files will not have customizations. Please manually port any customizations and save
+copies of the resulting files under `$TMS_LOCAL_DIR` for possible use in future upgrades.
 
 ### Run the installation script with upgrade option
 Once the prerequisite steps are taken and the required and optional environment variables are set, simply run the
@@ -131,7 +132,7 @@ The upgrade script will:
 - The new `migrations` directory will be copied into place from `~tms/tms_server/resources/migrations`.
 
 Please note that if upgrading the script will not overwrite the `log4rs.yml` file located in `$TMS_ROOT_DIR/config`.
-Any customizations will remain in place. As noted above, an exisiting `tms.toml` file will be backed up and replaced.
+Any customizations will remain in place. As noted above, an existing `tms.toml` file will be backed up and replaced.
 Customizations for `tms.toml` will need to be ported.
 
 ## Running TMSS
