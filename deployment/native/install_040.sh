@@ -332,6 +332,10 @@ if [ "$UPGRADE" == "true" ]; then
     echo "Exiting ..."
     exit 1
   fi
+  # Back up the existing executable. Skip if backup exists so we do not overwrite.
+  if [ ! -e "${EXEC_FILE_DST}_${VERS_OLD}" ]; then
+    cp -p "$EXEC_FILE_DST" "${EXEC_FILE_DST}_${VERS_OLD}"
+  fi
 else
   # This is an install, there should not be an existing installation
   if [ -e "$ROOT_DIR/config" ]; then
@@ -500,7 +504,7 @@ else
   # --------------------------------------
   # Clean install specific steps
   # --------------------------------------
-  # Configure service TODO only do this for clean install?
+  # Configure service
   echo
   echo "===== Configuring TMS service"
   echo "========================================================================================="
