@@ -433,37 +433,6 @@ cp $EXEC_FILE_SRC $EXEC_FILE_DST
 chown $INSTALL_USR:$INSTALL_USR $EXEC_FILE_DST
 chmod 770 $EXEC_FILE_DST
 
-# Configure service
-echo
-echo "===== Configuring TMS service"
-echo "========================================================================================="
-SVC_CFG_FILE="$SVC_CFG_DIR/tms_server.service"
-SVC_ENV_PATH="$ROOT_DIR/tms_service.env"
-# Copy service config into place
-cp -p "${SRC_DIR}/deployment/native/tms_server.service" "$SVC_CFG_FILE"
-RET_CODE=$?
-if [ $RET_CODE -ne 0 ]; then
-  echo
-  echo "*************** Error copying service config to: $SVC_CFG_FILE"
-  echo "Exiting ..."
-  exit $RET_CODE
-fi
-
-# Update service file to point to executable and environment settings file
-echo -e "ExecStart=$EXEC_FILE_DST\n" >> $SVC_CFG_FILE
-echo -e "EnvironmentFile=$SVC_ENV_PATH\n" >> $SVC_CFG_FILE
-
-# Create environment file for service
-cat >> $SVC_ENV_PATH << EOB
-TMS_DB_USER="tms"
-TMS_DB_DB_NAME="tmsdb"
-TMS_DB_HOST="$TMS_DB_HOST"
-TMS_DB_PORT="$TMS_DB_PORT"
-TMS_DB_USER_PASSWORD="$TMS_DB_USER_PASSWORD"
-EOB
-chown $INSTALL_USR:$INSTALL_USR "$SVC_ENV_PATH"
-chmod 400 "$SVC_ENV_PATH"
-
 # Copy latest backup script into place.
 echo
 echo "===== Updating backup script. Target path: $BAK_FILE_PATH"
@@ -531,6 +500,36 @@ else
   # --------------------------------------
   # Clean install specific steps
   # --------------------------------------
+  # Configure service TODO only do this for clean install?
+  echo
+  echo "===== Configuring TMS service"
+  echo "========================================================================================="
+  SVC_CFG_FILE="$SVC_CFG_DIR/tms_server.service"
+  SVC_ENV_PATH="$ROOT_DIR/tms_service.env"
+  # Copy service config into place
+  cp -p "${SRC_DIR}/deployment/native/tms_server.service" "$SVC_CFG_FILE"
+  RET_CODE=$?
+  if [ $RET_CODE -ne 0 ]; then
+    echo
+    echo "*************** Error copying service config to: $SVC_CFG_FILE"
+    echo "Exiting ..."
+    exit $RET_CODE
+  fi
+  # Update service file to point to executable and environment settings file
+  echo -e "ExecStart=$EXEC_FILE_DST\n" >> $SVC_CFG_FILE
+  echo -e "EnvironmentFile=$SVC_ENV_PATH\n" >> $SVC_CFG_FILE
+
+  # Create environment file for service
+  cat >> $SVC_ENV_PATH << EOB
+TMS_DB_USER="tms"
+TMS_DB_DB_NAME="tmsdb"
+TMS_DB_HOST="$TMS_DB_HOST"
+TMS_DB_PORT="$TMS_DB_PORT"
+TMS_DB_USER_PASSWORD="$TMS_DB_USER_PASSWORD"
+EOB
+  chown $INSTALL_USR:$INSTALL_USR "$SVC_ENV_PATH"
+  chmod 600 "$SVC_ENV_PATH"
+
   # Create environment file for backup script
   DB_ENV_FILE="$DB_ENV_PATH"
   echo

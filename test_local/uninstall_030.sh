@@ -10,6 +10,15 @@ set -o errexit
 set -o nounset
 # If any of the components of a pipe fails, then the pipe fails
 set -o pipefail
+echo
+echo "WARNING!!!"
+echo "WARNING!!! - This is a DESTRUCTIVE uninstall"
+echo "WARNING!!!"
+read -p "Enter Y to continue: " resp
+case $resp in
+  Y ) echo "Continuing ... " ;;
+  *) echo "Uninstall cancelled. Exiting ... " ; exit 1 ;;
+esac
 
 set -xv
 # Set env vars
