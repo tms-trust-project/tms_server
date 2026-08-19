@@ -619,9 +619,14 @@ fi
 #  END install/upgrade specific code
 # =====================================================================================
 
-# TODO Update template variable {{TMS_ROOT_DIR}} in file log4rs.yml
-#      basically to a gres_r operation
-# TODO
+# Version 0.4.0 has an updated log4rs config file.
+# For both an upgrade and a normal install we replace the template variable TMS_ROOT_DIR
+# Create Ctl-A character to be used as separator for sed
+ASEP="$(echo | tr '\012' '\001' )"
+pattern="{{TMS_ROOT_DIR}}"
+sed -e "s${ASEP}${pattern}${ASEP}${ROOT_DIR}${ASEP}g" \
+  "${SRC_DIR}/resources/config/log4rs.yml" > "${ROOT_DIR}/config/log4rs.yml"
+
 # Update version in install dir
 echo "$VERS_NEW" > $VERS_FILE
 chown $INSTALL_USR:$INSTALL_USR $VERS_FILE
