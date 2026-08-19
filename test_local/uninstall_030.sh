@@ -28,11 +28,7 @@ set -xv
 ../deployment/postgres/tms_drop_db.sh
 ../deployment/postgres/tms_init_db.sh
 
-# Clean up installed directories, but not ~/.tms/local which contains a modified tms.toml
-rm -fr ~/.tms/certs
-rm -fr ~/.tms/config/
-rm -fr ~/.tms/logs/
-rm -fr ~/.tms/migrations/
+rm -fr ~/.tms
 if [ -d "/tmp/tms_server" ]; then
   rm -fr /tmp/tms_server/
 fi
@@ -40,6 +36,6 @@ if [ -d "/opt/tms_server" ]; then
   rm -fr /opt/tms_server/
 fi
 # Clean up files created during install that cause errors when re-installing
-/bin/rm -f ~/.tms/local/tms-db-env
-/bin/rm -f ~/.tms/local/tms-install.out
-/bin/rm -f ~/.tms/local/tms_service.env
+/bin/rm -f $TMS_LOCAL_DIR/tms-db-env
+/bin/rm -f $TMS_LOCAL_DIR/tms-install.out
+/bin/rm -f $TMS_LOCAL_DIR/tms_service.env
