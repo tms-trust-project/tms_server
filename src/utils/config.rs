@@ -28,14 +28,14 @@ use super::tms_utils::get_absolute_path;
 // ***************************************************************************
 //                                Constants
 // ***************************************************************************
-// Directory and file locations. Unless otherwise noted, all files and directories
-// are relative to the TMS root directory.
-const DEFAULT_ROOT_DIR     : &str = "~/.tms";
+// Directory and file locations.
+// Unless otherwise noted, all files and directories are relative to the TMS root directory.
+const DEFAULT_ROOT_DIR     : &str = "~/tms_root";
 const MIGRATIONS_DIR       : &str = "/migrations";
 const CONFIG_DIR           : &str = "/config";
 const LOGS_DIR             : &str = "/logs";
 const CERTS_DIR            : &str = "/certs";
-const RESOURCES_DIR        : &str = "./resources"; // relative to currnent dir
+const RESOURCES_DIR        : &str = "./resources"; // relative to current dir
 
 const LOG4RS_CONFIG_FILE   : &str = "/log4rs.yml"; // relative to config dir
 const TMS_CONFIG_FILE      : &str = "/tms.toml";   // relative to config dir
@@ -93,10 +93,6 @@ lazy_static! {
     pub static ref TMS_DIRS: TmsDirs = init_tms_dirs();
 }
 
-// lazy_static! {
-//     pub static ref TMS_DB_CONFIG: TmsDbConfig = init_tms_db_config();
-// }
-
 // Initialize the authz parameter sets.
 lazy_static! {
     pub static ref AUTHZ_ARGS: AuthzArgs = init_authz_args();
@@ -116,18 +112,6 @@ pub struct TmsDirs {
     pub config_dir: String,
     pub logs_dir: String,
     pub certs_dir: String
-}
-
-// ---------------------------------------------------------------------------
-// TmsDbConfig:
-// ---------------------------------------------------------------------------
-#[derive(Debug, Deserialize)]
-pub struct TmsDbConfig {
-    // pub db_host: String,
-    // pub db_port: u16,
-    // pub db_user: String,
-    // pub db_password: String,
-    pub db_url: String
 }
 
 // ***************************************************************************
@@ -324,12 +308,11 @@ pub fn set_directories_and_check_install() {
     // Construct root_dir path and perform checks
     let root_dir = get_root_dir();
     let root_path = Path::new(&root_dir);
-    if root_path.is_file() {
-        // Expected either nothing or a directory, but found a file.
-        let msg = 
+    if !root_path.exists() || !root_path.is_dir() {
+        let msg =
             format!("\n***********************************************************************\n\
-                    ERROR: Detected an existing file at TMS root directory.\n\
-                    ERROR: Expected a directory or nothing at path. Path: {}\n\n\
+                    ERROR: Unable to find TMS root directory.\n\
+                    ERROR: Directory does not exist or path is not a directory. Path: {}\n\n\
                     Please correct the path and try again.\n\
                     ***********************************************************************\n", root_dir);
         panic!("{}", msg);
@@ -338,32 +321,13 @@ pub fn set_directories_and_check_install() {
     let config_dir = format!("{}/config", root_dir);
     let config_path = Path::new(&config_dir);
 
-    if config_path.is_file() {
-        // Expected either nothing or a directory, but found a file.
+    if !config_path.exists() || !config_path.is_dir() {
+        // Expected a directory, but found a file or nothing.
         let msg =
             format!("\n***********************************************************************\n\
-                    ERROR: Detected an existing file at TMS root config directory.\n\
-                    ERROR: Expected a directory or nothing at path. Path: {}\n\n\
+                    ERROR: Unable to find TMS root config directory.\n\
+                    ERROR: Directory does not exist or path is not a directory. Path: {}\n\n\
                     Please correct the path and try again.\n\
-                    ***********************************************************************\n", config_dir);
-        panic!("{}", msg);
-    }
-    if !config_path.is_dir() && !TMS_CMD_ARGS.install {
-        // We are not installing and no directory found.
-        let msg = 
-            format!("\n***********************************************************************\n\
-                    ERROR: Expected the TMS root config directory to exist at path. Path: {}. \n\n\
-                    Please run 'tms_server --install' to initialize root directory at the default path \n\
-                    or consult the README file for configuring a non-default root directory location.\n\
-                    ***********************************************************************\n", config_dir);
-        panic!("{}", msg);
-    }
-    if config_path.is_dir() && TMS_CMD_ARGS.install {
-        // We are installing and root config directory already exists.
-        let msg =
-            format!("\n***********************************************************************\n\
-                    ERROR: Cannot install over existing TMS root config directory at {}. \n\n\
-                    Please correct or run tms_server without the --install option.\n\
                     ***********************************************************************\n", config_dir);
         panic!("{}", msg);
     }
@@ -373,6 +337,7 @@ pub fn set_directories_and_check_install() {
 // init_tms_dirs:
 // ---------------------------------------------------------------------------
 /*
+ * TODO/TBD is this method still needed?
  * Setup for TmsDirs.
  * During the initial installation create and populate the directories.
  * During normal startup check the directories.
@@ -382,8 +347,8 @@ fn init_tms_dirs() -> TmsDirs {
     // Initialize the mistrust object.
     let mistrust = get_mistrust();
 
-    // Declare directory create flag to control file copying.
-    let mut dir_created;
+    // // Declare directory create flag to control file copying.
+    // let mut dir_created;
 
     // Check that each path is absolute and is a directory with the proper permissions assigned
     // if it exists. If directory does not exist then create it.
@@ -392,19 +357,19 @@ fn init_tms_dirs() -> TmsDirs {
     check_tms_dir(&root_dir, "root directory", &mistrust);
 
     let config_dir = root_dir.clone() + CONFIG_DIR;
-    dir_created = check_tms_dir(&config_dir, "config directory", &mistrust);
-    if dir_created {copy_resource_files(&config_dir, CONFIG_DIR, &root_dir);}
+    // dir_created = check_tms_dir(&config_dir, "config directory", &mistrust);
+    // if dir_created {copy_resource_files(&config_dir, CONFIG_DIR, &root_dir);}
     
     let logs_dir = root_dir.clone() + LOGS_DIR;
-    check_tms_dir(&logs_dir, "logs directory", &mistrust);
+    // check_tms_dir(&logs_dir, "logs directory", &mistrust);
     
     let certs_dir = root_dir.clone() + CERTS_DIR;
-    dir_created = check_tms_dir(&certs_dir, "certs directory", &mistrust);
-    if dir_created {copy_resource_files(&certs_dir, CERTS_DIR, &root_dir);}
+    // dir_created = check_tms_dir(&certs_dir, "certs directory", &mistrust);
+    // if dir_created {copy_resource_files(&certs_dir, CERTS_DIR, &root_dir);}
 
     let migrations_dir = root_dir.clone() + MIGRATIONS_DIR;
-    dir_created = check_tms_dir(&migrations_dir, "migrations directory", &mistrust);
-    if dir_created {copy_resource_files(&migrations_dir, MIGRATIONS_DIR, &root_dir);}
+    // dir_created = check_tms_dir(&migrations_dir, "migrations directory", &mistrust);
+    // if dir_created {copy_resource_files(&migrations_dir, MIGRATIONS_DIR, &root_dir);}
 
     // Package up and return the directories.
     TmsDirs {
@@ -454,106 +419,107 @@ fn check_tms_dir(dir: &String, msgname: &str, mistrust: &Mistrust) -> bool {
     }
 }
 
-// ---------------------------------------------------------------------------
-// copy_resource_files:
-// ---------------------------------------------------------------------------
-/* Copy the resource files to the target directory from the ./resources directory.
- * This function will not copy any files if the current working directory of this
- * program does have a subdirectory named "resources".
- * 
- * Since this function is only called on source code resource directories that contain 
- * files copied during installation process, at least one file must be available
- * for copying each time this function is called.
- * 
- * Source files known to contain jinja2-style template variables will have those 
- * variables replaced with values hardcoded in this function.     
- */
-fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String) {
-    // Create the source directory pathname.
-    let source_dir = env::var(ENV_TMS_RESOURCES_DIR).unwrap_or_else(|_| RESOURCES_DIR.to_string()) + dir_suffix;
-    let source_dir = get_absolute_path(&source_dir);
-    println!("copy_resource_files source_dir: {}", source_dir);
-    println!("copy_resource_files target_dir: {}", target_dir);
-    println!("copy_resource_files dir_suffix: {}", dir_suffix);
-    println!("copy_resource_files root_dir:   {}", root_dir);
-
-    // Get the files in the specified resource directory.
-    let pathbufs = match tms_utils::get_files_in_dir(source_dir.as_str()) {
-        Ok(p) => p,
-        Err(e) => {
-            panic!("Unable to list files in directy {}: {}", &source_dir, e);
-        }
-    };
-
-    // Don't call this function if there's nothing to copy.
-    if pathbufs.is_empty() {
-        let mut msg = format!("Installation aborted because no files were found in directory {}. ", &source_dir);
-        msg += "For new installations, please ensure that during the install the current working directory is at the top level of the tms_server source code tree.";
-        panic!("{}", msg);
-    }
-
-    // Process directories that don't contain files with template variables.
-    // Copy each of the files to target directory and set permissions.
-    for pathbuf in pathbufs {
-        // Construct the full pathname of the target file.
-        let os_filename = pathbuf.file_name().expect("Unable to read file name");
-        let filename = os_filename.to_string_lossy();
-        let target_file = target_dir.to_string() + "/" + &filename;
-
-        // Do we need to replace template variables in the source file?
-        // If so, take the first branch and perform jinja2-style substitutions.
-        if dir_suffix == CONFIG_DIR && filename == LOG4RS_CONFIG_FILE[1..] {
-            // Create the source file path.
-            let source_file = source_dir.to_string() + "/" + &filename;
-
-            // Create the template processor and initialize with a single file.
-            let mut tera = Tera::default();
-            match tera.add_template_file(&source_file, None) {
-                Ok(_) => (),
-                Err(e) => {
-                    panic!("Unable to read and parse template file {}: {}", &source_file, e);
-                },
-            };
-
-            // Set the replacement value in a context and render the final output string. 
-            let mut context = tera::Context::new();
-            context.insert("TMS_ROOT_DIR", root_dir);
-            let rendered = match tera.render(&source_file, &context) {
-                Ok(s) => s,
-                Err(e) => {
-                    panic!("Unable to render template file {}: {}", &source_file, e);
-                },
-            };
-
-            // Write the file with all substitutions performed.
-            match fs::write(&target_file, rendered) {
-                Ok(_) => (),
-                Err(e) => {
-                    panic!("Unable to write rendered file {}: {}", &target_file, e);
-                },
-           };
-        } else {
-            // Copy the local resource file to the target file with no template substitutions.
-            match fs::copy(&pathbuf, &target_file) {
-                Ok(_) => (),
-                Err(e) => {
-                    panic!("File copy from {:?} to {} failed: {}", &pathbuf, &target_file, e);
-                },
-            }
-        }
-
-        // Set the target's permissions.
-        match fs::set_permissions(&target_file, Permissions::from_mode(0o600)) {
-            Ok(_) => (),
-            Err(e) => {
-                panic!("Unable to set 0o600 permission on {}: {}", target_file, e);
-            },    
-        };
-
-        // Print installation information to stdout since logger has not initialized yet.
-        println!("*** Copied default installation file to '{}'", &target_file);
-    }
-}
+// TODO remove?
+// // ---------------------------------------------------------------------------
+// // copy_resource_files:
+// // ---------------------------------------------------------------------------
+// /* Copy the resource files to the target directory from the ./resources directory.
+//  * This function will not copy any files if the current working directory of this
+//  * program does have a subdirectory named "resources".
+//  *
+//  * Since this function is only called on source code resource directories that contain
+//  * files copied during installation process, at least one file must be available
+//  * for copying each time this function is called.
+//  *
+//  * Source files known to contain jinja2-style template variables will have those
+//  * variables replaced with values hardcoded in this function.
+//  */
+// fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String) {
+//     // Create the source directory pathname.
+//     let source_dir = env::var(ENV_TMS_RESOURCES_DIR).unwrap_or_else(|_| RESOURCES_DIR.to_string()) + dir_suffix;
+//     let source_dir = get_absolute_path(&source_dir);
+//     println!("copy_resource_files source_dir: {}", source_dir);
+//     println!("copy_resource_files target_dir: {}", target_dir);
+//     println!("copy_resource_files dir_suffix: {}", dir_suffix);
+//     println!("copy_resource_files root_dir:   {}", root_dir);
+//
+//     // Get the files in the specified resource directory.
+//     let pathbufs = match tms_utils::get_files_in_dir(source_dir.as_str()) {
+//         Ok(p) => p,
+//         Err(e) => {
+//             panic!("Unable to list files in directy {}: {}", &source_dir, e);
+//         }
+//     };
+//
+//     // Don't call this function if there's nothing to copy.
+//     if pathbufs.is_empty() {
+//         let mut msg = format!("Installation aborted because no files were found in directory {}. ", &source_dir);
+//         msg += "For new installations, please ensure that during the install the current working directory is at the top level of the tms_server source code tree.";
+//         panic!("{}", msg);
+//     }
+//
+//     // Process directories that don't contain files with template variables.
+//     // Copy each of the files to target directory and set permissions.
+//     for pathbuf in pathbufs {
+//         // Construct the full pathname of the target file.
+//         let os_filename = pathbuf.file_name().expect("Unable to read file name");
+//         let filename = os_filename.to_string_lossy();
+//         let target_file = target_dir.to_string() + "/" + &filename;
+//
+//         // Do we need to replace template variables in the source file?
+//         // If so, take the first branch and perform jinja2-style substitutions.
+//         if dir_suffix == CONFIG_DIR && filename == LOG4RS_CONFIG_FILE[1..] {
+//             // Create the source file path.
+//             let source_file = source_dir.to_string() + "/" + &filename;
+//
+//             // Create the template processor and initialize with a single file.
+//             let mut tera = Tera::default();
+//             match tera.add_template_file(&source_file, None) {
+//                 Ok(_) => (),
+//                 Err(e) => {
+//                     panic!("Unable to read and parse template file {}: {}", &source_file, e);
+//                 },
+//             };
+//
+//             // Set the replacement value in a context and render the final output string.
+//             let mut context = tera::Context::new();
+//             context.insert("TMS_ROOT_DIR", root_dir);
+//             let rendered = match tera.render(&source_file, &context) {
+//                 Ok(s) => s,
+//                 Err(e) => {
+//                     panic!("Unable to render template file {}: {}", &source_file, e);
+//                 },
+//             };
+//
+//             // Write the file with all substitutions performed.
+//             match fs::write(&target_file, rendered) {
+//                 Ok(_) => (),
+//                 Err(e) => {
+//                     panic!("Unable to write rendered file {}: {}", &target_file, e);
+//                 },
+//            };
+//         } else {
+//             // Copy the local resource file to the target file with no template substitutions.
+//             match fs::copy(&pathbuf, &target_file) {
+//                 Ok(_) => (),
+//                 Err(e) => {
+//                     panic!("File copy from {:?} to {} failed: {}", &pathbuf, &target_file, e);
+//                 },
+//             }
+//         }
+//
+//         // Set the target's permissions.
+//         match fs::set_permissions(&target_file, Permissions::from_mode(0o600)) {
+//             Ok(_) => (),
+//             Err(e) => {
+//                 panic!("Unable to set 0o600 permission on {}: {}", target_file, e);
+//             },
+//         };
+//
+//         // Print installation information to stdout since logger has not initialized yet.
+//         println!("*** Copied default installation file to '{}'", &target_file);
+//     }
+// }
 
 // ---------------------------------------------------------------------------
 // check_resource_files:
@@ -563,7 +529,7 @@ fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String)
  * The log4rs.yml and tms.toml files have already been checked and read, so no need to do
  * that here, see init_log() and get_parms().
  * 
- * We panic if either of the pem files are not found or don't have the proper permissions.
+ * We panic if either of the pem files are not found or do not have the proper permissions.
  */
 fn check_resource_files() {
     // Get the directory in which the pem files reside.

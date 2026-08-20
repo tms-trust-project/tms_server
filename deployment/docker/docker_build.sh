@@ -19,5 +19,5 @@ TAG=$1
 
 # Build image
 cd ../..
-echo docker build -t "tapis/tms_server:"${TAG} -f deployment/docker/Dockerfile .
-docker build -t "tapis/tms_server:"${TAG} -f deployment/docker/Dockerfile .
+echo docker build -t "tapis/tms_server:"${TAG} -f deployment/docker/Dockerfile_040 .
+docker build -t "tapis/tms_server:"${TAG} -f deployment/docker/Dockerfile_040 .

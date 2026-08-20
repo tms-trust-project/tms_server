@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #set -x
 
-# This script should only be called AFTER docker_install.sh has successfully run.
+# This script should only be called AFTER docker_install_tms.sh has successfully run.
 
 # The tag of the image to be run needs to be the first and only parameter.
 PrgName=$(basename "$0")
 if [ $# -ne 1 ]; then 
     echo "Usage: $PrgName <docker tag>"
     echo "  where <docker tag> is the image version tag"
+    echo "For example $PrgName dev"
     exit 1
 fi
 
@@ -18,9 +19,11 @@ TAG=$1
 # that launches it.  The host's ~/tms-docker/tms_customizations directory is mounted into the 
 # container and the persistent named volume, tms_docker_vol, contains the .tms directory that 
 # the server uses during execution.  The container is removed when the server exits.
-docker run --name tms_server_container --user $(id -u):$(id -g) -e HOME=/tms-root -p 3000:3000 -d --rm \
+set -xv
+#docker run --name tms_server_container --user $(id -u):$(id -g) -e HOME=/tms-root -p 3001:3000 -d --rm \
+docker run --name tms_server_container --user $(id -u):$(id -g) -e HOME=/tms-root -p 3001:3000 -d \
 --volume tms_docker_vol:/tms-root \
---mount type=bind,source=${HOME}/tms-docker/tms_customizations,target=/tms-root/tms_customizations \
+--mount type=bind,source=${HOME}/tms-docker/tms_local,target=/tms-root/tms_local \
 --volume="/etc/group:/etc/group:ro" \
 --volume="/etc/passwd:/etc/passwd:ro" \
 --volume="/etc/shadow:/etc/shadow:ro" \

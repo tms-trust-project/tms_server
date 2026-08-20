@@ -86,7 +86,7 @@ async fn main() -> Result<(), std::io::Error> {
     set_directories_and_check_install();
 
     // Directory setup. init_tms_dirs is triggered by lazy_static init of TMS_DIRS
-    // During the initial install this creates and populates the directories
+    // TODO/TBD remove this comment/function? During the initial install this creates and populates the directories
     // During normal startup it checks the directories and constructs the TmsDirs object
     // After this all directories and files should be in place, including the config file tms.toml.
     // NOTE: This is where --install is handled.
