@@ -8,8 +8,8 @@ use chrono::{DateTime, Utc};
 use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::{INSERT_USER_HOSTS, INSERT_USER_HOSTS_NOT_STRICT};
 use crate::utils::db_types::UserHostInput;
-use crate::utils::authz::{authorize, AuthzTypes, get_tenant_header, X_TMS_TENANT}; 
-use crate::utils::tms_utils::{self, timestamp_utc, timestamp_utc_to_str, calc_expires_at, RequestDebug, check_tenant_enabled};
+use crate::utils::authz::{authorize, AuthzTypes};
+use crate::utils::tms_utils::{self, timestamp_utc, timestamp_utc_to_str, calc_expires_at, RequestDebug};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;
@@ -28,7 +28,6 @@ pub struct CreateUserHostsApi;
 #[derive(Object)]
 pub struct ReqCreateUserHosts
 {
-    tenant: String,
     tms_user_id: String,
     host: String,
     host_account: String,
@@ -52,8 +51,6 @@ impl RequestDebug for ReqCreateUserHosts {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s.push_str("\n    tms_user_id: ");
         s.push_str(&self.tms_user_id);
         s.push_str("\n    host: ");
@@ -104,34 +101,14 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl CreateUserHostsApi {
     #[oai(path = "/tms/userhosts", method = "post")]
     async fn create_client(&self, http_req: &Request, req: Json<ReqCreateUserHosts>) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-
-        // Check that the tenant specified in the header is the same as the one in the request body.
-        if hdr_tenant != req.tenant {
-            let msg = format!("ERROR: FORBIDDEN - The tenant in the {} header ({}) does not match the tenant in the request body ({})", 
-                                      X_TMS_TENANT, hdr_tenant, req.tenant);
-            error!("{}", msg);
-            return make_http_403(msg);  
-        }
-
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
         // -------------------- Authorize ----------------------------
-        // Currently, only the tenant admin can create a user host record.
+        // Currently, only the admin can create a user host record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
-        let allowed = [AuthzTypes::TenantAdmin];
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to add a user host record in tenant {}.", req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to add a user host record.");
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -174,7 +151,6 @@ impl RespCreateUserHosts {
         // Create the input record.  Note that we save the hash of
         // the hex secret, but never the secret itself.  
         let input_record = UserHostInput::new(
-            req.tenant.clone(),
             req.tms_user_id.clone(),
             req.host.clone(),
             req.host_account.clone(),
@@ -185,8 +161,8 @@ impl RespCreateUserHosts {
 
         // Insert the new key record.
         insert_user_host(input_record, STRICT).await?;
-        info!("Host mapping for user '{}' created in tenant '{}' with experation at {}.", 
-              req.tms_user_id, req.tenant, expires_at.clone());
+        info!("Host mapping for user '{}' created with experation at {}.",
+              req.tms_user_id, expires_at.clone());
         
         // Return the secret represented in hex.
         Ok(make_http_201(Self::new("0", "success".to_string(), 
@@ -212,7 +188,6 @@ pub async fn insert_user_host(rec: UserHostInput, strict: bool) -> Result<u64> {
     
     // Create the insert statement.
     let result = sqlx::query(sql_query)
-        .bind(rec.tenant)
         .bind(rec.tms_user_id)
         .bind(rec.host)
         .bind(rec.host_account)

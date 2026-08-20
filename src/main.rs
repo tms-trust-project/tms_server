@@ -6,14 +6,12 @@
  */
 use std::time::Duration;
 use anyhow::Result;
-use clap::Parser;
 use lazy_static::lazy_static;
 use log::{info};
 use poem::listener::{Listener, OpensslTlsConfig};
 use poem::{listener::TcpListener, Route};
 use poem_openapi::{param::Query, payload::PlainText, OpenApi, OpenApiService};
 use poem_extensions::api;
-use futures::executor::block_on;
 // TMS APIs
 use crate::v1::tms::client_create::CreateClientApi;
 use crate::v1::tms::client_delete::DeleteClientApi;
@@ -23,44 +21,13 @@ use crate::v1::tms::client_update_secret::UpdateClientSecretApi;
 use crate::v1::tms::client_update::UpdateClientApi;
 use crate::v1::tms::pubkeys_create::NewSshKeysApi;
 use crate::v1::tms::pubkeys_retrieve::PublicKeyApi;
-use crate::v1::tms::user_mfa_create::CreateUserMfaApi;
-use crate::v1::tms::user_mfa_delete::DeleteUserMfaApi;
-use crate::v1::tms::user_mfa_get::GetUserMfaApi;
-use crate::v1::tms::user_mfa_list::ListUserMfaApi;
-use crate::v1::tms::user_mfa_update::UpdateUserMfaApi;
 use crate::v1::tms::pubkeys_delete::DeletePubkeysApi;
 use crate::v1::tms::pubkeys_get::GetPubkeysApi;
-use crate::v1::tms::pubkeys_list::ListPubkeysApi;
 use crate::v1::tms::pubkeys_update::UpdatePubkeyApi;
-use crate::v1::tms::user_hosts_create::CreateUserHostsApi;
-use crate::v1::tms::user_hosts_get::GetUserHostsApi;
-use crate::v1::tms::user_hosts_list::ListUserHostsApi;
-use crate::v1::tms::user_hosts_delete::DeleteUserHostsApi;
-use crate::v1::tms::user_hosts_update::UpdateUserHostsApi;
-use crate::v1::tms::delegations_create::CreateDelegationsApi;
-use crate::v1::tms::delegations_get::GetDelegationsApi;
-use crate::v1::tms::delegations_list::ListDelegationsApi;
-use crate::v1::tms::delegations_delete::DeleteDelegationsApi;
-use crate::v1::tms::delegations_update::UpdateDelegationsApi;
-use crate::v1::tms::tenants_create::CreateTenantsApi;
-use crate::v1::tms::tenants_get::GetTenantsApi;
-use crate::v1::tms::tenants_list::ListTenantsApi;
-use crate::v1::tms::tenants_delete::DeleteTenantsApi;
-use crate::v1::tms::tenants_update::UpdateTenantsApi;
-use crate::v1::tms::tenants_wipe::WipeTenantsApi;
-use crate::v1::tms::hosts_create::CreateHostsApi;
-use crate::v1::tms::hosts_get::GetHostsApi;
-use crate::v1::tms::hosts_delete::DeleteHostsApi;
-use crate::v1::tms::hosts_list::ListHostsApi;
-use crate::v1::tms::reservations_get::GetReservationApi;
-use crate::v1::tms::reservations_delete::DeleteReservationApi;
-use crate::v1::tms::reservations_delete_related::DeleteRelatedReservationsApi;
-use crate::v1::tms::reservations_create::CreateReservationsApi;
-use crate::v1::tms::reservations_extend::ExtendReservationsApi;
 use crate::v1::tms::version::VersionApi;
 
 // TMS Utilities
-use crate::utils::config::{TMS_CMD_ARGS, TMS_DIRS, TEST_TENANT, init_log, init_runtime_context,
+use crate::utils::config::{TMS_CMD_ARGS, TMS_DIRS, TEST_CLIENT, init_log, init_runtime_context,
                            set_directories_and_check_install, prohibit_root_user, RuntimeCtx};
 use crate::utils::errors::Errors;
 use crate::utils::{keygen, db};
@@ -85,6 +52,7 @@ const TMSS_CERT_FILE: &str = "/cert.pem";
 // This will exit if there is a problem reading the config file or connecting to the database.
 // This depends on install directories being present, so this should be instantiated after
 //   processing of --install
+// NOTE: This makes a block_on call to initialize the DB pool
 lazy_static! {
     static ref RUNTIME_CTX: RuntimeCtx = init_runtime_context();
 }
@@ -134,10 +102,13 @@ async fn main() -> Result<(), std::io::Error> {
     //   - Check resource files
     //   - read configuration parameters from tms.toml and environment
     //   - initialize database, makes db connections available to all modules.
+    // NOTE: This makes a block_on call to initialize the DB pool
     info!("{}", Errors::InputParms(format!("{:#?}", *RUNTIME_CTX)));
 
-    // Initialize standard tenants and test data. Skip if --schema-only specified.
-    if (!TMS_CMD_ARGS.schema_only) { tms_init_data(); }
+    // Initialize test data. Skip if --schema-only specified.
+    if (!TMS_CMD_ARGS.schema_only) {
+        tms_init_data().await.expect("Error initializing data");
+    }
 
     // If this was an installation run then we are done
     if (TMS_CMD_ARGS.install) {
@@ -151,7 +122,7 @@ async fn main() -> Result<(), std::io::Error> {
     }
 
     // This is a non-install startup. Perform second stage initialization
-    tms_init2();
+    tms_init2().await.expect("Error during second stage initialization.");
 
     // --------------- Main Loop Set Up ---------------
     // Create a tuple with all the endpoints, create the service and add the server urls to it.
@@ -160,14 +131,8 @@ async fn main() -> Result<(), std::io::Error> {
     // endpoint support is needed.
     let endpoints = 
         api!(HelloApi, NewSshKeysApi, PublicKeyApi, VersionApi, 
-         CreateClientApi, GetClientApi, UpdateClientApi, DeleteClientApi, UpdateClientSecretApi, ListClientApi, 
-         CreateUserMfaApi, GetUserMfaApi, UpdateUserMfaApi, DeleteUserMfaApi, ListUserMfaApi,
-         GetPubkeysApi, ListPubkeysApi, DeletePubkeysApi, UpdatePubkeyApi,
-         CreateUserHostsApi, GetUserHostsApi, ListUserHostsApi, DeleteUserHostsApi, UpdateUserHostsApi,
-         CreateDelegationsApi, GetDelegationsApi, ListDelegationsApi, DeleteDelegationsApi, UpdateDelegationsApi,
-         CreateTenantsApi, GetTenantsApi, ListTenantsApi, DeleteTenantsApi, UpdateTenantsApi, WipeTenantsApi,
-         CreateHostsApi, GetHostsApi, DeleteHostsApi, ListHostsApi,
-         GetReservationApi, DeleteReservationApi, CreateReservationsApi, ExtendReservationsApi, DeleteRelatedReservationsApi);
+         CreateClientApi, GetClientApi, UpdateClientApi, DeleteClientApi, UpdateClientSecretApi, ListClientApi,
+         GetPubkeysApi, DeletePubkeysApi, UpdatePubkeyApi);
     let mut api_service = 
         OpenApiService::new(endpoints, "TMS Server", version_str);
     let urls = &RUNTIME_CTX.parms.config.server_urls;
@@ -215,40 +180,42 @@ async fn main() -> Result<(), std::io::Error> {
 //                             Private Functions
 // ***************************************************************************
 
-// ---------------------------------------------------------------------------
-// tms_init1:
-// ---------------------------------------------------------------------------
 /*
  * Initialize all subsystems and data structures. Init needed for normal and install startup.
+ * This function either experiences an error or returns true (false is never returned).
  */
-fn tms_init_data() {
-
+async fn tms_init_data() -> Result<bool> {
     // Insert default records into database if they don't already exist.
-    // This call is a no-op except when the --install option is set.
-    let inserts = block_on(db::create_std_tenants())
-        .expect("Unable to create or access standard tenant records.");
-    info!("Number of standard tenants created: {}.", inserts);
 
-    // Optionally insert test records into test tenant
-    // only if we just created the standard tenants.
-    if inserts > 0 {db::check_test_data();}
+    // This call is a no-op except when the --install option is set.
+    let inserts = db::create_default_admin().await.expect("Error creating default admin user.");
+    info!("Number of admin user records created: {}.", inserts);
+
+    // Create test client if it does not already exist.
+    let inserts = db::create_test_client().await.expect("Error creating test client.");
+    info!("Number of test clients created: {}.", inserts);
+
+    // Create test delegation, user_mfa and user_host records if they do not already exist.
+    let inserts = db::create_test_data().await.expect("Error creating delegation records for test users.");
+    info!("Number of test delegation related records created: {}.", inserts);
+
+    // Create a test pubkey for each user
+    let inserts = db::create_test_keys().await.expect("Error creating keys for test users.");
+    info!("Number of test keys created: {}.", inserts);
+    Ok(true)
 }
 
 // ---------------------------------------------------------------------------
 // tms_init2:
 // ---------------------------------------------------------------------------
 /*
- * Perform initialization steps for a normal non-install run
+ * Perform initialization steps for a normal non-install run.
+ * Currently, this simply updates enabled flag for the test client based on current configuration.
  */
-fn tms_init2() {
-    // Manage test tenant enablement by always setting the test tenant's enablement
-    // flag to the value specified in the configuration.
-    let tenant = TEST_TENANT.to_string();
-    block_on(db::set_tenant_enabled_internal(
-        &tenant, RUNTIME_CTX.parms.config.enable_test_tenant)).unwrap_or_else(|_|{
-            panic!("Unable to set the {} tenant's enabled flag to match the enable_test_tenant configuration. \
-                    Aborting server execution.", tenant);
-        });
+async fn tms_init2() -> Result<u64> {
+    // Manage test client enablement by always setting flag based on current configuration.
+    let test_client = TEST_CLIENT.to_string();
+    db::set_test_enabled_internal(&test_client, RUNTIME_CTX.parms.config.enable_test_client).await
 }
 
 // ---------------------------------------------------------------------------

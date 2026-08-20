@@ -5,30 +5,27 @@ use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
 use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
-use crate::utils::db_statements::INSERT_CLIENTS;
-use crate::utils::db_types::ClientInput; 
+use crate::utils::db_types::ClientInput;
+use crate::utils::db::insert_new_client;
 use crate::utils::config::{DB_TRUE, NEW_CLIENTS_DISALLOW};
-use crate::utils::tms_utils::{self, create_hex_secret, hash_hex_secret, timestamp_utc, timestamp_utc_to_str, 
-                              RequestDebug, validate_semver, check_tenant_enabled};
+use crate::utils::tms_utils::{self, create_hex_secret, hash_hex_secret, timestamp_utc, RequestDebug};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 pub struct CreateClientApi;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 #[derive(Object)]
 pub struct ReqCreateClient
 {
     client_id: String,
-    tenant: String,
-    app_name: String,
-    app_version: String,
+    app_name: String
 }
 
 #[derive(Object, Debug)]
@@ -48,12 +45,8 @@ impl RequestDebug for ReqCreateClient {
         s.push_str("  Request body:");
         s.push_str("\n    client_id: ");
         s.push_str(&self.client_id);
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s.push_str("\n    app_name: ");
         s.push_str(&self.app_name);
-        s.push_str("\n    app_version: ");
-        s.push_str(&self.app_version);
         s
     }
 }
@@ -116,11 +109,6 @@ impl RespCreateClient {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
-        // -------------------- Validate Tenant ------------------------
-        if !check_tenant_enabled(&req.tenant).await {
-            return Ok(make_http_400("Tenant not enabled.".to_string()));
-        }
-
         // -------------------- Client Creation Check ------------------
         // Client creation is disabled if we are running in MVP mode because of the
         // security implications of automating user/host mappings, client delegations 
@@ -133,18 +121,7 @@ impl RespCreateClient {
             return Ok(make_http_400(msg.to_string()));
         }
 
-        // ------------------------ Validate Version -------------------
-        // Only valid semantic versions are accepted.
-        match validate_semver(req.app_version.as_str()) {
-            Ok(_) => (),
-            Err(e) => {
-                let msg = format!("ERROR: Invalid app_version value ({}): {}", req.app_version, e);
-                error!("{}", msg);
-                return Ok(make_http_400(e.to_string()));
-            }
-        };
-
-        // ------------------------ Generate Secret --------------------  
+        // ------------------------ Generate Secret --------------------
         let client_secret_str  = create_hex_secret();
         let client_secret_hash = hash_hex_secret(&client_secret_str);
 
@@ -153,9 +130,7 @@ impl RespCreateClient {
 
         // Create the input record. Note we save the hash of the hex secret, but never the secret.
         let input_record = ClientInput::new(
-            req.tenant.clone(),
             req.app_name.clone(),
-            req.app_version.clone(),
             req.client_id.clone(),
             client_secret_hash, 
             DB_TRUE,
@@ -165,8 +140,8 @@ impl RespCreateClient {
 
         // Insert the new key record.
         insert_new_client(input_record).await?;
-        info!("Client '{}' created for application '{}:{}' in tenant '{}'.", 
-              req.client_id, req.app_name, req.app_version, req.tenant);
+        info!("Client '{}' created for application '{}'.",
+              req.client_id, req.app_name);
         
         // Return the secret represented in hex.
         Ok(make_http_201(Self::new("0", "success", req.client_id.clone(), client_secret_str)))
@@ -176,30 +151,3 @@ impl RespCreateClient {
 // ***************************************************************************
 //                          Private Functions
 // ***************************************************************************
-// ---------------------------------------------------------------------------
-// insert_new_client:
-// ---------------------------------------------------------------------------
-async fn insert_new_client(rec: ClientInput) -> Result<u64> {
-    // Get a connection to the db and start a transaction.  Uncommited transactions 
-    // are automatically rolled back when they go out of scope. 
-    // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
-    let mut tx = RUNTIME_CTX.db.begin().await?;
-    
-    // Create the insert statement.
-    let result = sqlx::query(INSERT_CLIENTS)
-        .bind(rec.tenant)
-        .bind(rec.app_name)
-        .bind(rec.app_version)
-        .bind(rec.client_id)
-        .bind(rec.client_secret)
-        .bind(rec.enabled)
-        .bind(rec.created)
-        .bind(rec.updated)
-        .execute(&mut *tx)
-        .await?;
-
-    // Commit the transaction.
-    tx.commit().await?;
-
-    Ok(result.rows_affected())
-}

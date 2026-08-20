@@ -7,9 +7,9 @@ use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 use crate::utils::errors::HttpResult;
-use crate::utils::authz::{authorize, AuthzTypes, get_tenant_header};
+use crate::utils::authz::{authorize, AuthzTypes};
 use crate::utils::db_statements::GET_USER_MFA;
-use crate::utils::tms_utils::{self, RequestDebug, check_tenant_enabled};
+use crate::utils::tms_utils::{self, RequestDebug};
 use crate::utils::db_types::UserMfa;
 use log::error;
 
@@ -26,8 +26,7 @@ pub struct GetUserMfaApi;
 #[derive(Object)]
 struct ReqGetUserMfa
 {
-    tms_user_id: String,
-    tenant: String,
+    tms_user_id: String
 }
 
 #[derive(Object, Debug)]
@@ -36,7 +35,6 @@ pub struct RespGetUserMfa
     result_code: String,
     result_msg: String,
     id: i32,
-    tenant: String,
     tms_user_id: String,
     expires_at: DateTime<Utc>,
     enabled: bool,
@@ -52,8 +50,6 @@ impl RequestDebug for ReqGetUserMfa {
         s.push_str("  Request body:");
         s.push_str("\n    tms_user_id: ");
         s.push_str(&self.tms_user_id);
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s
     }
 }
@@ -96,30 +92,18 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl GetUserMfaApi {
     #[oai(path = "/tms/usermfa/:tms_user_id", method = "get")]
     async fn get_user_mfa_api(&self, http_req: &Request, tms_user_id: Path<String>) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-        
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
-        // Package the request parameters.        
-        let req = ReqGetUserMfa {tms_user_id: tms_user_id.to_string(), tenant: hdr_tenant};
+        // Package the request parameters.
+        let req = ReqGetUserMfa {tms_user_id: tms_user_id.to_string()};
         
         // -------------------- Authorize ----------------------------
-        // Currently, only the tenant admin can create a user mfa record.
+        // Currently, only the admin can create a user mfa record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
-        let allowed = [AuthzTypes::TenantAdmin];
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to view mfa information for record #{} in tenant {}", 
-                                      req.tms_user_id, req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to view mfa information for record #{}",
+                                      req.tms_user_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -143,11 +127,11 @@ impl GetUserMfaApi {
 impl RespGetUserMfa {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, id: i32, tenant: String, tms_user_id: String, 
+    fn new(result_code: &str, result_msg: String, id: i32, tms_user_id: String,
             expires_at: DateTime<Utc>, enabled: bool, created: DateTime<Utc>, updated: DateTime<Utc>)
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-                  id, tenant, tms_user_id, expires_at, enabled, created, updated}
+                  id, tms_user_id, expires_at, enabled, created, updated}
         }
 
     /// Process the request.
@@ -155,11 +139,11 @@ impl RespGetUserMfa {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
-        // Search for the tenant/client id in the database.  Not found was already 
+        // Search for the client id in the database.  Not found was already
         // The client_secret is never part of the response.
         let db_result = get_user_mfa(req).await;
         match db_result {
-            Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id, u.tenant, 
+            Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
                                         u.tms_user_id, u.expires_at, u.enabled, u.created, u.updated))),
             Err(e) => {
                 // Determine if this is a real db error or just record not found.
@@ -186,7 +170,6 @@ async fn get_user_mfa(req: &ReqGetUserMfa) -> Result<UserMfa> {
     // Create the select statement.
     let result = sqlx::query(GET_USER_MFA)
         .bind(&req.tms_user_id)
-        .bind(&req.tenant)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -197,7 +180,7 @@ async fn get_user_mfa(req: &ReqGetUserMfa) -> Result<UserMfa> {
     match result {
         Some(row) => {
             Ok(UserMfa::new(row.get(0), row.get(1), row.get(2), row.get(3), 
-                           row.get(4), row.get(5), row.get(6)))
+                           row.get(4), row.get(5)))
         },
         None => {
             Err(anyhow!("NOT_FOUND"))

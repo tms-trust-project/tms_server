@@ -1,16 +1,11 @@
-# To change the log file location, replace the roller.path and  
-# roller.policy.roller.pattern values below.  fout.path will also
-# need to be change if it's being used.
+# To change the log file location, replace the roller.path and roller.policy.roller.pattern values below.
+# fout.path will also need to be change if it's being used.
 #
-# By default, rootdir = ~/.tms.  Note that shell macros like ~ 
-# cannot be used in this file; use an absoluted path instead,
+# By default, rootdir = $HOME/.tms. Note that shell macros like ~ cannot be used, use an absolute path instead.
 #
-# Note the use of the jinja2-like template variable: {{TMS_ROOT_DIR}}.
-# This placeholder variable gets replaced by the rootdir on new 
-# installations of the tms_server.  This is a one time replacement when
-# a new, non-existing rootdir is specified.  If this file is copied to 
-# a new rootdir after installation, manual adjustment of the paths 
-# configured in this file will be necessary. 
+# Note the use of the jinja2-like template variable TMS_ROOT_DIR. During a clean install this gets replaced by the
+# rootdir of the tms_server.
+# If this file is copied to a new rootdir after installation, manual adjustment of the paths will be needed.
 
 refresh_rate: 30 seconds
 
@@ -45,14 +40,15 @@ appenders:
         pattern: "{{TMS_ROOT_DIR}}/logs/tms_roller{}.log"
         
 root:
-  level: info
+  level: warn
   appenders:
     - stdout
     - roller
 
-# loggers:
-#   rust-logtest2:
-#     level: trace
-#     appenders:
-#       - stdout
-#     additive: false
+loggers:
+  tms_server:
+    level: debug
+    appenders:
+      - stdout
+      - roller
+    additive: false

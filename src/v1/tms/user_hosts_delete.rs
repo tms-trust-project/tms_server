@@ -6,8 +6,8 @@ use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::DELETE_USER_HOST;
-use crate::utils::tms_utils::{self, RequestDebug, check_tenant_enabled};
-use crate::utils::authz::{authorize, get_tenant_header, AuthzTypes, X_TMS_TENANT};
+use crate::utils::tms_utils::{self, RequestDebug};
+use crate::utils::authz::{authorize, AuthzTypes};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;
@@ -24,7 +24,6 @@ pub struct DeleteUserHostsApi;
 pub struct ReqDeleteUserHosts
 {
     tms_user_id: String,
-    tenant: String,
     host: String,
     host_account: String,
 }
@@ -45,8 +44,6 @@ impl RequestDebug for ReqDeleteUserHosts {
         s.push_str("  Request body:");
         s.push_str("\n    tms_user_id: ");
         s.push_str(&self.tms_user_id);
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
         s.push_str("\n    host_account: ");
@@ -93,35 +90,15 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl DeleteUserHostsApi {
     #[oai(path = "/tms/userhosts/del", method = "delete")]
     async fn delete_user_host_api(&self, http_req: &Request, req: Json<ReqDeleteUserHosts>) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-        
-        // Check that the tenant specified in the header is the same as the one in the request body.
-        if hdr_tenant != req.tenant {
-            let msg = format!("ERROR: FORBIDDEN - The tenant in the {} header ({}) does not match the tenant in the request body ({})", 
-                                      X_TMS_TENANT, hdr_tenant, req.tenant);
-            error!("{}", msg);
-            return make_http_403(msg);  
-        }
-    
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
         // -------------------- Authorize ----------------------------
-        // Currently, only the tenant admin can delete a user hosts record.
+        // Currently, only the admin can delete a user hosts record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
-        let allowed = [AuthzTypes::TenantAdmin];
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to delete host {} for user {} in tenant {}.", 
-                                      req.host, req.tms_user_id, req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to delete host {} for user {}.",
+                                      req.host, req.tms_user_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -182,7 +159,6 @@ async fn delete_user_host(req: &ReqDeleteUserHosts) -> Result<u64> {
     // Issue the db delete call.
     let result = sqlx::query(DELETE_USER_HOST)
         .bind(&req.tms_user_id)
-        .bind(&req.tenant)
         .bind(&req.host)
         .bind(&req.host_account)
         .execute(&mut *tx)

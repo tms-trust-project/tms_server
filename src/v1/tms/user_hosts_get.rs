@@ -7,9 +7,9 @@ use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 use crate::utils::errors::HttpResult;
-use crate::utils::authz::{authorize, AuthzTypes, get_tenant_header};
+use crate::utils::authz::{authorize, AuthzTypes};
 use crate::utils::db_statements::GET_USER_HOST;
-use crate::utils::tms_utils::{self, RequestDebug, check_tenant_enabled};
+use crate::utils::tms_utils::{self, RequestDebug};
 use crate::utils::db_types::UserHost;
 use log::error;
 
@@ -26,8 +26,7 @@ pub struct GetUserHostsApi;
 #[derive(Object)]
 struct ReqGetUserHosts
 {
-    id: i32,
-    tenant: String,
+    id: i32
 }
 
 #[derive(Object, Debug)]
@@ -36,7 +35,6 @@ pub struct RespGetUserHosts
     result_code: String,
     result_msg: String,
     id: i32,
-    tenant: String,
     tms_user_id: String,
     host: String,
     host_account: String,
@@ -53,8 +51,6 @@ impl RequestDebug for ReqGetUserHosts {
         s.push_str("  Request body:");
         s.push_str("\n    id: ");
         s.push_str(&self.id.to_string());
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s
     }
 }
@@ -97,30 +93,18 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl GetUserHostsApi {
     #[oai(path = "/tms/userhosts/:id", method = "get")]
     async fn get_user_host_api(&self, http_req: &Request, id: Path<i32>) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-        
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
-        // Package the request parameters.   
-        let req = ReqGetUserHosts {id: *id, tenant: hdr_tenant};
+        // Package the request parameters.
+        let req = ReqGetUserHosts {id: *id};
         
         // -------------------- Authorize ----------------------------
-        // Currently, only the tenant admin can create a user host record.
+        // Currently, only the admin can create a user host record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
-        let allowed = [AuthzTypes::TenantAdmin];
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to view host information for record #{} in tenant {}", 
-                                      req.id, req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to view host information for record #{}",
+                                      req.id);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -144,11 +128,11 @@ impl GetUserHostsApi {
 impl RespGetUserHosts {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, id: i32, tenant: String, tms_user_id: String, 
+    fn new(result_code: &str, result_msg: String, id: i32, tms_user_id: String,
             host: String, host_account: String, expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) 
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-                  id, tenant, tms_user_id, host, host_account, expires_at, created, updated}
+                  id, tms_user_id, host, host_account, expires_at, created, updated}
         }
 
     /// Process the request.
@@ -156,11 +140,11 @@ impl RespGetUserHosts {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
-        // Search for the tenant/client id in the database.  Not found was already 
+        // Search for the client id in the database.  Not found was already
         // The client_secret is never part of the response.
         let db_result = get_user_host(req).await;
         match db_result {
-            Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id, u.tenant, 
+            Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
                                         u.tms_user_id, u.host, u.host_account, 
                                         u.expires_at, u.created, u.updated))),
             Err(e) => {
@@ -188,7 +172,6 @@ async fn get_user_host(req: &ReqGetUserHosts) -> Result<UserHost> {
     // Create the select statement.
     let result = sqlx::query(GET_USER_HOST)
         .bind(req.id)
-        .bind(req.tenant.clone())
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -199,7 +182,7 @@ async fn get_user_host(req: &ReqGetUserHosts) -> Result<UserHost> {
     match result {
         Some(row) => {
             Ok(UserHost::new(row.get(0), row.get(1), row.get(2), row.get(3), 
-                           row.get(4), row.get(5), row.get(6), row.get(7)))
+                           row.get(4), row.get(5), row.get(6)))
         },
         None => {
             Err(anyhow!("NOT_FOUND"))

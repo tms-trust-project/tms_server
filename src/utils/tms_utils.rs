@@ -17,12 +17,10 @@ use hex;
 use sha2::{Sha512, Digest};
 
 use anyhow::{Result, anyhow};
-use lazy_static::lazy_static;
 use log::{error, debug, LevelFilter};
 
 use crate::utils::db_statements::PLACEHOLDER;
 use crate::utils::authz::{AuthzResult, AuthzTypes};
-use crate::utils::db::is_tenant_enabled;
 
 // ----------- Constants
 // The chrono library's MAX_UTC causes overflow during string conversions because year is more
@@ -323,11 +321,9 @@ pub fn validate_semver(semver: &str) -> Result<bool> {
 // ---------------------------------------------------------------------------
 // sql_substitute_client_constraint:
 // ---------------------------------------------------------------------------
-/** Complete the sql select statement by substituting an appropriate value
- * for the placeholder text in the query template.  The substitution 
- * restricts the query to a specific client when the request was authorized 
- * using X_TMS_CLIENT_ID.  When authorized using a tenant admin, the record
- * created by any client in the tenant can be returned.
+/** Complete the sql select statement by substituting an appropriate value for the placeholder text
+ * in the query template. The substitution restricts the query to a specific client when the
+ * request was authorized using X_TMS_CLIENT_ID.
  * 
  * The sql_query is the template text into which a value is substituted 
  * for the placeholder.  The authz_result is the result of a prior authorize()
@@ -356,20 +352,6 @@ pub fn sql_substitute_client_constraint(sql_query: &str, authz_result: &AuthzRes
 
     // Return the template after substitution.
     sql_query.replace(PLACEHOLDER, replacement.as_str())    
-}
-
-// ---------------------------------------------------------------------------
-// check_tenant_enabled:
-// ---------------------------------------------------------------------------
-/** Wrapper for the actual database call that handles errors and logging. */
-pub async fn check_tenant_enabled(tenant: &String) -> bool {
-    match is_tenant_enabled(tenant).await {
-        Ok(enabled) => enabled,
-        Err(e) => {
-            error!("Unable to determine if tenant '{}' is enabled: {}", tenant, e);
-            false
-        }
-    }
 }
 
 // ***************************************************************************

@@ -1,19 +1,23 @@
 #!/bin/bash
-# Combined build/upgrade script for TMS Server 0.3.0
-#  - Upgrade support only for 0.2.0->0.3.0
+# Combined build/upgrade script for TMS Server 0.4.0
+#  - Upgrade support for 0.3.0->0.4.0 only.
+#
 # Build and install the latest native version TMS Server
 # This script must be run as root or run in --test mode.
 #
-# This script builds a release version and either updates or installs files in the
-# install and root directories as needed.
+# This script builds a release version and either updates or installs files in the install and root directories.
 #
 # Default install directory is /opt/tms_server. May be overridden using env variable TMS_INSTALL_DIR.
-#   In test mode this defaults to /tmp/tms_server so any user can perform the service related config.
+#   - In test mode this defaults to /tmp/tms_server so any user can perform the service related config.
 #
 # Default root directory is $HOME/.tms as the install user. May be overridden using env variable TMS_ROOT_DIR.
 #
-# User may define TMS_LOCAL_DIR for local customizations. Default is $TMS_ROOT_DIR/local
-# Local directory will contain install output and may contain custom tms.toml and log4rs.yml files.
+# User may define TMS_LOCAL_DIR for local customizations. Default is ~tms/tms_local
+#  - Local directory may contain custom tms.toml and log4rs.yml files.
+#
+#  NOTE: It is strongly recommended that *TMS_LOCAL_DIR* be left as the default or at a minimum set to a directory
+#  outside of *TMS_ROOT_DIR*. This will allow you to keep custom configuration files separate which will make it easier
+#  to fully remove TMSS without removing custom settings.
 #
 # User used to build and install TMS may be given on the command line. Default user is "tms"
 #
@@ -21,17 +25,17 @@
 #  - We are running from a checkout of tms_server github repo.
 #  - When running in non-test mode (i.e. as root), the source code is checked out under $HOME/tms_server.
 #  - Following are installed: rust tool chain (cargo, rustc), postgres psql.
-#  - If this is an upgrade from TMS version 0.2.0 then SQLite must also be installed.
 #
 # Configuration:
 #  - Following env variables are set at minimum:
 #    - POSTGRES_PASSWORD
 #    - TMS_DB_USER_PASSWORD
-#    - TMS_SSL_CERT_PATH    : Path to the SSL fullchain certificate file in PEM format.
-#    - TMS_SSL_KEY_PATH     : Path to the private key file in PEM format associated with the SSL certificate.
 #  - Other env variables that can be set to override defaults:
 #    - TMS_DB_HOST    default = localhost
 #    - TMS_DB_PORT    default = 5432
+#  - For a clean install the ssl cert variables must also be set
+#    - TMS_SSL_CERT_PATH    : Path to the SSL fullchain certificate file in PEM format.
+#    - TMS_SSL_KEY_PATH     : Path to the private key file in PEM format associated with the SSL certificate.
 #  - Other less common env variable overrides:
 #    - TMS_ROOT_DIR     default = $HOME/.tms
 #    - TMS_INSTALL_DIR  default = /opt/tms_server or /tmp/tms_server in test mode
@@ -47,6 +51,9 @@ RUN_DIR=$(pwd)
 PRG_RELPATH=$(dirname "$0")
 cd "$PRG_RELPATH"/. || exit
 PRG_PATH=$(pwd)
+
+# We only support upgrading from version 0.3.0
+VERS_UPG_SUPPORTED="0.3.0"
 
 # This script is located under deployment/native. Some operations are relative to the top level source directory.
 SRC_DIR=$PRG_PATH/../..
@@ -111,7 +118,7 @@ fi
 
 # Check that all required env variables are set
 FAILED=false
-env_list="POSTGRES_PASSWORD TMS_DB_USER_PASSWORD TMS_SSL_CERT_PATH TMS_SSL_KEY_PATH"
+env_list="POSTGRES_PASSWORD TMS_DB_USER_PASSWORD"
 for name in $env_list
 do
   if [[ -z "${!name}" ]]; then
@@ -119,6 +126,16 @@ do
     FAILED=true
   fi
 done
+if [ "$UPGRADE" == false ]; then
+  env_list="TMS_SSL_CERT_PATH TMS_SSL_KEY_PATH"
+  for name in $env_list
+  do
+    if [[ -z "${!name}" ]]; then
+      echo "Please set env var ${name} before running this script"
+      FAILED=true
+    fi
+  done
+fi
 if [ "$FAILED" = true ]; then
   echo "Please set required environment variables"
   echo "Exiting ..."
@@ -196,8 +213,8 @@ else
   INSTALL_DIR="$INSTALL_DEF_DIR"
 fi
 
-# Set local directory. Location of install output and optional custom tms.toml, log4rs.yml files.
-LOCAL_DEF_DIR="$ROOT_DIR/local"
+# Set local directory. Location of optional custom tms.toml, log4rs.yml files.
+LOCAL_DEF_DIR="$TMS_HOME/tms_local"
 if [ -n "$TMS_LOCAL_DIR" ]; then
   LOCAL_DIR="$TMS_LOCAL_DIR"
 else
@@ -254,6 +271,22 @@ if [ $RET_CODE -ne 0 ]; then
     exit $RET_CODE
 fi
 
+VERS_OLD=None
+# If upgrading determine the current version
+if [ "$UPGRADE" == "true" ]; then
+  if [ ! -f "$VERS_FILE" ]; then
+    echo "Unable to determine existing TMS version. Cannot find file: $VERS_FILE"
+    echo "Exiting ..."
+    exit 1
+  fi
+  VERS_OLD=$(cat $VERS_FILE)
+  if [ "$VERS_OLD" != "$VERS_UPG_SUPPORTED" ]; then
+    echo "Uprading from version $VERS_OLD is not supported."
+    echo "Exiting ..."
+    exit 1
+  fi
+fi
+
 # Output configuration
 echo "******* Install / Upgrade Settings ************************"
 echo "******* TMS Version: $VERS_NEW ********************************"
@@ -267,6 +300,7 @@ echo "   SVC_CFG_DIR=$SVC_CFG_DIR"
 echo "   BAK_FILE_PATH=$BAK_FILE_PATH"
 echo "   TMS_DB_HOST=$TMS_DB_HOST"
 echo "   VERS_FILE=$VERS_FILE"
+echo "   VERS_OLD=$VERS_OLD"
 echo "   TMS_SSL_CERT_PATH=$TMS_SSL_CERT_PATH"
 echo "   TMS_SSL_KEY_PATH=$TMS_SSL_KEY_PATH"
 echo "***********************************************************"
@@ -297,6 +331,10 @@ if [ "$UPGRADE" == "true" ]; then
     echo "Default path for the installation: $INSTALL_DEF_DIR"
     echo "Exiting ..."
     exit 1
+  fi
+  # Back up the existing executable. Skip if backup exists so we do not overwrite.
+  if [ ! -e "${EXEC_FILE_DST}_${VERS_OLD}" ]; then
+    cp -p "$EXEC_FILE_DST" "${EXEC_FILE_DST}_${VERS_OLD}"
   fi
 else
   # This is an install, there should not be an existing installation
@@ -399,37 +437,6 @@ cp $EXEC_FILE_SRC $EXEC_FILE_DST
 chown $INSTALL_USR:$INSTALL_USR $EXEC_FILE_DST
 chmod 770 $EXEC_FILE_DST
 
-# Configure service
-echo
-echo "===== Configuring TMS service"
-echo "========================================================================================="
-SVC_CFG_FILE="$SVC_CFG_DIR/tms_server.service"
-SVC_ENV_PATH="$LOCAL_DIR/tms_service.env"
-# Copy service config into place
-cp -p "${SRC_DIR}/deployment/native/tms_server.service" "$SVC_CFG_FILE"
-RET_CODE=$?
-if [ $RET_CODE -ne 0 ]; then
-  echo
-  echo "*************** Error copying service config to: $SVC_CFG_FILE"
-  echo "Exiting ..."
-  exit $RET_CODE
-fi
-
-# Update service file to point to executable and environment settings file
-echo -e "ExecStart=$EXEC_FILE_DST\n" >> $SVC_CFG_FILE
-echo -e "EnvironmentFile=$SVC_ENV_PATH\n" >> $SVC_CFG_FILE
-
-# Create environment file for service
-cat >> $SVC_ENV_PATH << EOB
-TMS_DB_USER="tms"
-TMS_DB_DB_NAME="tmsdb"
-TMS_DB_HOST="$TMS_DB_HOST"
-TMS_DB_PORT="$TMS_DB_PORT"
-TMS_DB_USER_PASSWORD="$TMS_DB_USER_PASSWORD"
-EOB
-chown $INSTALL_USR:$INSTALL_USR "$SVC_ENV_PATH"
-chmod 400 "$SVC_ENV_PATH"
-
 # Copy latest backup script into place.
 echo
 echo "===== Updating backup script. Target path: $BAK_FILE_PATH"
@@ -451,13 +458,89 @@ chmod +x "$BAK_FILE_PATH"
 # Make sure everything under BAK_DIR is owned by the install user.
 chown -R $INSTALL_USR:$INSTALL_USR $BAK_DIR
 
-# Create environment file for backup script
-DB_ENV_FILE="$LOCAL_DIR/tms-db-env"
-echo
-echo "===== Creating environment file for backup script. File path: $DB_ENV_FILE"
-echo "========================================================================================="
-# Construct env file
-cat >> $DB_ENV_FILE << EOB
+# =====================================================================================
+#  BEGIN install/upgrade specific code
+# =====================================================================================
+DB_ENV_FILE="tms-db-env"
+DB_ENV_PATH_LOCAL="$ROOT_DIR/local/${DB_ENV_FILE}"
+DB_ENV_PATH="$ROOT_DIR/${DB_ENV_FILE}"
+
+#####################################################
+################## UPGRADE ##########################
+#####################################################
+if [ "$UPGRADE" == "true" ]; then
+  # --------------------------------------
+  # Upgrade specific steps
+  # --------------------------------------
+  # Update migrations files.
+  echo
+  echo "===== Updating DB schema migration files"
+  echo "========================================================================================="
+  cp -pr "$ROOT_DIR/migrations" "${ROOT_DIR}/migrations.bak_${BAK_TIMESTAMP}"
+  # Copy new migration files
+  cp "${SRC_DIR}/resources/migrations/10002_remove_tenancy.sql" "${ROOT_DIR}/migrations"
+  chmod 0700 "${ROOT_DIR}/migrations"
+  chown $INSTALL_USR:$INSTALL_USR "${ROOT_DIR}/migrations"
+
+  # Back up the existing configuration files
+  echo
+  echo "===== Backing up configuration file from $ROOT_DIR/config/tms.toml to $LOCAL_DIR/tms.toml.bak_${BAK_TIMESTAMP}"
+  echo "========================================================================================="
+  cp -p "$ROOT_DIR/config/tms.toml" "$LOCAL_DIR/tms.toml.bak_${BAK_TIMESTAMP}"
+  echo
+  echo "===== Backing up configuration file from $ROOT_DIR/config/log4rs.yml to $LOCAL_DIR/log4rs.yml.bak_${BAK_TIMESTAMP}"
+  echo "========================================================================================="
+  cp -p "$ROOT_DIR/config/log4rs.yml" "$LOCAL_DIR/log4rs.yml.bak_${BAK_TIMESTAMP}"
+  # Copy new config files into place
+  echo
+  echo "===== Copying configuration files from ${SRC_DIR}/resources/config to ${ROOT_DIR}/config"
+  echo "========================================================================================="
+  cp -p "${SRC_DIR}/resources/config/tms.toml" "${ROOT_DIR}/config"
+  cp -p "${SRC_DIR}/resources/config/log4rs.yml" "${ROOT_DIR}/config"
+#####################################################
+################## INSTALL ##########################
+#####################################################
+else
+  # --------------------------------------
+  # Clean install specific steps
+  # --------------------------------------
+  # Configure service
+  echo
+  echo "===== Configuring TMS service"
+  echo "========================================================================================="
+  SVC_CFG_FILE="$SVC_CFG_DIR/tms_server.service"
+  SVC_ENV_PATH="$ROOT_DIR/tms_service.env"
+  # Copy service config into place
+  cp -p "${SRC_DIR}/deployment/native/tms_server.service" "$SVC_CFG_FILE"
+  RET_CODE=$?
+  if [ $RET_CODE -ne 0 ]; then
+    echo
+    echo "*************** Error copying service config to: $SVC_CFG_FILE"
+    echo "Exiting ..."
+    exit $RET_CODE
+  fi
+  # Update service file to point to executable and environment settings file
+  echo -e "ExecStart=$EXEC_FILE_DST\n" >> $SVC_CFG_FILE
+  echo -e "EnvironmentFile=$SVC_ENV_PATH\n" >> $SVC_CFG_FILE
+
+  # Create environment file for service
+  cat >> $SVC_ENV_PATH << EOB
+TMS_DB_USER="tms"
+TMS_DB_DB_NAME="tmsdb"
+TMS_DB_HOST="$TMS_DB_HOST"
+TMS_DB_PORT="$TMS_DB_PORT"
+TMS_DB_USER_PASSWORD="$TMS_DB_USER_PASSWORD"
+EOB
+  chown $INSTALL_USR:$INSTALL_USR "$SVC_ENV_PATH"
+  chmod 600 "$SVC_ENV_PATH"
+
+  # Create environment file for backup script
+  DB_ENV_FILE="$DB_ENV_PATH"
+  echo
+  echo "===== Creating environment file for backup script. File path: $DB_ENV_FILE"
+  echo "========================================================================================="
+  # Construct env file
+  cat >> $DB_ENV_FILE << EOB
 PG_DEPLOYMENT="tms-postgres"
 PG_USER="tms"
 PG_DBNAME="tmsdb"
@@ -465,70 +548,10 @@ PG_HOST="$TMS_DB_HOST"
 PG_PORT="$TMS_DB_PORT"
 PG_PASSWORD="$TMS_DB_USER_PASSWORD"
 EOB
-chown $INSTALL_USR:$INSTALL_USR "$DB_ENV_FILE"
-chmod 400 "$DB_ENV_FILE"
+  chown $INSTALL_USR:$INSTALL_USR "$DB_ENV_FILE"
+  chmod 400 "$DB_ENV_FILE"
 
-# =====================================================================================
-#  BEGIN install/upgrade specific code
-# =====================================================================================
-if [ "$UPGRADE" == "true" ]; then
-  # --------------------------------------
-  # Upgrade specific steps
-  # --------------------------------------
-  # Determine existing version
-  if [ ! -f "$VERS_FILE" ]; then
-    echo "Unable to determine existing TMS version. Cannot find file: $VERS_FILE"
-    echo "Exiting ..."
-    exit 1
-  fi
-  VERS_OLD=$(cat $VERS_FILE)
-
-  # If there is a customizations directory then rename it to local to match layout as of 0.3.0
-  CUST_DIR="${TMS_HOME}/tms_customizations"
-  if [ -d ${CUST_DIR} ]; then
-    echo
-    echo "===== Backing up customizations directory from ${CUST_DIR} to ${CUST_DIR}.bak_${BAK_TIMESTAMP}"
-    echo "========================================================================================="
-    cp -pr "${CUST_DIR}" "${CUST_DIR}.bak_${BAK_TIMESTAMP}"
-    echo
-    echo "===== Moving customizations directory from ${CUST_DIR} to $LOCAL_DIR"
-    echo "========================================================================================="
-    mv "${CUST_DIR}" "$LOCAL_DIR"
-  fi
-
-  # Update migrations files.
-  mv "$ROOT_DIR/migrations" "${ROOT_DIR}/migrations.bak_${BAK_TIMESTAMP}"
-  cp -pr "${SRC_DIR}/resources/migrations" "${ROOT_DIR}/migrations"
-  chmod 0700 "${ROOT_DIR}/migrations"
-  chown $INSTALL_USR:$INSTALL_USR "${ROOT_DIR}/migrations"
-
-  # Before updating version and starting up new tms_server, perform the migration from sqlite to postgres
-  echo
-  echo "===== Migrating DB from sqlite to postgres"
-  echo "========================================================================================="
-  # Fill in some defaults as needed before running migration
-  TMS_TEST_MODE=$TEST_MODE
-  TMS_USR=$INSTALL_USR
-  # Set TMS_ROOT_DIR and TMS_INSTALL_DIR to the final resolved values
-  TMS_ROOT_DIR=$ROOT_DIR
-  TMS_INSTALL_DIR=$INSTALL_DIR
-  TMS_VERS_NEW=$VERS_NEW
-  export TMS_DB_HOST TMS_DB_PORT TMS_ROOT_DIR TMS_INSTALL_DIR TMS_TEST_MODE TMS_VERS_NEW TMS_USR
-
-  $SRC_DIR/migrate_to_psql/migrate_from_sqlite.sh
-  RET_CODE=$?
-  if [ $RET_CODE -ne 0 ]; then
-    echo
-    echo "*************** Error running migration script"
-    echo "Exiting ..."
-    exit $RET_CODE
-  fi
-else
-  # --------------------------------------
-  # Clean install specific steps
-  # --------------------------------------
-  # First Time Install Processing. Save output to LOCAL_DIR
-
+  # First Time Install Processing. Save output of initial --install run to ROOT_DIR
   # Copy the SSL cert files into place
   mkdir -p $ROOT_DIR/certs
   chmod 700 $ROOT_DIR/certs
@@ -537,34 +560,34 @@ else
   chown -R $INSTALL_USR:$INSTALL_USR $ROOT_DIR/certs
   chmod 600 $ROOT_DIR/certs/*.pem
   echo
-  echo "===== Initialize server. Running tms_server --install as user: $INSTALL_USR"
+  echo "===== Initializing server. Running tms_server --install as user: $INSTALL_USR"
   echo "========================================================================================="
   # Initialize the content of the install directory.
   INSTALL_INIT_CMD="$EXEC_FILE_DST --install --root-dir $ROOT_DIR"
   # We must run from the top of the source code checkout so the files under resources are available
   if [ "$TEST_MODE" != "true" ]; then
-    su - $INSTALL_USR -c "cd $SRC_DIR; set -a; source $SVC_ENV_PATH; set +a; $INSTALL_INIT_CMD > ${LOCAL_DIR}/tms-install.out 2>&1"
+    su - $INSTALL_USR -c "cd $SRC_DIR; set -a; source $SVC_ENV_PATH; set +a; $INSTALL_INIT_CMD > ${ROOT_DIR}/tms-install.out 2>&1"
     RET_CODE=$?
   else
     cd $SRC_DIR || exit 1
-    $INSTALL_INIT_CMD > ${LOCAL_DIR}/tms-install.out 2>&1
+    $INSTALL_INIT_CMD > ${ROOT_DIR}/tms-install.out 2>&1
     RET_CODE=$?
   fi
   if [ $RET_CODE -ne 0 ]; then
     echo "ERROR: Error running tms_server init. Command: $INSTALL_INIT_CMD"
-    echo "       Please see output here: ${LOCAL_DIR}/tms-install.out"
+    echo "       Please see output here: ${ROOT_DIR}/tms-install.out"
     echo "Exiting ..."
     exit $RET_CODE
   fi
-  chmod 400 $LOCAL_DIR/tms-install.out
-  chown $INSTALL_USR:$INSTALL_USR $LOCAL_DIR/tms-install.out
+  chmod 400 $ROOT_DIR/tms-install.out
+  chown $INSTALL_USR:$INSTALL_USR $ROOT_DIR/tms-install.out
 
   # If there are custom tms or log4s config then copy into place
   if [ -f $LOCAL_DIR/tms.toml ]; then
     cp -p $LOCAL_DIR/tms.toml $ROOT_DIR/config
     RET_CODE=$?
     if [ $RET_CODE -ne 0 ]; then
-      echo "ERROR: Unable to copy: $LOCAL_DIR/tms.toml"
+      echo "ERROR: Unable to copy: $LOCAL_DIR/tms.toml to $ROOT_DIR/config"
       echo "Exiting ..."
       exit $RET_CODE
     fi
@@ -574,7 +597,7 @@ else
     cp -p $LOCAL_DIR/log4rs.yml $ROOT_DIR/config
     RET_CODE=$?
     if [ $RET_CODE -ne 0 ]; then
-      echo "ERROR: Unable to copy file: $LOCAL_DIR/log4rs.yml"
+      echo "ERROR: Unable to copy file: $LOCAL_DIR/log4rs.yml to $ROOT_DIR/config"
       echo "Exiting ..."
       exit $RET_CODE
     fi
@@ -596,11 +619,19 @@ fi
 #  END install/upgrade specific code
 # =====================================================================================
 
+# Version 0.4.0 has an updated log4rs config file.
+# For both an upgrade and a normal install we replace the template variable TMS_ROOT_DIR
+# Create Ctl-A character to be used as separator for sed
+ASEP="$(echo | tr '\012' '\001' )"
+pattern="{{TMS_ROOT_DIR}}"
+sed -e "s${ASEP}${pattern}${ASEP}${ROOT_DIR}${ASEP}g" \
+  "${SRC_DIR}/resources/config/log4rs.yml" > "${ROOT_DIR}/config/log4rs.yml"
+
 # Update version in install dir
 echo "$VERS_NEW" > $VERS_FILE
 chown $INSTALL_USR:$INSTALL_USR $VERS_FILE
 
-# Start up the service
+# For normal non-test install log a message about how to start the service
 if [ "$TEST_MODE" != "true" ]; then
   echo
   echo "===== To start the TMS service, please run:"

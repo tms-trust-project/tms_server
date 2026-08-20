@@ -8,11 +8,9 @@ use std::collections::HashMap;
 use toml;
 use fs_mistrust::Mistrust;
 use std::os::unix::fs::PermissionsExt;
-use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use tera::Tera;
 use users::get_effective_uid;
-use poem::web::{Data};
 use sqlx::{Pool, Postgres};
 use clap::{Parser};
 // See https://users.rust-lang.org/t/relationship-between-std-futures-futures-and-tokio/38077
@@ -22,7 +20,6 @@ use futures::executor::block_on;
 
 // TMS Utilities
 use crate::utils::{tms_utils, db_init, errors::Errors};
-use crate::v1::tms::pubkeys_get::RespGetPubkeys;
 use super::db_statements::{GET_CLIENT_SECRET, GET_ADMIN_SECRET};
 use super::authz::{AuthzTypes, X_TMS_ADMIN_ID, X_TMS_ADMIN_SECRET, X_TMS_CLIENT_ID, X_TMS_CLIENT_SECRET};
 
@@ -50,9 +47,10 @@ const DEFAULT_HTTP_ADDR    : &str = "https://localhost";
 const DEFAULT_HTTP_PORT    : u16  = 3000;
 const DEFAULT_SVR_URL      : &str = "https://localhost:3000/v1";
 
-// Tenants used in all installations.
-pub const DEFAULT_TENANT   : &str = "default";
-pub const TEST_TENANT      : &str = "test";
+// Test data constants.
+pub const TEST_CLIENT : &str = "testclient1";
+pub const TEST_CLIENT_SECRET : &str = "secret1";
+pub const TEST_APP: &str = "testapp1";
 
 // Admin table constants.
 #[allow(dead_code)]
@@ -235,7 +233,7 @@ pub struct Config {
     pub http_addr: String,
     pub http_port: u16,
     pub enable_mvp: bool,
-    pub enable_test_tenant: bool,
+    pub enable_test_client: bool,
     pub new_clients: String,
     pub server_urls: Vec<String>
 }
@@ -273,7 +271,7 @@ impl Default for Config {
             http_addr: DEFAULT_HTTP_ADDR.to_string(),
             http_port: DEFAULT_HTTP_PORT,
             enable_mvp: false,
-            enable_test_tenant: false,
+            enable_test_client: false,
             new_clients: DEFAULT_NEW_CLIENTS.to_string(),
             server_urls: vec![DEFAULT_SVR_URL.to_string()]
         }
@@ -318,7 +316,7 @@ pub fn prohibit_root_user() {
 pub fn set_directories_and_check_install() {
 
     // Check that --schema_only and --install are not specified together
-    if (TMS_CMD_ARGS.schema_only && TMS_CMD_ARGS.install) {
+    if TMS_CMD_ARGS.schema_only && TMS_CMD_ARGS.install {
         panic!("\n***********************************************************************\n\
                     ERROR: Option --schema-only may not be used along with --install. \n\
                   ***********************************************************************\n");
@@ -745,7 +743,7 @@ fn init_authz_args() -> AuthzArgs {
     // Create and fill in the hashmap of authz specs.
     let mut args = AuthzArgs {specs: HashMap::new()};
     args.specs.insert(AuthzTypes::ClientOwn, client_spec);
-    args.specs.insert(AuthzTypes::TenantAdmin, admin_spec);
+    args.specs.insert(AuthzTypes::TmsAdmin, admin_spec);
     args
 }
 
