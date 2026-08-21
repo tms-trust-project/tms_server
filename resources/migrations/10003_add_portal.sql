@@ -1,10 +1,19 @@
 --
--- Add tables used by TMS portal backend
--- This includes all the tables as of 21 Aug 2026
---    with portal clients table renamed to prtl_clients
--- Note that portal resource_provider_account_logins table is intended to serve the same purpose as
---      the server user_mfa table
+-- TODO remove This includes all the tables as of 21 Aug 2026
+-- TODO    with portal clients table renamed to prtl_clients
+-- TODO Note that portal resource_provider_account_logins table is intended to serve the same purpose as
+-- TODO     the server user_mfa table
 
+-- Add tables needed for TMS Portal backend
+--   TMS portal and server will use the same DB
+-- 
+
+-- ---------------------------------------
+-- Identity Provider tables
+-- ---------------------------------------
+-- All cloud and resource IdPs
+-- Example cloud IdPs: UT Austin, UC San Diego, Univ of Pittsburgh, ACCESS
+-- Example resource providers: TACC, SDSC, PSC
 CREATE TABLE IF NOT EXISTS identity_providers
 (
     uuid                  UUID PRIMARY KEY  NOT NULL DEFAULT gen_random_uuid(),
@@ -24,15 +33,19 @@ CREATE TABLE IF NOT EXISTS identity_providers
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     UNIQUE (id)
-    );
+);
+ALTER TABLE identity_providers OWNER TO tms;
 
+-- Identity provider types
 CREATE TABLE IF NOT EXISTS identity_provider_types
 (
     provider_type TEXT PRIMARY KEY            NOT NULL,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
-    );
+);
+ALTER TABLE identity_provider_types OWNER TO tms;
 
+-- Insert hard-coded types
 INSERT INTO identity_provider_types (provider_type)
 VALUES ('globus');
 INSERT INTO identity_provider_types (provider_type)
@@ -41,6 +54,10 @@ VALUES ('tacc_tapis');
 ALTER TABLE identity_providers
     ADD CONSTRAINT fk_provider FOREIGN KEY (provider_type) REFERENCES identity_provider_types (provider_type);
 
+-- ---------------------------------------
+-- keys table
+-- ---------------------------------------
+-- TODO brief description
 CREATE TABLE IF NOT EXISTS keys
 (
     kid             TEXT PRIMARY KEY            NOT NULL,
@@ -48,8 +65,13 @@ CREATE TABLE IF NOT EXISTS keys
     jwt_private_key TEXT                        NOT NULL,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
-    );
+);
+ALTER TABLE keys OWNER TO tms;
 
+-- ---------------------------------------
+-- prtl_clients table
+-- ---------------------------------------
+-- TODO Merge with tms_server clients table
 CREATE TABLE IF NOT EXISTS prtl_clients
 (
     id      TEXT PRIMARY KEY            NOT NULL,
@@ -57,16 +79,44 @@ CREATE TABLE IF NOT EXISTS prtl_clients
     secret  TEXT                        NOT NULL,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
-    );
 
+);
+ALTER TABLE prtl_clients OWNER TO tms;
+
+-- TODO Table used by tms_server
+-- CREATE TABLE IF NOT EXISTS clients
+-- (
+--     id SERIAL PRIMARY KEY,
+--     tenant        TEXT REFERENCES tenants(tenant) ON UPDATE CASCADE ON DELETE RESTRICT,
+--     app_name      TEXT NOT NULL,
+--     app_version   TEXT NOT NULL,
+--     client_id     TEXT NOT NULL,
+--     client_secret TEXT NOT NULL,
+--     enabled       BOOLEAN NOT NULL,
+--     created       TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+--     updated       TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+--     UNIQUE (tenant, app_name, app_version)
+-- );
+-- ALTER TABLE clients OWNER TO tms;
+-- CREATE UNIQUE INDEX IF NOT EXISTS clients_tenant_client_idx ON clients (tenant, client_id);
+
+-- ---------------------------------------
+-- configuration table
+-- ---------------------------------------
+-- TODO brief description
 CREATE TABLE IF NOT EXISTS configuration
 (
     config_name  TEXT PRIMARY KEY            NOT NULL,
     config_value JSONB                       NOT NULL,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
-    );
+);
+ALTER TABLE configuration OWNER TO tms;
 
+-- ---------------------------------------
+-- allowed_redirects table
+-- ---------------------------------------
+-- Allowable re-directs for each client
 CREATE TABLE IF NOT EXISTS allowed_redirects
 (
     uri       TEXT                        NOT NULL,
@@ -74,12 +124,32 @@ CREATE TABLE IF NOT EXISTS allowed_redirects
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     constraint fk_client_id FOREIGN KEY (client_id) REFERENCES prtl_clients (id)
-    );
+);
+ALTER TABLE allowed_redirects OWNER TO tms;
 
 -- ---------------------------------------
--- user_mfa table
+-- resource_provider_account_logins table
 -- ---------------------------------------
--- This table records when a user's MFA validation will expire.
+-- TODO brief description
+-- TODO   This table records when a user's MFA validation will expire.
+-- TODO   changed name because it's not really user_mfa. I don't have strong feelings about what we call it though.
+
+-- TODO Merge with below table? Or create new table and migrate old records?
+-- TODO - This table records when a user's MFA validation will expire.
+-- TODO table used by tms_server
+-- CREATE TABLE IF NOT EXISTS user_mfa
+-- (
+--     id                     SERIAL PRIMARY KEY,
+--     tenant                 TEXT REFERENCES tenants(tenant) ON UPDATE CASCADE ON DELETE RESTRICT,
+--     tms_user_id            TEXT NOT NULL,
+--     expires_at             TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+--     enabled                BOOLEAN NOT NULL,
+--     created                TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+--     updated                TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+--     UNIQUE (tenant, tms_user_id)
+-- );
+
+-- TODO This table records when a user's MFA validation will expire.
 -- CREATE TABLE IF NOT EXISTS user_mfa
 -- changed name because it's not really user_mfa.  I don't have strong feelings about what we call it though.
 CREATE TABLE IF NOT EXISTS resource_provider_account_logins
@@ -94,7 +164,8 @@ CREATE TABLE IF NOT EXISTS resource_provider_account_logins
     updated                     TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     UNIQUE (tms_identity, resource_provider_uuid, resource_provider_account),
     FOREIGN KEY(resource_provider_uuid) REFERENCES identity_providers(uuid)
-    );
+);
+ALTER TABLE resource_provider_account_logins OWNER TO tms;
 
 CREATE TABLE IF NOT EXISTS auth_code_data
 (
