@@ -4,9 +4,10 @@
 -- TODO Note that portal resource_provider_account_logins table is intended to serve the same purpose as
 -- TODO     the server user_mfa table
 
+-- ==================================================
 -- Add tables needed for TMS Portal backend
 --   TMS portal and server will use the same DB
--- 
+-- ==================================================
 
 -- ---------------------------------------
 -- Identity Provider tables
@@ -188,3 +189,24 @@ CREATE TABLE IF NOT EXISTS issued_tokens
     created       TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated       TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
     );
+
+-- ==================================================
+-- TODO
+-- Add columns to clients table needed by portal
+-- ==================================================
+
+-- ==================================================
+-- TODO
+-- Rename column app_name in clients table to name
+-- app_name stands for "application client" but that could be confusing.
+-- ==================================================
+
+-- ==================================================
+-- TODO
+-- Rename table user_mfa to resource_provider_account_logins???? to better reflect the purpose.
+-- ==================================================
+
+-- ==================================================
+-- TODO
+-- Add columns to resource_provider_account_logins???? table needed by portal
+-- ==================================================
