@@ -1,12 +1,9 @@
 #![forbid(unsafe_code)]
 
-use std::str::FromStr;
 use sqlx::{Pool, Postgres};
 use sqlx::postgres::PgPoolOptions;
 
-use log::{info, error};
-use crate::RUNTIME_CTX;
-use crate::utils::errors::Errors;
+use log::{info};
 use crate::utils::config::TMS_DIRS;
 
 // Database constants.

@@ -1,9 +1,8 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use crate::utils::db_types::{DelegationInput, UserMfaInput, UserHostInput};
-use crate::utils::tms_utils::{timestamp_utc, timestamp_utc_to_str, MAX_TMS_UTC_STR};
+use crate::utils::tms_utils::{timestamp_utc};
 use crate::v1::tms::delegations_create::insert_delegation;
 use crate::v1::tms::user_mfa_create::insert_user_mfa;
 use crate::v1::tms::user_hosts_create::insert_user_host;
@@ -16,7 +15,6 @@ const NOT_STRICT:bool = false;
 
 pub struct MVPDependencyParms
 {
-    pub tenant: String,
     pub client_id: String,
     pub client_user_id: String,
     pub host: String,
@@ -49,15 +47,12 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
 
      // Use the same current UTC timestamp in all related time calculations.
      let now = timestamp_utc();
-     let current_ts = timestamp_utc_to_str(now);
 
     // --------------------- Insert user_mfa record ------------------------
-    // Required inputs: tenant, client_user_id
+    // Required inputs: client_user_id
     //
-    // Create the input record.  Note that we save the hash of
-    // the hex secret, but never the secret itself.  
+    // Create the input record.
     let input_record = UserMfaInput::new(
-        parms.tenant.clone(),
         parms.client_user_id.clone(),
         expires_at,
         DB_TRUE,
@@ -69,17 +64,16 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let count = insert_user_mfa(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP: MFA for user '{}' created in tenant '{}' with expiration at {}.",
-            parms.client_user_id, parms.tenant, expires_at);
+        info!("MVP: MFA for user '{}' created with expiration at {}.",
+            parms.client_user_id, expires_at);
     }
 
     // --------------------- Insert delegations record ---------------------
-    // Required inputs: tenant, client_id, client_user_id
+    // Required inputs: client_id, client_user_id
     //
     // Create the input record.  Note that we save the hash of
     // the hex secret, but never the secret itself.  
     let input_record = DelegationInput::new(
-        parms.tenant.clone(),
         parms.client_id.clone(),
         parms.client_user_id.clone(),
         expires_at,
@@ -91,17 +85,16 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let count = insert_delegation(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP: Delegation for user '{}' to client '{}' created in tenant '{}' with expiration at {}.", 
-              parms.client_user_id, parms.client_id, parms.tenant, expires_at);
+        info!("MVP: Delegation for user '{}' to client '{}' created with expiration at {}.",
+              parms.client_user_id, parms.client_id, expires_at);
     }
 
     // --------------------- Insert user_hosts record ---------------------
-    // Required inputs: tenant, client_user_id, host, host_account
+    // Required inputs: client_user_id, host, host_account
     //
     // Create the input record.  Note that we save the hash of
     // the hex secret, but never the secret itself.  
     let input_record = UserHostInput::new(
-        parms.tenant.clone(),
         parms.client_user_id.clone(),
         parms.host.clone(),
         parms.host_account.clone(),
@@ -114,8 +107,8 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let count = insert_user_host(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP: Host mapping for user '{}' created in tenant '{}' with experation at {}.", 
-                parms.client_user_id, parms.tenant, expires_at);
+        info!("MVP: Host mapping for user '{}' created with experation at {}.",
+                parms.client_user_id, expires_at);
     }
 
     Ok(insert_count)

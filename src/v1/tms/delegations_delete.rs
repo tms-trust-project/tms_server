@@ -6,26 +6,25 @@ use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::DELETE_DELEGATION;
-use crate::utils::tms_utils::{self, RequestDebug, check_tenant_enabled};
-use crate::utils::authz::{authorize, get_tenant_header, AuthzTypes, X_TMS_TENANT};
+use crate::utils::tms_utils::{self, RequestDebug};
+use crate::utils::authz::{authorize, AuthzTypes};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 pub struct DeleteDelegationsApi;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 #[derive(Object)]
 pub struct ReqDeleteDelegations
 {
     client_id: String,
-    client_user_id: String,
-    tenant: String,
+    client_user_id: String
 }
 
 #[derive(Object, Debug)]
@@ -46,8 +45,6 @@ impl RequestDebug for ReqDeleteDelegations {
         s.push_str(&self.client_id);
         s.push_str("\n    client_user_id: ");
         s.push_str(&self.client_user_id);
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s
     }
 }
@@ -90,35 +87,15 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl DeleteDelegationsApi {
     #[oai(path = "/tms/delegations/del", method = "delete")]
     async fn delete_delegation_api(&self, http_req: &Request, req: Json<ReqDeleteDelegations>) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-        
-        // Check that the tenant specified in the header is the same as the one in the request body.
-        if hdr_tenant != req.tenant {
-            let msg = format!("ERROR: FORBIDDEN - The tenant in the {} header ({}) does not match the tenant in the request body ({})", 
-                                      X_TMS_TENANT, hdr_tenant, req.tenant);
-            error!("{}", msg);
-            return make_http_403(msg);  
-        }
-    
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
         // -------------------- Authorize ----------------------------
-        // Currently, only the tenant admin can delete a delegation record.
+        // Currently, only the admin can delete a delegation record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
-        let allowed = [AuthzTypes::TenantAdmin];
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to delete delegation for user {} to client {} in tenant {}.", 
-                                      req.client_user_id, req.client_id, req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to delete delegation for user {} to client {}.",
+                                      req.client_user_id, req.client_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -180,7 +157,6 @@ async fn delete_delegation(req: &ReqDeleteDelegations) -> Result<u64> {
     let result = sqlx::query(DELETE_DELEGATION)
         .bind(&req.client_id)
         .bind(&req.client_user_id)
-        .bind(&req.tenant)
         .execute(&mut *tx)
         .await?;
     deletes += result.rows_affected();

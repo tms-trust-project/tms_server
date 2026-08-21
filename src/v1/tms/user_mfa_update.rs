@@ -6,8 +6,8 @@ use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::UPDATE_USER_MFA_ENABLED;
-use crate::utils::tms_utils::{self, RequestDebug, timestamp_utc, timestamp_utc_to_str, check_tenant_enabled};
-use crate::utils::authz::{authorize, AuthzTypes, get_tenant_header, X_TMS_TENANT};
+use crate::utils::tms_utils::{self, RequestDebug, timestamp_utc, timestamp_utc_to_str};
+use crate::utils::authz::{authorize, AuthzTypes};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;
@@ -24,7 +24,6 @@ pub struct UpdateUserMfaApi;
 pub struct ReqUpdateUserMfa
 {
     tms_user_id: String,
-    tenant: String,
     enabled: bool,
 }
 
@@ -47,8 +46,6 @@ impl RequestDebug for ReqUpdateUserMfa {
         s.push_str("  Request body:");
         s.push_str("\n    tms_user_id: ");
         s.push_str(&self.tms_user_id);
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s.push_str("\n    enabled: ");
         s.push_str(enabled.as_str());
         s
@@ -93,34 +90,14 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl UpdateUserMfaApi {
     #[oai(path = "/tms/usermfa/upd", method = "patch")]
 async fn update_user_mfa(&self, http_req: &Request, req: Json<ReqUpdateUserMfa>) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-
-        // Check that the tenant specified in the header is the same as the one in the request body.
-        if hdr_tenant != req.tenant {
-            let msg = format!("ERROR: FORBIDDEN - The tenant in the {} header ({}) does not match the tenant in the request body ({})", 
-                                      X_TMS_TENANT, hdr_tenant, req.tenant);
-            error!("{}", msg);
-            return make_http_403(msg);  
-        }
-
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
         // -------------------- Authorize ----------------------------
-        // Currently, only the tenant admin can create a user mfa record.
+        // Currently, only the admin can create a user mfa record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
-        let allowed = [AuthzTypes::TenantAdmin];
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to update MFA for user {} in tenant {}.", req.tms_user_id, req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to update MFA for user {}.", req.tms_user_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -185,7 +162,6 @@ async fn update_user_mfa(req: &ReqUpdateUserMfa) -> Result<u64> {
         .bind(req.enabled)
         .bind(current_ts)
         .bind(&req.tms_user_id)
-        .bind(&req.tenant)
         .execute(&mut *tx)
         .await?;
     updates += result.rows_affected();

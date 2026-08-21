@@ -8,9 +8,9 @@ use sqlx::Row;
 
 use crate::utils::errors::HttpResult;
 
-use crate::utils::authz::{authorize, AuthzTypes, get_tenant_header};
+use crate::utils::authz::{authorize, AuthzTypes};
 use crate::utils::db_statements::LIST_USER_HOSTS;
-use crate::utils::tms_utils::{self, RequestDebug, check_tenant_enabled};
+use crate::utils::tms_utils::{self, RequestDebug};
 use log::error;
 
 use crate::RUNTIME_CTX;
@@ -26,7 +26,6 @@ pub struct ListUserHostsApi;
 #[derive(Object)]
 struct ReqListUserHosts
 {
-    tenant: String,
 }
 
 #[derive(Object, Debug)]
@@ -42,7 +41,6 @@ pub struct RespListUserHosts
 pub struct UserHostsListElement
 {
     id: i32,
-    tenant: String,
     tms_user_id: String,
     host: String,
     host_account: String,
@@ -57,8 +55,6 @@ impl RequestDebug for ReqListUserHosts {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tenant: ");
-        s.push_str(&self.tenant);
         s
     }
 }
@@ -96,27 +92,15 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl ListUserHostsApi {
     #[oai(path = "/tms/userhosts/list", method = "get")]
     async fn get_user_hosts(&self, http_req: &Request) -> TmsResponse {
-        // -------------------- Get Tenant Header --------------------
-        // Get the required tenant header value.
-        let hdr_tenant = match get_tenant_header(http_req) {
-            Ok(t) => t,
-            Err(e) => return make_http_400(e.to_string()),
-        };
-        
-        // Check tenant.
-        if !check_tenant_enabled(&hdr_tenant).await {
-            return make_http_400("Tenant not enabled.".to_string());
-        }
-
-        // Package the request parameters.        
-        let req = ReqListUserHosts {tenant: hdr_tenant};
+        // Package the request parameters.
+        let req = ReqListUserHosts {};
         
         // -------------------- Authorize ----------------------------
-        // Only the tenant admin can query a user host record.
-        let allowed = [AuthzTypes::TenantAdmin];
+        // Only the admin can query a user host record.
+        let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to list user host information in tenant {}.", req.tenant);
+            let msg = format!("ERROR: NOT AUTHORIZED to list user host information.");
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -140,9 +124,9 @@ impl ListUserHostsApi {
 impl UserHostsListElement {
     /// Create response elements.
     #[allow(clippy::too_many_arguments)]
-    fn new(id: i32, tenant: String, tms_user_id: String, host: String, host_account: String, 
+    fn new(id: i32, tms_user_id: String, host: String, host_account: String,
            expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) -> Self {
-        Self {id, tenant, tms_user_id, host, host_account, expires_at, created, updated}
+        Self {id, tms_user_id, host, host_account, expires_at, created, updated}
     }
 }
 
@@ -159,7 +143,7 @@ impl RespListUserHosts {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
-        // Search for the tenant/client id in the database.  Not found was already 
+        // Search for the client id in the database.  Not found was already
         // The client_secret is never part of the response.
         let clients = list_hosts_users(req).await?;
         Ok(make_http_200(Self::new("0", "success".to_string(), 
@@ -181,7 +165,6 @@ async fn list_hosts_users(req: &ReqListUserHosts) -> Result<Vec<UserHostsListEle
     
     // Create the select statement.
     let rows = sqlx::query(LIST_USER_HOSTS)
-        .bind(req.tenant.clone())
         .fetch_all(&mut *tx)
         .await?;
 
@@ -193,8 +176,7 @@ async fn list_hosts_users(req: &ReqListUserHosts) -> Result<Vec<UserHostsListEle
     for row in rows {
         let elem = UserHostsListElement::new(
                  row.get(0), row.get(1), row.get(2), 
-        row.get(3), row.get(4), row.get(5), 
-            row.get(6), row.get(7));
+        row.get(3), row.get(4), row.get(5), row.get(6));
         element_list.push(elem);
     }
 
