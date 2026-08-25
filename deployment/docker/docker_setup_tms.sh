@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -xv
 
 # This script should be run one time on the user account under which tms_server will execute.
 # It creates and initializes directories on the host and in persistent named volumes used by the server.
@@ -11,6 +10,22 @@ if [ $# -ne 1 ]; then
     echo "  where <docker tag> is the image version tag"
     echo "E.g. $PrgName dev"
     exit 1
+fi
+# Check that all required env variables are set
+FAILED=false
+#env_list="POSTGRES_PASSWORD TMS_DB_USER_PASSWORD"
+env_list="TMS_DB_USER_PASSWORD"
+for name in $env_list
+do
+  if [[ -z "${!name}" ]]; then
+    echo "Please set env var ${name} before running this script"
+    FAILED=true
+  fi
+done
+if [ "$FAILED" = true ]; then
+  echo "Please set required environment variables"
+  echo "Exiting ..."
+  exit 1
 fi
 
 # Assign the image tag
@@ -40,7 +55,7 @@ chmod 700 ~/tms-docker/tms_local
 # both the host and the container.
 #
 # Note: The use of ${HOME} rather than ~ is necessary due to docker's less than perfect test for absolute paths.
-docker run --name tms_server_container --user $(id -u):$(id -g) -e HOME=/tms-root --rm \
+docker run --name tms_server --user "$(id -u)":"$(id -g)" -e HOME=/tms-root --rm \
 --volume tms_docker_vol:/tms-root \
 --mount type=bind,source=${HOME}/tms-docker/tms_local,target=/tms-root/tms_local \
 --volume="/etc/group:/etc/group:ro" \

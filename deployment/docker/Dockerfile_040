@@ -6,8 +6,8 @@
 # The requirements for TMS to initialize and run involve two subdirectories of the root installation directory.
 # For containers, the root installation directory is tms-root and its subdirectories are:
 #
-#   - .tms, which has five subdirectories used my TMS during initialization and when executing normally.
-#     The .tms/certs directory needs to be written from outside the container so that the host-specific certificate
+#   - tms, which has five subdirectories used my TMS during initialization and when executing normally.
+#     The tms/certs directory needs to be written to from outside the container so that the host-specific certificate
 #     chain and private key can be installed and updated as needed.
 #
 #   - tms_local, which is a bind mounted host directory used by TMS running in the container to
@@ -67,6 +67,9 @@ COPY --from=builder /tms_server/resources ./resources
 RUN chmod 777 ./resources ./resources/certs ./resources/config ./resources/migrations
 RUN chmod 666 ./resources/certs/* ./resources/config/*
 
+# Become the user we will run as
+USER tms
+
 # Start the server after having run it once with the --install option.
-#CMD ["./tms_server"]
-CMD ["/usr/bin/sleep", "10000"]
+CMD ["./tms_server"]
+#CMD ["/usr/bin/sleep", "10000"]

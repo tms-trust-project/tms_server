@@ -1,11 +1,17 @@
 # TMS Web Server Deployment
 
-This directory (*tms_server/deployment/docker*) contains files related to the deployment of the TMS server container,
-including Dockerfiles, scripts and a docker-compose file. The procedures discussed here focus on the standard cargo
-build of TMS using *Dockerfile*. Unless otherwise noted, the current directory from which commands are issued
-is *deployment/docker*.  
+This directory (*tms_server/deployment/docker*) contains files related to the deployment of TMS server using a docker
+image. This includes Dockerfiles, scripts and a docker-compose file.
 
-## Installing TMS Server (tms_server)
+## Building the Docker Image
+The following scripts can be used to build and push *tms_server* images:
+- `./docker_build.sh <image tag>`
+- `./docker_push.sh <image tag>`
+
+For example:
+- `./docker_build.sh dev`
+
+## Initial Setup
 
 The TMS Server must first be installed on the user account under which it will run.
 We recommend dedicating a no-password account on the host to run *tms_server*.
@@ -90,17 +96,8 @@ To stop and remove the container, issue:
 
    - `./docker-compose_down.sh \<image tag\>`
 
-## Reinstalling TMS
+## Uninstalling TMS Server
 
-If you want to wipe out and/or reinstall TMS from scratch, these two manual steps should be performed:
-
-   - `docker volume rm tms_docker_vol`
-   - `rm ~/tms-docker//tms-install.out` to preserve customization files, OR
-   - `rm -r ~/tms-docker` to wipe clean all traces of TMS.
-
-# Developer Notes
-
-The following scripts can be used to build and push *tms_server* images:
-
-   - `./docker_build.sh \<image tag\>`
-   - `./docker_push.sh \<image tag\>`
+If you want to wipe out and/or reinstall TMS from scratch, the script `docker_uninstall.sh` may be used.
+This script should kill any running containers, remove any leftover containers that have existed,
+remove the docker volume and remove the directory `$HOME/tms-docker/tms_local`.
