@@ -179,4 +179,4 @@ ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS last_login TIMESTA
 
 ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_uuid_account_key
     UNIQUE (tms_identity, provider_uuid, provider_account);
-ALTER TABLE resource_provider_logins ADD CONSTRAINT uuid_fkey FOREIN KEY (provider_uuid) REFERENCES identity_providers(uuid);
+ALTER TABLE resource_provider_logins ADD CONSTRAINT uuid_fkey FOREIGN KEY (provider_uuid) REFERENCES identity_providers(uuid);
