@@ -1,6 +1,6 @@
 #!/bin/sh
 # ----------------------------------------------------------------
-# Publish docker image for tms_server.
+# Publish docker image for tms_server
 # ----------------------------------------------------------------
 
 PrgName=$(basename "$0")

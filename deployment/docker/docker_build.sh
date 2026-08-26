@@ -1,8 +1,7 @@
 #!/bin/sh
 # ----------------------------------------------------------------
-# Build docker image for tms_server.
+# Build docker image for tms_server
 # ----------------------------------------------------------------
-
 PrgName=$(basename "$0")
 # Determine absolute path to location from which we are running and change to that directory.
 RUN_DIR=$(pwd)
@@ -22,6 +21,6 @@ fi
 TAG=$1
 
 # Build image
-cd ../..
+cd $PRG_PATH/../.. || exit
 echo docker build -t "tapis/tms_server:"${TAG} -f $PRG_PATH/Dockerfile_040 .
 docker build -t "tapis/tms_server:"${TAG} -f $PRG_PATH/Dockerfile_040 .

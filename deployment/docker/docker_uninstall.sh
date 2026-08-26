@@ -22,6 +22,26 @@ case $resp in
   *) echo "Uninstall cancelled. Exiting ... " ; exit 1 ;;
 esac
 
+# Check that all required env variables are set
+FAILED=false
+env_list="POSTGRES_PASSWORD TMS_DB_USER_PASSWORD"
+for name in $env_list
+do
+  if [[ -z "${!name}" ]]; then
+    echo "Please set env var ${name} before running this script"
+    FAILED=true
+  fi
+done
+if [ "$FAILED" = true ]; then
+  echo "Please set required environment variables"
+  echo "Exiting ..."
+  exit 1
+fi
+
+# Reset DB
+$PRG_PATH/../postgres/tms_drop_db.sh
+$PRG_PATH/../postgres/tms_init_db.sh
+
 # Kill containers that might be running
 docker kill tms_sleep > /dev/null 2>&1
 docker kill tms_server > /dev/null 2>&1

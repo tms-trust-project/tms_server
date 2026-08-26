@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#set -x
 
 # This script should only be called AFTER docker_setup_tms.sh has successfully run.
 
@@ -27,20 +26,16 @@ if [ "$FAILED" = true ]; then
   echo "Exiting ..."
   exit 1
 fi
+TMS_DB_HOST="${TMS_DB_HOST:-127.0.0.1}"
+TMS_DB_PORT="${TMS_DB_PORT:-5432}"
 
 # Assign the image tag
 TAG=$1
 
-# This script starts the tms_server in the background in a docker container under the user ID
-# that launches it.  The host's ~/tms-docker/tms_customizations directory is mounted into the 
-# container and the persistent named volume, tms_docker_vol, contains the .tms directory that 
-# the server uses during execution.  The container is removed when the server exits.
-set -xv
-#docker run --name tms_server_container --user "$(id -u)":"$(id -g)" -e HOME=/tms-root -p 3001:3000 -d --rm \
-docker run --name tms_server --user "$(id -u)":"$(id -g)" -e HOME=/tms-root -p 3001:3000 -d \
---volume tms_docker_vol:/tms-root \
---mount type=bind,source=${HOME}/tms-docker/tms_local,target=/tms-root/tms_local \
---volume="/etc/group:/etc/group:ro" \
---volume="/etc/passwd:/etc/passwd:ro" \
---volume="/etc/shadow:/etc/shadow:ro" \
-tapis/tms_server:${TAG}
+# This script starts the tms_server in the background in a docker container under the user ID that launches it.
+# The container persistent named volume, tms_server_vol, contains all the files used at runtime.
+# The container is removed when the server exits.
+docker run --name tms_server --user "tms" --network="host" -d --rm \
+  -e TMS_DB_HOST=$TMS_DB_HOST -e TMS_DB_PORT=$TMS_DB_PORT -e TMS_DB_USER_PASSWORD=$TMS_DB_USER_PASSWORD \
+  --volume tms_server_vol:/home/tms \
+  tapis/tms_server:${TAG}

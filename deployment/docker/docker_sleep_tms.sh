@@ -14,11 +14,7 @@ fi
 # Assign the image tag
 TAG=$1
 
-docker run --name tms_sleep --user "$(id -u)":"$(id -g)" -e HOME=/tms-root -d --rm \
---volume tms_docker_vol:/tms-root \
---mount type=bind,source=${HOME}/tms-docker/tms_local,target=/tms-root/tms_local \
---volume="/etc/group:/etc/group:ro" \
---volume="/etc/passwd:/etc/passwd:ro" \
---volume="/etc/shadow:/etc/shadow:ro" \
-tapis/tms_server:${TAG} \
-/bin/bash -c "sleep 10000"
+docker run --name tms_sleep --user "tms" -d --rm \
+  --volume tms_server_vol:/home/tms \
+  tapis/tms_server:${TAG} \
+  /bin/bash -c "sleep 10000"

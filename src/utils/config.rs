@@ -166,7 +166,7 @@ pub struct TmsCmdArgs {
     ///
     ///   2. Otherwise, if set, the value of the environment variable TMS_ROOT_DIR,
     ///
-    ///   3. Otherwise, ~/.tms
+    ///   3. Otherwise, ~/tms
     #[arg(short, long)]
     pub install: bool,
     /// Create the DB schema, skip data initialization.
