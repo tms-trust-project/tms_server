@@ -27,7 +27,7 @@ const MAX_RESERVATION_MINUTES: i32 = 48 * 60;
 // ***************************************************************************
 /** Create a new reservation on an active (non-expired) pubkey record.  All 
  * dependency checking required for pubkey creation is also performed here.  
- * Specifically, the user mfa, user/host mapping and client delegation records 
+ * Specifically, the user rp_login, user/host mapping and client delegation records
  * must be in order and active before a reservation can be created.
  */
 pub struct CreateReservationsApi;
@@ -225,7 +225,7 @@ impl RespCreateReservation {
         // --------------------- Check Expirations -----------------------
         // The 3 tables whose expiration times need to be checked before we create this key are:
         //
-        //  user_mfa - use tenant and client_user_id to target unique record
+        //  rp_login - use tenant and client_user_id to target unique record
         //  delegations - use tenant, client_id and client_user_id to target unique record
         //  user_hosts - use tenant, client_user_id, host and host_account to target unique record
         //

@@ -186,7 +186,7 @@ impl RespNewSshKeys {
                 host_account: req.host_account.clone(), 
             };
 
-            // Insert records into the user_mfa, user_hosts and delegations tables
+            // Insert records into the resource_provider_logins, user_hosts and delegations tables
             // that the key pair we are about to create depends on.
             match create_pubkey_dependencies(mvp_inputs).await {
                 Ok(inserts) => info!("{} MVP dependency records inserted.", inserts),
@@ -201,7 +201,7 @@ impl RespNewSshKeys {
         // --------------------- Check Expirations -----------------------
         // The 3 tables whose expiration times need to be checked before we create this key are:
         //
-        //  user_mfa - use client_user_id to target unique record
+        //  resource_provider_logins - use client_user_id to target unique record
         //  delegations - use client_id and client_user_id to target unique record
         //  user_hosts - use client_user_id, host and host_account to target unique record
         //

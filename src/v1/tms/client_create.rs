@@ -25,7 +25,7 @@ pub struct CreateClientApi;
 pub struct ReqCreateClient
 {
     client_id: String,
-    app_name: String
+    name: String
 }
 
 #[derive(Object, Debug)]
@@ -34,7 +34,7 @@ pub struct RespCreateClient
     result_code: String,
     result_msg: String,
     client_id: String,
-    client_secret: String,
+    secret: String,
 }
 
 // Implement the debug record trait for logging.
@@ -45,8 +45,8 @@ impl RequestDebug for ReqCreateClient {
         s.push_str("  Request body:");
         s.push_str("\n    client_id: ");
         s.push_str(&self.client_id);
-        s.push_str("\n    app_name: ");
-        s.push_str(&self.app_name);
+        s.push_str("\n    name: ");
+        s.push_str(&self.name);
         s
     }
 }
@@ -96,11 +96,11 @@ impl CreateClientApi {
 // ***************************************************************************
 impl RespCreateClient {
     /// Create a new response.
-    fn new(result_code: &str, result_msg: &str, client_id: String, client_secret: String,) -> Self {
+    fn new(result_code: &str, result_msg: &str, client_id: String, secret: String,) -> Self {
         Self {result_code: result_code.to_string(), 
               result_msg: result_msg.to_string(), 
               client_id,
-              client_secret,
+            secret: secret,
             }
     }
 
@@ -112,7 +112,7 @@ impl RespCreateClient {
         // -------------------- Client Creation Check ------------------
         // Client creation is disabled if we are running in MVP mode because of the
         // security implications of automating user/host mappings, client delegations 
-        // and unlimited mfa lifetimes.  Users also can explicitly disable client creation.
+        // and unlimited rp_login lifetimes.  Users also can explicitly disable client creation.
         if RUNTIME_CTX.parms.config.enable_mvp || 
            RUNTIME_CTX.parms.config.new_clients == NEW_CLIENTS_DISALLOW {
             let msg = "Client creation is disallowed due either to running in MVP mode \
@@ -122,17 +122,17 @@ impl RespCreateClient {
         }
 
         // ------------------------ Generate Secret --------------------
-        let client_secret_str  = create_hex_secret();
-        let client_secret_hash = hash_hex_secret(&client_secret_str);
+        let secret_str  = create_hex_secret();
+        let secret_hash = hash_hex_secret(&secret_str);
 
         // ------------------------ Update Database --------------------
         let now = timestamp_utc();
 
         // Create the input record. Note we save the hash of the hex secret, but never the secret.
         let input_record = ClientInput::new(
-            req.app_name.clone(),
+            req.name.clone(),
             req.client_id.clone(),
-            client_secret_hash, 
+            secret_hash,
             DB_TRUE,
             now.clone(),
             now.clone(),
@@ -141,10 +141,10 @@ impl RespCreateClient {
         // Insert the new key record.
         insert_new_client(input_record).await?;
         info!("Client '{}' created for application '{}'.",
-              req.client_id, req.app_name);
+              req.client_id, req.name);
         
         // Return the secret represented in hex.
-        Ok(make_http_201(Self::new("0", "success", req.client_id.clone(), client_secret_str)))
+        Ok(make_http_201(Self::new("0", "success", req.client_id.clone(), secret_str)))
     }
 }
 

@@ -195,7 +195,7 @@ async fn tms_init_data() -> Result<bool> {
     let inserts = db::create_test_client().await.expect("Error creating test client.");
     info!("Number of test clients created: {}.", inserts);
 
-    // Create test delegation, user_mfa and user_host records if they do not already exist.
+    // Create test delegation, resource_provider_logins and user_host records if they do not already exist.
     let inserts = db::create_test_data().await.expect("Error creating delegation records for test users.");
     info!("Number of test delegation related records created: {}.", inserts);
 

@@ -6,8 +6,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 
 use crate::utils::errors::HttpResult;
-use crate::utils::db_statements::{INSERT_USER_MFA, INSERT_USER_MFA_NOT_STRICT};
-use crate::utils::db_types::UserMfaInput;
+use crate::utils::db_statements::{INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
+use crate::utils::db_types::RPLoginInput;
 use crate::utils::authz::{authorize, AuthzTypes};
 use crate::utils::tms_utils::{self, timestamp_utc, timestamp_utc_to_str, calc_expires_at, 
                               RequestDebug};
@@ -22,20 +22,20 @@ const STRICT:bool = true;
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
-pub struct CreateUserMfaApi;
+pub struct CreateRPLoginApi;
 
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
 #[derive(Object)]
-pub struct ReqCreateUserMfa
+pub struct ReqCreateRPLogin
 {
-    tms_user_id: String,
+    tms_identity: String,
     ttl_minutes: i32,  // negative means i32::MAX
 }
 
 #[derive(Object, Debug)]
-pub struct RespCreateUserMfa
+pub struct RespCreateRPLogin
 {
     result_code: String,
     result_msg: String,
@@ -45,13 +45,13 @@ pub struct RespCreateUserMfa
 }
 
 // Implement the debug record trait for logging.
-impl RequestDebug for ReqCreateUserMfa {   
-    type Req = ReqCreateUserMfa;
+impl RequestDebug for ReqCreateRPLogin {
+    type Req = ReqCreateRPLogin;
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
         s.push_str("\n    tms_user_id: ");
-        s.push_str(&self.tms_user_id);
+        s.push_str(&self.tms_identity);
         s.push_str("\n    tts_minutes: ");
         s.push_str(&self.ttl_minutes.to_string());
         s
@@ -62,7 +62,7 @@ impl RequestDebug for ReqCreateUserMfa {
 #[derive(Debug, ApiResponse)]
 enum TmsResponse {
     #[oai(status = 201)]
-    Http201(Json<RespCreateUserMfa>),
+    Http201(Json<RespCreateRPLogin>),
     #[oai(status = 400)]
     Http400(Json<HttpResult>),
     #[oai(status = 401)]
@@ -73,7 +73,7 @@ enum TmsResponse {
     Http500(Json<HttpResult>),
 }
 
-fn make_http_201(resp: RespCreateUserMfa) -> TmsResponse {
+fn make_http_201(resp: RespCreateRPLogin) -> TmsResponse {
     TmsResponse::Http201(Json(resp))
 }
 fn make_http_400(msg: String) -> TmsResponse {
@@ -93,23 +93,23 @@ fn make_http_500(msg: String) -> TmsResponse {
 //                             OpenAPI Endpoint
 // ***************************************************************************
 #[OpenApi]
-impl CreateUserMfaApi {
-    #[oai(path = "/tms/usermfa", method = "post")]
-    async fn create_client(&self, http_req: &Request, req: Json<ReqCreateUserMfa>) -> TmsResponse {
+impl CreateRPLoginApi {
+    #[oai(path = "/tms/rPLogin", method = "post")]
+    async fn create_client(&self, http_req: &Request, req: Json<ReqCreateRPLogin>) -> TmsResponse {
         // -------------------- Authorize ----------------------------
-        // Currently, only the admin can create a user mfa record.
+        // Currently, only the admin can create a user rp_login record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to add a user MFA record.");
+            let msg = format!("ERROR: NOT AUTHORIZED to add a user RP_LOGIN record.");
             error!("{}", msg);
             return make_http_401(msg);
         }
 
         // -------------------- Process Request ----------------------
-        match RespCreateUserMfa::process(http_req, &req).await {
+        match RespCreateRPLogin::process(http_req, &req).await {
             Ok(r) => r,
             Err(e) => {
                 let msg = "ERROR: ".to_owned() + e.to_string().as_str();
@@ -123,13 +123,13 @@ impl CreateUserMfaApi {
 // ***************************************************************************
 //                          Request/Response Methods
 // ***************************************************************************
-impl RespCreateUserMfa {
+impl RespCreateRPLogin {
     /// Create a new response.
     fn new(result_code: &str, result_msg: String, tms_user_id: String, expires_at: DateTime<Utc>, enabled: bool,) -> Self {
         Self {result_code: result_code.to_string(), result_msg, tms_user_id, expires_at, enabled,}}
 
     /// Process the request.
-    async fn process(http_req: &Request, req: &ReqCreateUserMfa) -> Result<TmsResponse, anyhow::Error> {
+    async fn process(http_req: &Request, req: &ReqCreateRPLogin) -> Result<TmsResponse, anyhow::Error> {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
@@ -144,21 +144,21 @@ impl RespCreateUserMfa {
 
         // Create the input record.  Note that we save the hash of
         // the hex secret, but never the secret itself.  
-        let input_record = UserMfaInput::new(
-            req.tms_user_id.clone(),
+        let input_record = RPLoginInput::new(
+            req.tms_identity.clone(),
             expires_at.clone(),
             DB_TRUE,
-            now.clone(), 
+            now.clone(),
             now.clone(),
         );
 
         // Insert the new key record.
-        insert_user_mfa(input_record, STRICT).await?;
-        info!("MFA for user '{}' created with experation at {}.", req.tms_user_id, expires_at.clone());
+        insert_rp_login(input_record, STRICT).await?;
+        info!("RP_LOGIN for user '{}' created with expiration at {}.", req.tms_identity, expires_at.clone());
         
         // Return the secret represented in hex.
-        Ok(make_http_201(Self::new("0", "success".to_string(), 
-                            req.tms_user_id.clone(), expires_at, true)))
+        Ok(make_http_201(Self::new("0", "success".to_string(),
+                                   req.tms_identity.clone(), expires_at, true)))
     }
 }
 
@@ -166,11 +166,11 @@ impl RespCreateUserMfa {
 //                          Private Functions
 // ***************************************************************************
 // ---------------------------------------------------------------------------
-// insert_user_mfa:
+// insert_rp_login:
 // ---------------------------------------------------------------------------
-pub async fn insert_user_mfa(rec: UserMfaInput, strict: bool) -> Result<u64> {
+pub async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
     // Choose the query based on strictness requirement.
-    let sql_query = if strict {INSERT_USER_MFA} else {INSERT_USER_MFA_NOT_STRICT};
+    let sql_query = if strict { INSERT_RP_LOGIN } else { INSERT_RP_LOGIN_NOT_STRICT };
 
     // Get a connection to the db and start a transaction.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 

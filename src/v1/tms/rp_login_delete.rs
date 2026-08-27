@@ -1,59 +1,47 @@
 #![forbid(unsafe_code)]
 
 use poem::Request;
-use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
+use poem_openapi::{ OpenApi, payload::Json, Object, param::Path, ApiResponse };
 use anyhow::Result;
-use chrono::{DateTime, Utc};
-use sqlx::Row;
 
 use crate::utils::errors::HttpResult;
-
-use crate::utils::authz::{authorize, AuthzTypes};
-use crate::utils::db_statements::LIST_USER_MFA;
+use crate::utils::db_statements::DELETE_RP_LOGIN;
 use crate::utils::tms_utils::{self, RequestDebug};
-use log::error;
+use crate::utils::authz::{authorize, AuthzTypes};
+use log::{error, info};
 
 use crate::RUNTIME_CTX;
 
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
-pub struct ListUserMfaApi;
+pub struct DeleteRPLoginApi;
 
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
 #[derive(Object)]
-struct ReqListUserMfa
+pub struct ReqDeleteRPLogin
 {
+    tms_identity: String
 }
 
 #[derive(Object, Debug)]
-pub struct RespListUserMfa
+pub struct RespDeleteRPLogin
 {
     result_code: String,
     result_msg: String,
-    num_users: i32,
-    users: Vec<UserMfaListElement>,
-}
-
-#[derive(Object, Debug)]
-pub struct UserMfaListElement
-{
-    id: i32,
-    tms_user_id: String,
-    expires_at: DateTime<Utc>,
-    enabled: i32,
-    created: DateTime<Utc>,
-    updated: DateTime<Utc>,
+    num_deleted: u32,
 }
 
 // Implement the debug record trait for logging.
-impl RequestDebug for ReqListUserMfa {   
-    type Req = ReqListUserMfa;
+impl RequestDebug for ReqDeleteRPLogin {   
+    type Req = ReqDeleteRPLogin;
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
+        s.push_str("\n    tms_user_id: ");
+        s.push_str(&self.tms_identity);
         s
     }
 }
@@ -62,7 +50,7 @@ impl RequestDebug for ReqListUserMfa {
 #[derive(Debug, ApiResponse)]
 enum TmsResponse {
     #[oai(status = 200)]
-    Http200(Json<RespListUserMfa>),
+    Http200(Json<RespDeleteRPLogin>),
     #[oai(status = 400)]
     Http400(Json<HttpResult>),
     #[oai(status = 401)]
@@ -71,7 +59,7 @@ enum TmsResponse {
     Http500(Json<HttpResult>),
 }
 
-fn make_http_200(resp: RespListUserMfa) -> TmsResponse {
+fn make_http_200(resp: RespDeleteRPLogin) -> TmsResponse {
     TmsResponse::Http200(Json(resp))
 }
 fn make_http_400(msg: String) -> TmsResponse {
@@ -88,25 +76,27 @@ fn make_http_500(msg: String) -> TmsResponse {
 //                             OpenAPI Endpoint
 // ***************************************************************************
 #[OpenApi]
-impl ListUserMfaApi {
-    #[oai(path = "/tms/usermfa/list", method = "get")]
-    async fn get_users(&self, http_req: &Request) -> TmsResponse {
+impl DeleteRPLoginApi {
+    #[oai(path = "/tms/rplogin/del/:tms_user_id", method = "delete")]
+    async fn delete_rp_login_api(&self, http_req: &Request, tms_user_id: Path<String>) -> TmsResponse {
         // Package the request parameters.
-        let req = ReqListUserMfa {};
-        
+        let req = ReqDeleteRPLogin { tms_identity: tms_user_id.to_string()};
+
         // -------------------- Authorize ----------------------------
-        // Only the admin can query user records.
+        // Currently, only the admin can delete a user rp_login record.
+        // When user authentication is implemented, we'll add user-own 
+        // authorization and any additional validation.
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to list user MFA information.");
+            let msg = format!("ERROR: NOT AUTHORIZED to delete resource provider login for user {}.", req.tms_identity);
             error!("{}", msg);
             return make_http_401(msg);
         }
 
         // -------------------- Process Request ----------------------
         // Process the request.
-        match RespListUserMfa::process(http_req, &req).await {
+        match RespDeleteRPLogin::process(http_req, &req).await {
             Ok(r) => r,
             Err(e) => {
                 let msg = "ERROR: ".to_owned() + e.to_string().as_str();
@@ -120,32 +110,25 @@ impl ListUserMfaApi {
 // ***************************************************************************
 //                          Request/Response Methods
 // ***************************************************************************
-impl UserMfaListElement {
-    /// Create response elements.
-    #[allow(clippy::too_many_arguments)]
-    fn new(id: i32, tms_user_id: String, expires_at: DateTime<Utc>,
-           enabled: i32, created: DateTime<Utc>, updated: DateTime<Utc>) -> Self {
-        Self {id, tms_user_id, expires_at, enabled, created, updated}
-    }
-}
-
-impl RespListUserMfa {
+impl RespDeleteRPLogin {
     /// Create a new response.
-    #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, num_users: i32, users: Vec<UserMfaListElement>) 
-    -> Self {
-        Self {result_code: result_code.to_string(), result_msg, num_users, users}
-        }
+    fn new(result_code: &str, result_msg: String, num_deleted: u32) -> Self {
+        Self {result_code: result_code.to_string(), result_msg, num_deleted}}
 
     /// Process the request.
-    async fn process(http_req: &Request, req: &ReqListUserMfa) -> Result<TmsResponse, anyhow::Error> {
+    async fn process(http_req: &Request, req: &ReqDeleteRPLogin) -> Result<TmsResponse, anyhow::Error> {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
-        // Search for the users in the database.
-        let users = list_mfa_users(req).await?;
-        Ok(make_http_200(Self::new("0", "success".to_string(), 
-                                        users.len() as i32, users)))
+        // Insert the new key record.
+        let deletes = delete_rp_login(req).await?;
+        
+        // Log result and return response.
+        let msg = 
+            if deletes < 1 {format!("RP_LOGIN {} NOT FOUND - Nothing deleted", req.tms_identity)}
+            else {format!("RP_LOGIN {} deleted", req.tms_identity)};
+        info!("{}", msg);
+        Ok(make_http_200(RespDeleteRPLogin::new("0", msg, deletes as u32)))
     }
 }
 
@@ -153,30 +136,25 @@ impl RespListUserMfa {
 //                          Private Functions
 // ***************************************************************************
 // ---------------------------------------------------------------------------
-// list_mfa_users:
+// delete_rp_login:
 // ---------------------------------------------------------------------------
-async fn list_mfa_users(req: &ReqListUserMfa) -> Result<Vec<UserMfaListElement>> {
+async fn delete_rp_login(req: &ReqDeleteRPLogin) -> Result<u64> {
     // Get a connection to the db and start a transaction.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    
-    // Create the select statement.
-    let rows = sqlx::query(LIST_USER_MFA)
-        .fetch_all(&mut *tx)
+
+    // Deletion count.
+    let mut deletes: u64 = 0;
+
+    // Issue the db delete call.
+    let result = sqlx::query(DELETE_RP_LOGIN)
+        .bind(&req.tms_identity)
+        .execute(&mut *tx)
         .await?;
+    deletes += result.rows_affected();
 
     // Commit the transaction.
     tx.commit().await?;
-
-    // Collect the row data into element objects.
-    let mut element_list: Vec<UserMfaListElement> = vec!();
-    for row in rows {
-        let elem = UserMfaListElement::new(
-                 row.get(0), row.get(1), row.get(2), row.get(3),
-                 row.get(4), row.get(5));
-        element_list.push(elem);
-    }
-
-    Ok(element_list)
+    Ok(deletes)
 }

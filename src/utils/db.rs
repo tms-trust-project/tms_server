@@ -7,7 +7,7 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_USER_MFA, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS};
+use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
@@ -17,8 +17,8 @@ use crate::utils::db_types::{ClientInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
 use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RESERVATION_FOR_EXTEND,
-                           GET_USER_HOST_ACTIVE, GET_USER_HOST_EXISTS, GET_USER_MFA_ACTIVE,
-                           GET_USER_MFA_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
+                           GET_USER_HOST_ACTIVE, GET_USER_HOST_EXISTS, GET_RP_LOGIN_ACTIVE,
+                           GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
                            SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
 const TEST_USER: &str = "testuser";
@@ -51,9 +51,9 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // Create the insert statement.
     let result = sqlx::query(INSERT_CLIENT)
-        .bind(rec.app_name.clone())
+        .bind(rec.name.clone())
         .bind(rec.client_id.clone())
-        .bind(rec.client_secret)
+        .bind(rec.secret)
         .bind(rec.enabled)
         .bind(rec.created)
         .bind(rec.updated)
@@ -61,7 +61,7 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
         .await?;
     tx.commit().await?;
     info!("New client created. ClientId: {} App: '{}' enabled: {} created: {} updated: {}",
-          rec.client_id, rec.app_name, rec.enabled, rec.created, rec.updated);
+          rec.client_id, rec.name, rec.enabled, rec.created, rec.updated);
     Ok(result.rows_affected())
 }
 
@@ -300,15 +300,15 @@ pub async fn create_test_data() -> Result<u64> {
 
         // Check for existing record. If found then continue;
         // Note: checking for a delegation record is  enough since the delegation and user_hosts
-        //       records reference the user_mfa record as a foreign key.
+        //       records reference the rp_login record as a foreign key.
         let skip_create: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
             .bind(TEST_CLIENT)
             .bind(test_user.clone())
             .fetch_one(&mut *tx).await?;
         if skip_create {continue};
         info!("Creating delegation records for user: {} host: {} host_acct {}", test_user, test_host, test_host_acct);
-        // -------- Populate user_mfa
-        sqlx::query(INSERT_USER_MFA)
+        // -------- Populate rp_login
+        sqlx::query(INSERT_RP_LOGIN)
             .bind(test_user.clone())
             .bind(max_tms_utc)
             .bind(DB_TRUE)
@@ -373,7 +373,7 @@ pub async fn create_test_keys() -> Result<u64> {
 // check_pubkey_dependencies:
 // ---------------------------------------------------------------------------
 /** When creating a public key or a reservation on a public key we must check
- * that the user's MFA, user/host mapping and client delegation are currently 
+ * that the user's RP_LOGIN, user/host mapping and client delegation are currently 
  * active.  Active means that the records exist in their respective tables, are
  * enabled and have not expired.
  * 
@@ -392,36 +392,36 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
     // Get a connection to the db and start a transaction.
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
-    // -------- Check user_mfa dependency
-    let mfa_row = sqlx::query(GET_USER_MFA_ACTIVE)
+    // -------- Check rp_login dependency
+    let rplogin_row = sqlx::query(GET_RP_LOGIN_ACTIVE)
         .bind(client_user_id)
         .fetch_optional(&mut *tx)
         .await?;
 
-    match mfa_row {
+    match rplogin_row {
         Some(row) => {
             // Unpack row.
             let expires_at: DateTime<Utc> = row.get(0);
             let enabled: bool = row.get(1);
 
-            // Check whether the user's mfa is enabled.
+            // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
-                let msg = format!("Required user MFA record for user ID {} is disabled.",
+                let msg = format!("Required user RP_LOGIN record for user ID {} is disabled.",
                                           client_user_id);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
 
-            // Check whether the mfa has expired.
+            // Check whether the rplogin has expired.
             if expires_at < timestamp_utc() {
-                let msg = format!("Required user MFA record for user ID '{}' expired at {}.",
+                let msg = format!("Required user RP_LOGIN record for user ID '{}' expired at {}.",
                                           client_user_id, expires_at);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Required user MFA record not found for user ID {}.", client_user_id);
+            let msg = format!("Required user RP_LOGIN record not found for user ID {}.", client_user_id);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
@@ -510,12 +510,12 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
  * 
  * Other Constraints
  * -----------------
- * The user_mfa, user_hosts and delegations tables must also contain records that the
+ * The rp_login, user_hosts and delegations tables must also contain records that the
  * new extended reservation will depend on.
  * 
- *  - user_mfa - the user must have an mfa record
+ *  - rp_login - the user must have an rplogin record
  *  - user_hosts - the user must have established a link to the reservation's host
- *  - delegations - the user must of delegated access to the reservation's client 
+ *  - delegations - the user must have delegated access to the reservation's client 
  * 
  * Validating these constraints before actually submitting the reservation extension
  * request allows us to return meaningful messages to users on error. The final arbiter, 
@@ -581,15 +581,15 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, client
         }
     };  
 
-    // -------- Check user_mfa dependency
-    let mfa_row = sqlx::query(GET_USER_MFA_EXISTS)
+    // -------- Check rp_login dependency
+    let rplogin_row = sqlx::query(GET_RP_LOGIN_EXISTS)
         .bind(client_user_id)
         .fetch_optional(&mut *tx)
         .await?;
-    match mfa_row {
+    match rplogin_row {
         Some(_) => (),
         None => {
-            let msg = format!("No MFA entry found for user {}.", client_user_id);
+            let msg = format!("No RP_LOGIN entry found for user {}.", client_user_id);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }

@@ -127,9 +127,9 @@ impl PubkeyRetrieval {
 #[allow(dead_code)]
 pub struct Client {
     pub id: i32,
-    pub app_name: String,
+    pub name: String,
     pub client_id: String,
-    pub client_secret: String,
+    pub secret: String,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -137,9 +137,9 @@ pub struct Client {
 
 #[derive(Debug, Deserialize)]
 pub struct ClientInput {
-    pub app_name: String,
+    pub name: String,
     pub client_id: String,
-    pub client_secret: String,
+    pub secret: String,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -149,16 +149,18 @@ impl Client {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
-        app_name: String,
+        name: String,
         client_id: String,
-        client_secret: String,
+        secret: String,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
     -> Client {
         Client {
-            id, app_name, client_id, client_secret, enabled, created, updated
+            id,
+            name: name, client_id,
+            secret: secret, enabled, created, updated
         }
     }
 }
@@ -166,26 +168,27 @@ impl Client {
 impl ClientInput {
         #[allow(dead_code, clippy::too_many_arguments)]
         pub fn new(
-            app_name: String,
+            name: String,
             client_id: String,
-            client_secret: String,
+            secret: String,
             enabled: bool,
             created: DateTime<Utc>,
             updated: DateTime<Utc>,
         ) 
         -> ClientInput {
             ClientInput {
-                app_name, client_id, client_secret, enabled, created, updated
+                name: name, client_id,
+                secret: secret, enabled, created, updated
             }
         }
 }
 
 // ---------------------------------------------------------------------------
-// user_mfa:
+// rp_login:
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-pub struct UserMfa {
+pub struct RPLogin {
     pub id: i32,
     pub tms_user_id: String,
     pub expires_at: DateTime<Utc>,
@@ -195,7 +198,7 @@ pub struct UserMfa {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UserMfaInput {
+pub struct RPLoginInput {
     pub tms_user_id: String,
     pub expires_at: DateTime<Utc>,
     pub enabled: bool,
@@ -203,7 +206,7 @@ pub struct UserMfaInput {
     pub updated: DateTime<Utc>,
 }
 
-impl UserMfa {
+impl RPLogin {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
@@ -213,14 +216,14 @@ impl UserMfa {
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
-    -> UserMfa {
-        UserMfa {
+    -> RPLogin {
+        RPLogin {
             id, tms_user_id, expires_at, enabled, created, updated
         }
     }
 }
 
-impl UserMfaInput {
+impl RPLoginInput {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         tms_user_id: String,
@@ -229,8 +232,8 @@ impl UserMfaInput {
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
-    -> UserMfaInput {
-        UserMfaInput {
+    -> RPLoginInput {
+        RPLoginInput {
             tms_user_id, expires_at, enabled, created, updated
         }
     }

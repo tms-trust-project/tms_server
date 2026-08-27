@@ -5,7 +5,7 @@ use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
 use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
-use crate::utils::db_statements::UPDATE_USER_MFA_ENABLED;
+use crate::utils::db_statements::UPDATE_RP_LOGIN_ENABLED;
 use crate::utils::tms_utils::{self, RequestDebug, timestamp_utc, timestamp_utc_to_str};
 use crate::utils::authz::{authorize, AuthzTypes};
 use log::{error, info};
@@ -15,20 +15,20 @@ use crate::RUNTIME_CTX;
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
-pub struct UpdateUserMfaApi;
+pub struct UpdateRPLoginApi;
 
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
 #[derive(Object)]
-pub struct ReqUpdateUserMfa
+pub struct ReqUpdateRPLogin
 {
     tms_user_id: String,
     enabled: bool,
 }
 
 #[derive(Object, Debug)]
-pub struct RespUpdateUserMfa
+pub struct RespUpdateRPLogin
 {
     result_code: String,
     result_msg: String,
@@ -36,8 +36,8 @@ pub struct RespUpdateUserMfa
 }
 
 // Implement the debug record trait for logging.
-impl RequestDebug for ReqUpdateUserMfa {   
-    type Req = ReqUpdateUserMfa;
+impl RequestDebug for ReqUpdateRPLogin {
+    type Req = ReqUpdateRPLogin;
     fn get_request_info(&self) -> String {
         // Get optional values in displayable form. 
         let enabled = format!("{:#?}", &self.enabled);
@@ -56,7 +56,7 @@ impl RequestDebug for ReqUpdateUserMfa {
 #[derive(Debug, ApiResponse)]
 enum TmsResponse {
     #[oai(status = 200)]
-    Http200(Json<RespUpdateUserMfa>),
+    Http200(Json<RespUpdateRPLogin>),
     #[oai(status = 400)]
     Http400(Json<HttpResult>),
     #[oai(status = 401)]
@@ -67,7 +67,7 @@ enum TmsResponse {
     Http500(Json<HttpResult>),
 }
 
-fn make_http_200(resp: RespUpdateUserMfa) -> TmsResponse {
+fn make_http_200(resp: RespUpdateRPLogin) -> TmsResponse {
     TmsResponse::Http200(Json(resp))
 }
 fn make_http_400(msg: String) -> TmsResponse {
@@ -87,24 +87,24 @@ fn make_http_500(msg: String) -> TmsResponse {
 //                             OpenAPI Endpoint
 // ***************************************************************************
 #[OpenApi]
-impl UpdateUserMfaApi {
-    #[oai(path = "/tms/usermfa/upd", method = "patch")]
-async fn update_user_mfa(&self, http_req: &Request, req: Json<ReqUpdateUserMfa>) -> TmsResponse {
+impl UpdateRPLoginApi {
+    #[oai(path = "/tms/rplogin/upd", method = "patch")]
+async fn update_rp_login(&self, http_req: &Request, req: Json<ReqUpdateRPLogin>) -> TmsResponse {
         // -------------------- Authorize ----------------------------
-        // Currently, only the admin can create a user mfa record.
+        // Currently, only the admin can create a user rp_login record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to update MFA for user {}.", req.tms_user_id);
+            let msg = format!("ERROR: NOT AUTHORIZED to update resource provider login for user {}.", req.tms_user_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
 
         // -------------------- Process Request ----------------------
         // Process the request.
-        match RespUpdateUserMfa::process(http_req, &req).await {
+        match RespUpdateRPLogin::process(http_req, &req).await {
             Ok(r) => r,
             Err(e) => {
                 let msg = "ERROR: ".to_owned() + e.to_string().as_str();
@@ -118,23 +118,23 @@ async fn update_user_mfa(&self, http_req: &Request, req: Json<ReqUpdateUserMfa>)
 // ***************************************************************************
 //                          Request/Response Methods
 // ***************************************************************************
-impl RespUpdateUserMfa {
+impl RespUpdateRPLogin {
     /// Create a new response.
     fn new(result_code: &str, result_msg: String, num_updates: i32,) -> Self {
         Self {result_code: result_code.to_string(), result_msg, fields_updated: num_updates}}
 
     /// Process the request.
-    async fn process(http_req: &Request, req: &ReqUpdateUserMfa) -> Result<TmsResponse, anyhow::Error> {
+    async fn process(http_req: &Request, req: &ReqUpdateRPLogin) -> Result<TmsResponse, anyhow::Error> {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
         // Insert the new key record.
-        let updates = update_user_mfa(req).await?;
+        let updates = update_rp_login(req).await?;
         
         // Log result and return response.
         let msg = format!("{} update(s) to tms_user_id {} completed, enabled = {}", updates, req.tms_user_id, req.enabled);
         info!("{}", msg);
-        Ok(make_http_200(RespUpdateUserMfa::new("0", msg, updates as i32)))
+        Ok(make_http_200(RespUpdateRPLogin::new("0", msg, updates as i32)))
     }
 }
 
@@ -142,9 +142,9 @@ impl RespUpdateUserMfa {
 //                          Private Functions
 // ***************************************************************************
 // ---------------------------------------------------------------------------
-// update_user_mfa:
+// update_rp_login:
 // ---------------------------------------------------------------------------
-async fn update_user_mfa(req: &ReqUpdateUserMfa) -> Result<u64> {
+async fn update_rp_login(req: &ReqUpdateRPLogin) -> Result<u64> {
     // Get timestamp.
     let now = timestamp_utc();
     let current_ts = timestamp_utc_to_str(now);
@@ -158,7 +158,7 @@ async fn update_user_mfa(req: &ReqUpdateUserMfa) -> Result<u64> {
     let mut updates: u64 = 0;
 
     // Issue the db update call.
-    let result = sqlx::query(UPDATE_USER_MFA_ENABLED)
+    let result = sqlx::query(UPDATE_RP_LOGIN_ENABLED)
         .bind(req.enabled)
         .bind(current_ts)
         .bind(&req.tms_user_id)

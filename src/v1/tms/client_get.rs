@@ -35,7 +35,7 @@ pub struct RespGetClient
     result_code: String,
     result_msg: String,
     id: i32,
-    app_name: String,
+    name: String,
     client_id: String,
     enabled: bool,
     created: DateTime<Utc>,
@@ -136,11 +136,12 @@ impl GetClientApi {
 impl RespGetClient {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, id: i32, app_name: String,
+    fn new(result_code: &str, result_msg: String, id: i32, name: String,
             client_id: String, enabled: bool, created: DateTime<Utc>, updated: DateTime<Utc>)
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-              id, app_name, client_id, enabled, created, updated}
+              id,
+                name: name, client_id, enabled, created, updated}
         }
 
     /// Process the request.
@@ -153,7 +154,7 @@ impl RespGetClient {
         let db_result = get_client(req).await;
         match db_result {
             Ok(client) => Ok(make_http_200(Self::new("0", "success".to_string(),
-                                                     client.id, client.app_name, client.client_id,
+                                                     client.id, client.name, client.client_id,
                                                      client.enabled, client.created, client.updated))),
             Err(e) => {
                 // Determine if this is a real db error or just record not found.

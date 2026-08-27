@@ -8,9 +8,9 @@ use sqlx::Row;
 
 use crate::utils::errors::HttpResult;
 use crate::utils::authz::{authorize, AuthzTypes};
-use crate::utils::db_statements::GET_USER_MFA;
+use crate::utils::db_statements::GET_RP_LOGIN;
 use crate::utils::tms_utils::{self, RequestDebug};
-use crate::utils::db_types::UserMfa;
+use crate::utils::db_types::RPLogin;
 use log::error;
 
 use crate::RUNTIME_CTX;
@@ -18,19 +18,19 @@ use crate::RUNTIME_CTX;
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
-pub struct GetUserMfaApi;
+pub struct GetRPLoginApi;
 
 // ***************************************************************************
 //                          Request/Response Definiions
 // ***************************************************************************
 #[derive(Object)]
-struct ReqGetUserMfa
+struct ReqGetRPLogin
 {
     tms_user_id: String
 }
 
 #[derive(Object, Debug)]
-pub struct RespGetUserMfa
+pub struct RespGetRPLogin
 {
     result_code: String,
     result_msg: String,
@@ -43,8 +43,8 @@ pub struct RespGetUserMfa
 }
 
 // Implement the debug record trait for logging.
-impl RequestDebug for ReqGetUserMfa {   
-    type Req = ReqGetUserMfa;
+impl RequestDebug for ReqGetRPLogin {   
+    type Req = ReqGetRPLogin;
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
@@ -58,7 +58,7 @@ impl RequestDebug for ReqGetUserMfa {
 #[derive(Debug, ApiResponse)]
 enum TmsResponse {
     #[oai(status = 200)]
-    Http200(Json<RespGetUserMfa>),
+    Http200(Json<RespGetRPLogin>),
     #[oai(status = 400)]
     Http400(Json<HttpResult>),
     #[oai(status = 401)]
@@ -69,7 +69,7 @@ enum TmsResponse {
     Http500(Json<HttpResult>),
 }
 
-fn make_http_200(resp: RespGetUserMfa) -> TmsResponse {
+fn make_http_200(resp: RespGetRPLogin) -> TmsResponse {
     TmsResponse::Http200(Json(resp))
 }
 fn make_http_400(msg: String) -> TmsResponse {
@@ -89,20 +89,20 @@ fn make_http_500(msg: String) -> TmsResponse {
 //                             OpenAPI Endpoint
 // ***************************************************************************
 #[OpenApi]
-impl GetUserMfaApi {
-    #[oai(path = "/tms/usermfa/:tms_user_id", method = "get")]
-    async fn get_user_mfa_api(&self, http_req: &Request, tms_user_id: Path<String>) -> TmsResponse {
+impl GetRPLoginApi {
+    #[oai(path = "/tms/rplogin/:tms_user_id", method = "get")]
+    async fn get_rp_login_api(&self, http_req: &Request, tms_user_id: Path<String>) -> TmsResponse {
         // Package the request parameters.
-        let req = ReqGetUserMfa {tms_user_id: tms_user_id.to_string()};
+        let req = ReqGetRPLogin {tms_user_id: tms_user_id.to_string()};
         
         // -------------------- Authorize ----------------------------
-        // Currently, only the admin can create a user mfa record.
+        // Currently, only the admin can create a user resource provider login record.
         // When user authentication is implemented, we'll add user-own 
         // authorization and any additional validation.
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to view mfa information for record #{}",
+            let msg = format!("ERROR: NOT AUTHORIZED to view resource provider login information for record #{}",
                                       req.tms_user_id);
             error!("{}", msg);
             return make_http_401(msg);
@@ -110,7 +110,7 @@ impl GetUserMfaApi {
 
         // -------------------- Process Request ----------------------
         // Process the request.
-        match RespGetUserMfa::process(http_req, &req).await {
+        match RespGetRPLogin::process(http_req, &req).await {
             Ok(r) => r,
             Err(e) => {
                 let msg = "ERROR: ".to_owned() + e.to_string().as_str();
@@ -124,7 +124,7 @@ impl GetUserMfaApi {
 // ***************************************************************************
 //                          Request/Response Methods
 // ***************************************************************************
-impl RespGetUserMfa {
+impl RespGetRPLogin {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
     fn new(result_code: &str, result_msg: String, id: i32, tms_user_id: String,
@@ -135,13 +135,13 @@ impl RespGetUserMfa {
         }
 
     /// Process the request.
-    async fn process(http_req: &Request, req: &ReqGetUserMfa) -> Result<TmsResponse, anyhow::Error> {
+    async fn process(http_req: &Request, req: &ReqGetRPLogin) -> Result<TmsResponse, anyhow::Error> {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
 
         // Search for the client id in the database.  Not found was already
         // The client_secret is never part of the response.
-        let db_result = get_user_mfa(req).await;
+        let db_result = get_rp_login(req).await;
         match db_result {
             Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
                                         u.tms_user_id, u.expires_at, u.enabled, u.created, u.updated))),
@@ -159,16 +159,16 @@ impl RespGetUserMfa {
 //                          Private Functions
 // ***************************************************************************
 // ---------------------------------------------------------------------------
-// get_user_mfa:
+// get_rp_login:
 // ---------------------------------------------------------------------------
-async fn get_user_mfa(req: &ReqGetUserMfa) -> Result<UserMfa> {
+async fn get_rp_login(req: &ReqGetRPLogin) -> Result<RPLogin> {
     // Get a connection to the db and start a transaction.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
     let mut tx = RUNTIME_CTX.db.begin().await?;
     
     // Create the select statement.
-    let result = sqlx::query(GET_USER_MFA)
+    let result = sqlx::query(GET_RP_LOGIN)
         .bind(&req.tms_user_id)
         .fetch_optional(&mut *tx)
         .await?;
@@ -176,10 +176,10 @@ async fn get_user_mfa(req: &ReqGetUserMfa) -> Result<UserMfa> {
     // Commit the transaction.
     tx.commit().await?;
 
-    // We may have found the user mfa.
+    // We may have found the user resource provider login record.
     match result {
         Some(row) => {
-            Ok(UserMfa::new(row.get(0), row.get(1), row.get(2), row.get(3), 
+            Ok(RPLogin::new(row.get(0), row.get(1), row.get(2), row.get(3), 
                            row.get(4), row.get(5)))
         },
         None => {

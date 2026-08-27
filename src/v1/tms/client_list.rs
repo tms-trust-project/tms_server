@@ -40,7 +40,7 @@ pub struct RespListClient
 pub struct ClientListElement
 {
     id: i32,
-    app_name: String,
+    name: String,
     client_id: String,
     enabled: i32,
     created: DateTime<Utc>,
@@ -123,9 +123,9 @@ impl ListClientApi {
 impl ClientListElement {
     /// Create response elements.
     #[allow(clippy::too_many_arguments)]
-    fn new(id: i32, app_name: String, client_id: String, enabled: i32,
+    fn new(id: i32, name: String, client_id: String, enabled: i32,
            created: DateTime<Utc>, updated: DateTime<Utc>) -> Self {
-        Self {id, app_name, client_id, enabled, created, updated}
+        Self {id, name: name, client_id, enabled, created, updated}
     }
 }
 

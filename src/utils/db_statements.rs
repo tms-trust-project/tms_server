@@ -5,12 +5,12 @@ pub const PLACEHOLDER: &str = "${PLACEHOLDER}";
 
 // ========================= clients table =========================
 pub const INSERT_CLIENT: &str = concat!(
-    "INSERT INTO clients (app_name, client_id, client_secret, enabled, created, updated) ",
+    "INSERT INTO clients (name, client_id, secret, enabled, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5, $6)",
 );
 
 pub const GET_CLIENT: &str = concat!(
-    "SELECT id, app_name, client_id, client_secret, enabled, created, updated ",
+    "SELECT id, name, client_id, secret, enabled, created, updated ",
     "FROM clients WHERE client_id = $1",
 );
 
@@ -20,14 +20,14 @@ pub const SEL_CLIENT_EXISTS: &str = concat!(
 
 // Secret elided.
 pub const LIST_CLIENTS_TEMPLATE: &str = concat!(
-    "SELECT id, app_name, client_id, enabled, created, updated ",
+    "SELECT id, name, client_id, enabled, created, updated ",
     "FROM clients ${PLACEHOLDER} ORDER BY client_id",
 );
 
 // Conforms to the signature required for secret retrieval queries as defined by 
 // get_authz_secret() in authz.rs.
 pub const GET_CLIENT_SECRET: &str = concat!(
-    "SELECT client_secret FROM clients WHERE client_id = $1",
+    "SELECT secret FROM clients WHERE client_id = $1",
 );
 
 pub const UPDATE_CLIENT_ENABLED: &str = concat!(
@@ -35,50 +35,50 @@ pub const UPDATE_CLIENT_ENABLED: &str = concat!(
 );
 
 pub const UPDATE_CLIENT_SECRET: &str = concat!(
-    "UPDATE clients SET client_secret = $1, updated = $2 WHERE client_id = $3"
+    "UPDATE clients SET secret = $1, updated = $2 WHERE client_id = $3"
 );
 
 pub const DELETE_CLIENT: &str = concat!(
     "DELETE FROM clients WHERE client_id = $1"
 );
 
-// ========================= user_mfa table ========================
-pub const INSERT_USER_MFA: &str = concat!(
-    "INSERT INTO user_mfa (tms_user_id, expires_at, enabled, created, updated) ",
+// ========================= resource_provider_logins table ========================
+pub const INSERT_RP_LOGIN: &str = concat!(
+    "INSERT INTO resource_provider_logins (tms_user_id, expires_at, enabled, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5)",
 );
 
-pub const INSERT_USER_MFA_NOT_STRICT: &str = concat!(
-    "INSERT INTO user_mfa (tms_user_id, expires_at, enabled, created, updated) ",
+pub const INSERT_RP_LOGIN_NOT_STRICT: &str = concat!(
+    "INSERT INTO resource_provider_logins (tms_user_id, expires_at, enabled, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
 );
 
-pub const GET_USER_MFA: &str = concat!(
+pub const GET_RP_LOGIN: &str = concat!(
     "SELECT id, tms_user_id, expires_at, enabled, created, updated ",
-    "FROM user_mfa WHERE tms_user_id = $1"
+    "FROM resource_provider_logins WHERE tms_user_id = $1"
 );
 
-pub const GET_USER_MFA_ACTIVE: &str = concat!(
+pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
     "SELECT expires_at, enabled ",
-    "FROM user_mfa WHERE tms_user_id = $1"
+    "FROM resource_provider_logins WHERE tms_user_id = $1"
 );
 
-pub const GET_USER_MFA_EXISTS: &str = concat!(
-    "SELECT 1 FROM user_mfa WHERE tms_user_id = $1"
+pub const GET_RP_LOGIN_EXISTS: &str = concat!(
+    "SELECT 1 FROM resource_provider_logins WHERE tms_user_id = $1"
 );
 
-pub const UPDATE_USER_MFA_ENABLED: &str = concat!(
-    "UPDATE user_mfa SET enabled = $1, updated = $2 WHERE tms_user_id = $3"
+pub const UPDATE_RP_LOGIN_ENABLED: &str = concat!(
+    "UPDATE resource_provider_logins SET enabled = $1, updated = $2 WHERE tms_user_id = $3"
 );
 
-pub const DELETE_USER_MFA: &str = concat!(
-    "DELETE FROM user_mfa WHERE tms_user_id = $1"
+pub const DELETE_RP_LOGIN: &str = concat!(
+    "DELETE FROM resource_provider_logins WHERE tms_user_id = $1"
 );
 
 // Secret elided.
-pub const LIST_USER_MFA: &str = concat!(
+pub const LIST_RP_LOGIN: &str = concat!(
     "SELECT id, tms_user_id, expires_at, enabled, created, updated ",
-    "FROM user_mfa ORDER BY tms_user_id",
+    "FROM resource_provider_logins ORDER BY tms_user_id",
 );
 
 // ========================= user_hosts table =======================

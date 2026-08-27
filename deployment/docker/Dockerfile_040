@@ -71,10 +71,6 @@ RUN chmod 700 ./tms_server/tms_server
 # Copy the resource files used during set up.
 COPY --from=builder --chown=tms:tms /tms_server/resources ./tms_server/resources
 
-# TODO remove next 2
-RUN pwd && sleep 15
-RUN ls -laR . && sleep 15
-
 # Start the server by default
 CMD ["/home/tms/tms_server/tms_server"]
 

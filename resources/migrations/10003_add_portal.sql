@@ -1,9 +1,4 @@
 --
---
--- TODO This includes all the tables as of 21 Aug 2026
--- TODO Notes
---   clients columns added: None
---           columns renamed: app_name to name, client_secret TO secret
 --   resource_provider_logins columns added: provider_account, provider_uuid, last_login
 --                            columns renamed: tms_user_id TO tms_identity
 -- TODO

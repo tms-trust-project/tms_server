@@ -1,10 +1,10 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use crate::utils::db_types::{DelegationInput, UserMfaInput, UserHostInput};
+use crate::utils::db_types::{DelegationInput, RPLoginInput, UserHostInput};
 use crate::utils::tms_utils::{timestamp_utc};
 use crate::v1::tms::delegations_create::insert_delegation;
-use crate::v1::tms::user_mfa_create::insert_user_mfa;
+use crate::v1::tms::rp_login_create::insert_rp_login;
 use crate::v1::tms::user_hosts_create::insert_user_host;
 use log::info;
 use crate::utils::config::DB_TRUE;
@@ -27,9 +27,9 @@ pub struct MVPDependencyParms
  * 
  *  - Keys don't expire.
  *  - Note that to satisfy foreign key constraints, records must be created
- *      in the following order: user_mfa, delegations, user_host
+ *      in the following order: rp_login, delegations, user_host
  *  - Key dependency records are automatically created in these tables:
- *      - user_mfa - non-expiring MFA set up for user
+ *      - rp_login - non-expiring RP_LOGIN set up for user
  *      - delegations - delegation established between user and client 
  *      - user_host - user binding created to host_account
  *  
@@ -48,11 +48,11 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
      // Use the same current UTC timestamp in all related time calculations.
      let now = timestamp_utc();
 
-    // --------------------- Insert user_mfa record ------------------------
+    // --------------------- Insert rp_login record ------------------------
     // Required inputs: client_user_id
     //
     // Create the input record.
-    let input_record = UserMfaInput::new(
+    let input_record = RPLoginInput::new(
         parms.client_user_id.clone(),
         expires_at,
         DB_TRUE,
@@ -61,10 +61,10 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     );
 
     // Insert the new record if it doesn't already exist.
-    let count = insert_user_mfa(input_record, NOT_STRICT).await?;
+    let count = insert_rp_login(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP: MFA for user '{}' created with expiration at {}.",
+        info!("MVP: RP_LOGIN for user '{}' created with expiration at {}.",
             parms.client_user_id, expires_at);
     }
 

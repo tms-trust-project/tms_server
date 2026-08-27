@@ -33,7 +33,7 @@ pub struct RespUpdateClientSecret
     result_code: String,
     result_msg: String,
     client_id: String,
-    client_secret: String,
+    secret: String,
 }
 
 // Implement the debug record trait for logging.
@@ -125,8 +125,8 @@ impl UpdateClientSecretApi {
 // ***************************************************************************
 impl RespUpdateClientSecret {
     /// Create a new response.
-    fn new(result_code: &str, result_msg: String, client_id: String, client_secret: String,) -> Self {
-        Self {result_code: result_code.to_string(), result_msg, client_id, client_secret,}
+    fn new(result_code: &str, result_msg: String, client_id: String, secret: String,) -> Self {
+        Self {result_code: result_code.to_string(), result_msg, client_id, secret: secret,}
     }
 
     /// Process the request.
@@ -135,17 +135,17 @@ impl RespUpdateClientSecret {
         tms_utils::debug_request(http_req, req);
 
         // ------------------------ Generate Secret --------------------  
-        let client_secret_str  = create_hex_secret();
-        let client_secret_hash = hash_hex_secret(&client_secret_str);
+        let secret_str  = create_hex_secret();
+        let secret_hash = hash_hex_secret(&secret_str);
 
         // Insert the new key record.
-        update_client_secret(req, client_secret_hash).await?;
+        update_secret(req, secret_hash).await?;
         
         // Log result and return response.
         let msg = format!("Secret updated for client {}", req.client_id);
         info!("{}", msg);
         Ok(make_http_200(RespUpdateClientSecret::new("0", msg, req.client_id.clone(),
-                                                     client_secret_str)))
+                                                     secret_str)))
     }
 }
 
@@ -153,9 +153,9 @@ impl RespUpdateClientSecret {
 //                          Private Functions
 // ***************************************************************************
 // ---------------------------------------------------------------------------
-// update_client_secret:
+// update_secret:
 // ---------------------------------------------------------------------------
-async fn update_client_secret(req: &ReqUpdateClientSecret, client_secret_hash: String) -> Result<u64> {
+async fn update_secret(req: &ReqUpdateClientSecret, secret_hash: String) -> Result<u64> {
     // Get timestamp.
     let now = timestamp_utc();
     let current_ts = timestamp_utc_to_str(now);
@@ -170,7 +170,7 @@ async fn update_client_secret(req: &ReqUpdateClientSecret, client_secret_hash: S
 
     // Issue the db update call.
     let result = sqlx::query(UPDATE_CLIENT_SECRET)
-        .bind(client_secret_hash)
+        .bind(secret_hash)
         .bind(current_ts)
         .bind(&req.client_id)
         .execute(&mut *tx)
