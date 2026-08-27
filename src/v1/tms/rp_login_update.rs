@@ -23,7 +23,7 @@ pub struct UpdateRPLoginApi;
 #[derive(Object)]
 pub struct ReqUpdateRPLogin
 {
-    tms_user_id: String,
+    tms_identity: String,
     enabled: bool,
 }
 
@@ -44,8 +44,8 @@ impl RequestDebug for ReqUpdateRPLogin {
 
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
-        s.push_str(&self.tms_user_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s.push_str("\n    enabled: ");
         s.push_str(enabled.as_str());
         s
@@ -97,7 +97,7 @@ async fn update_rp_login(&self, http_req: &Request, req: Json<ReqUpdateRPLogin>)
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to update resource provider login for user {}.", req.tms_user_id);
+            let msg = format!("ERROR: NOT AUTHORIZED to update resource provider login for user {}.", req.tms_identity);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -132,7 +132,7 @@ impl RespUpdateRPLogin {
         let updates = update_rp_login(req).await?;
         
         // Log result and return response.
-        let msg = format!("{} update(s) to tms_user_id {} completed, enabled = {}", updates, req.tms_user_id, req.enabled);
+        let msg = format!("{} update(s) to tms_identity {} completed, enabled = {}", updates, req.tms_identity, req.enabled);
         info!("{}", msg);
         Ok(make_http_200(RespUpdateRPLogin::new("0", msg, updates as i32)))
     }
@@ -161,7 +161,7 @@ async fn update_rp_login(req: &ReqUpdateRPLogin) -> Result<u64> {
     let result = sqlx::query(UPDATE_RP_LOGIN_ENABLED)
         .bind(req.enabled)
         .bind(current_ts)
-        .bind(&req.tms_user_id)
+        .bind(&req.tms_identity)
         .execute(&mut *tx)
         .await?;
     updates += result.rows_affected();

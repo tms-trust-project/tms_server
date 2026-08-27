@@ -24,7 +24,7 @@ pub struct UpdateUserHostsApi;
 #[derive(Object)]
 pub struct ReqUpdateUserHosts
 {
-    tms_user_id: String,
+    tms_identity: String,
     host: String,
     host_account: String,
     ttl_minutes: i32,  // negative means i32::MAX
@@ -45,8 +45,8 @@ impl RequestDebug for ReqUpdateUserHosts {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
-        s.push_str(&self.tms_user_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
         s.push_str("\n    host_account: ");
@@ -102,7 +102,7 @@ async fn update_client(&self, http_req: &Request, req: Json<ReqUpdateUserHosts>)
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to update host for user {}.", req.tms_user_id);
+            let msg = format!("ERROR: NOT AUTHORIZED to update host for user {}.", req.tms_identity);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -137,7 +137,7 @@ impl RespUpdateUserHosts {
         let (updates, expires_msg) = update_user_host(req).await?;
         
         // Log result and return response.
-        let msg = format!("{} update(s) to tms_user_id {} completed", updates, req.tms_user_id);
+        let msg = format!("{} update(s) to tms_identity {} completed", updates, req.tms_identity);
         info!("{}", msg);
         Ok(make_http_200(RespUpdateUserHosts::new("0", msg, updates as i32, expires_msg)))
     }
@@ -168,7 +168,7 @@ async fn update_user_host(req: &ReqUpdateUserHosts) -> Result<(u64, String)> {
     let result = sqlx::query(UPDATE_USER_HOST_EXPIRY)
         .bind(&expires_at)
         .bind(current_ts)
-        .bind(&req.tms_user_id)
+        .bind(&req.tms_identity)
         .bind(&req.host)
         .bind(&req.host_account)
         .execute(&mut *tx)

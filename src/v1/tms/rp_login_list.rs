@@ -41,7 +41,7 @@ pub struct RespListRPlogin
 pub struct RPloginListElement
 {
     id: i32,
-    tms_user_id: String,
+    tms_identity: String,
     expires_at: DateTime<Utc>,
     enabled: i32,
     created: DateTime<Utc>,
@@ -123,9 +123,9 @@ impl ListRPloginApi {
 impl RPloginListElement {
     /// Create response elements.
     #[allow(clippy::too_many_arguments)]
-    fn new(id: i32, tms_user_id: String, expires_at: DateTime<Utc>,
+    fn new(id: i32, tms_identity: String, expires_at: DateTime<Utc>,
            enabled: i32, created: DateTime<Utc>, updated: DateTime<Utc>) -> Self {
-        Self {id, tms_user_id, expires_at, enabled, created, updated}
+        Self {id, tms_identity, expires_at, enabled, created, updated}
     }
 }
 

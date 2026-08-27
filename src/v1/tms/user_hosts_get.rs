@@ -35,7 +35,7 @@ pub struct RespGetUserHosts
     result_code: String,
     result_msg: String,
     id: i32,
-    tms_user_id: String,
+    tms_identity: String,
     host: String,
     host_account: String,
     expires_at: DateTime<Utc>,
@@ -128,11 +128,11 @@ impl GetUserHostsApi {
 impl RespGetUserHosts {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, id: i32, tms_user_id: String,
+    fn new(result_code: &str, result_msg: String, id: i32, tms_identity: String,
             host: String, host_account: String, expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) 
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-                  id, tms_user_id, host, host_account, expires_at, created, updated}
+                  id, tms_identity, host, host_account, expires_at, created, updated}
         }
 
     /// Process the request.
@@ -145,8 +145,8 @@ impl RespGetUserHosts {
         let db_result = get_user_host(req).await;
         match db_result {
             Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
-                                        u.tms_user_id, u.host, u.host_account, 
-                                        u.expires_at, u.created, u.updated))),
+                                                u.tms_identity, u.host, u.host_account,
+                                                u.expires_at, u.created, u.updated))),
             Err(e) => {
                 // Determine if this is a real db error or just record not found.
                 let msg = e.to_string();

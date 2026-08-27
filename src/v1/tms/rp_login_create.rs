@@ -39,7 +39,7 @@ pub struct RespCreateRPLogin
 {
     result_code: String,
     result_msg: String,
-    tms_user_id: String,
+    tms_identity: String,
     expires_at: DateTime<Utc>,
     enabled: bool,
 }
@@ -50,7 +50,7 @@ impl RequestDebug for ReqCreateRPLogin {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
+        s.push_str("\n    tms_identity: ");
         s.push_str(&self.tms_identity);
         s.push_str("\n    tts_minutes: ");
         s.push_str(&self.ttl_minutes.to_string());
@@ -125,8 +125,8 @@ impl CreateRPLoginApi {
 // ***************************************************************************
 impl RespCreateRPLogin {
     /// Create a new response.
-    fn new(result_code: &str, result_msg: String, tms_user_id: String, expires_at: DateTime<Utc>, enabled: bool,) -> Self {
-        Self {result_code: result_code.to_string(), result_msg, tms_user_id, expires_at, enabled,}}
+    fn new(result_code: &str, result_msg: String, tms_identity: String, expires_at: DateTime<Utc>, enabled: bool,) -> Self {
+        Self {result_code: result_code.to_string(), result_msg, tms_identity, expires_at, enabled,}}
 
     /// Process the request.
     async fn process(http_req: &Request, req: &ReqCreateRPLogin) -> Result<TmsResponse, anyhow::Error> {
@@ -179,7 +179,7 @@ pub async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
     
     // Create the insert statement.
     let result = sqlx::query(sql_query)
-        .bind(rec.tms_user_id)
+        .bind(rec.tms_identity)
         .bind(rec.expires_at)
         .bind(rec.enabled)
         .bind(rec.created)

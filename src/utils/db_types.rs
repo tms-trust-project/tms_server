@@ -190,7 +190,7 @@ impl ClientInput {
 #[allow(dead_code)]
 pub struct RPLogin {
     pub id: i32,
-    pub tms_user_id: String,
+    pub tms_identity: String,
     pub expires_at: DateTime<Utc>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
@@ -199,7 +199,7 @@ pub struct RPLogin {
 
 #[derive(Debug, Deserialize)]
 pub struct RPLoginInput {
-    pub tms_user_id: String,
+    pub tms_identity: String,
     pub expires_at: DateTime<Utc>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
@@ -210,15 +210,16 @@ impl RPLogin {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
-        tms_user_id: String,
+        tms_identity: String,
         expires_at: DateTime<Utc>,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
-    ) 
-    -> RPLogin {
+    )
+        -> RPLogin {
         RPLogin {
-            id, tms_user_id, expires_at, enabled, created, updated
+            id,
+            tms_identity, expires_at, enabled, created, updated
         }
     }
 }
@@ -226,7 +227,7 @@ impl RPLogin {
 impl RPLoginInput {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
-        tms_user_id: String,
+        tms_identity: String,
         expires_at: DateTime<Utc>,
         enabled: bool,
         created: DateTime<Utc>,
@@ -234,7 +235,7 @@ impl RPLoginInput {
     ) 
     -> RPLoginInput {
         RPLoginInput {
-            tms_user_id, expires_at, enabled, created, updated
+            tms_identity: tms_identity, expires_at, enabled, created, updated
         }
     }
 }
@@ -246,7 +247,7 @@ impl RPLoginInput {
 #[allow(dead_code)]
 pub struct UserHost {
     pub id: i32,
-    pub tms_user_id: String,
+    pub tms_identity: String,
     pub host: String,
     pub host_account: String,
     pub expires_at: DateTime<Utc>,
@@ -256,7 +257,7 @@ pub struct UserHost {
 
 #[derive(Debug, Deserialize)]
 pub struct UserHostInput {
-    pub tms_user_id: String,
+    pub tms_identity: String,
     pub host: String,
     pub host_account: String,
     pub expires_at: DateTime<Utc>,
@@ -268,16 +269,17 @@ impl UserHost {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
-        tms_user_id: String,
+        tms_identity: String,
         host: String,
         host_account: String,
         expires_at: DateTime<Utc>,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
-    ) 
-    -> UserHost {
+    )
+        -> UserHost {
         UserHost {
-            id, tms_user_id, host, host_account, expires_at, created, updated
+            id,
+            tms_identity, host, host_account, expires_at, created, updated
         }
     }
 }
@@ -285,16 +287,16 @@ impl UserHost {
 impl UserHostInput {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
-        tms_user_id: String,
+        tms_identity: String,
         host: String,
         host_account: String,
         expires_at: DateTime<Utc>,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
-    ) 
-    -> UserHostInput {
+    )
+        -> UserHostInput {
         UserHostInput {
-            tms_user_id, host, host_account, expires_at, created, updated
+            tms_identity, host, host_account, expires_at, created, updated
         }
     }
 }

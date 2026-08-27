@@ -23,7 +23,7 @@ pub struct DeleteUserHostsApi;
 #[derive(Object)]
 pub struct ReqDeleteUserHosts
 {
-    tms_user_id: String,
+    tms_identity: String,
     host: String,
     host_account: String,
 }
@@ -42,8 +42,8 @@ impl RequestDebug for ReqDeleteUserHosts {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
-        s.push_str(&self.tms_user_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
         s.push_str("\n    host_account: ");
@@ -98,7 +98,7 @@ impl DeleteUserHostsApi {
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
             let msg = format!("ERROR: NOT AUTHORIZED to delete host {} for user {}.",
-                                      req.host, req.tms_user_id);
+                                      req.host, req.tms_identity);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -134,8 +134,8 @@ impl RespDeleteUserHosts {
         
         // Log result and return response.
         let msg = 
-            if deletes < 1 {format!("Host {} NOT FOUND for user {} - Nothing deleted", req.host, req.tms_user_id)}
-            else {format!("User host {} deleted for user {} and account {}", req.host, req.tms_user_id, req.host_account)};
+            if deletes < 1 {format!("Host {} NOT FOUND for user {} - Nothing deleted", req.host, req.tms_identity)}
+            else {format!("User host {} deleted for user {} and account {}", req.host, req.tms_identity, req.host_account)};
         info!("{}", msg);
         Ok(make_http_200(RespDeleteUserHosts::new("0", msg, deletes as u32)))
     }
@@ -158,7 +158,7 @@ async fn delete_user_host(req: &ReqDeleteUserHosts) -> Result<u64> {
 
     // Issue the db delete call.
     let result = sqlx::query(DELETE_USER_HOST)
-        .bind(&req.tms_user_id)
+        .bind(&req.tms_identity)
         .bind(&req.host)
         .bind(&req.host_account)
         .execute(&mut *tx)

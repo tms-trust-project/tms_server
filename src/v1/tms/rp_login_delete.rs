@@ -40,7 +40,7 @@ impl RequestDebug for ReqDeleteRPLogin {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
+        s.push_str("\n    tms_identity: ");
         s.push_str(&self.tms_identity);
         s
     }
@@ -77,10 +77,10 @@ fn make_http_500(msg: String) -> TmsResponse {
 // ***************************************************************************
 #[OpenApi]
 impl DeleteRPLoginApi {
-    #[oai(path = "/tms/rplogin/del/:tms_user_id", method = "delete")]
-    async fn delete_rp_login_api(&self, http_req: &Request, tms_user_id: Path<String>) -> TmsResponse {
+    #[oai(path = "/tms/rplogin/del/:tms_identity", method = "delete")]
+    async fn delete_rp_login_api(&self, http_req: &Request, tms_identity: Path<String>) -> TmsResponse {
         // Package the request parameters.
-        let req = ReqDeleteRPLogin { tms_identity: tms_user_id.to_string()};
+        let req = ReqDeleteRPLogin { tms_identity: tms_identity.to_string()};
 
         // -------------------- Authorize ----------------------------
         // Currently, only the admin can delete a user rp_login record.

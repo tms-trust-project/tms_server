@@ -26,7 +26,7 @@ pub struct GetRPLoginApi;
 #[derive(Object)]
 struct ReqGetRPLogin
 {
-    tms_user_id: String
+    tms_identity: String
 }
 
 #[derive(Object, Debug)]
@@ -35,7 +35,7 @@ pub struct RespGetRPLogin
     result_code: String,
     result_msg: String,
     id: i32,
-    tms_user_id: String,
+    tms_identity: String,
     expires_at: DateTime<Utc>,
     enabled: bool,
     created: DateTime<Utc>,
@@ -48,8 +48,8 @@ impl RequestDebug for ReqGetRPLogin {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
-        s.push_str(&self.tms_user_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s
     }
 }
@@ -90,10 +90,10 @@ fn make_http_500(msg: String) -> TmsResponse {
 // ***************************************************************************
 #[OpenApi]
 impl GetRPLoginApi {
-    #[oai(path = "/tms/rplogin/:tms_user_id", method = "get")]
-    async fn get_rp_login_api(&self, http_req: &Request, tms_user_id: Path<String>) -> TmsResponse {
+    #[oai(path = "/tms/rplogin/:tms_identity", method = "get")]
+    async fn get_rp_login_api(&self, http_req: &Request, tms_identity: Path<String>) -> TmsResponse {
         // Package the request parameters.
-        let req = ReqGetRPLogin {tms_user_id: tms_user_id.to_string()};
+        let req = ReqGetRPLogin {tms_identity: tms_identity.to_string()};
         
         // -------------------- Authorize ----------------------------
         // Currently, only the admin can create a user resource provider login record.
@@ -103,7 +103,7 @@ impl GetRPLoginApi {
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
             let msg = format!("ERROR: NOT AUTHORIZED to view resource provider login information for record #{}",
-                                      req.tms_user_id);
+                                      req.tms_identity);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -127,11 +127,11 @@ impl GetRPLoginApi {
 impl RespGetRPLogin {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, id: i32, tms_user_id: String,
+    fn new(result_code: &str, result_msg: String, id: i32, tms_identity: String,
             expires_at: DateTime<Utc>, enabled: bool, created: DateTime<Utc>, updated: DateTime<Utc>)
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-                  id, tms_user_id, expires_at, enabled, created, updated}
+                  id, tms_identity, expires_at, enabled, created, updated}
         }
 
     /// Process the request.
@@ -144,7 +144,7 @@ impl RespGetRPLogin {
         let db_result = get_rp_login(req).await;
         match db_result {
             Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
-                                        u.tms_user_id, u.expires_at, u.enabled, u.created, u.updated))),
+                                                u.tms_identity, u.expires_at, u.enabled, u.created, u.updated))),
             Err(e) => {
                 // Determine if this is a real db error or just record not found.
                 let msg = e.to_string();
@@ -169,7 +169,7 @@ async fn get_rp_login(req: &ReqGetRPLogin) -> Result<RPLogin> {
     
     // Create the select statement.
     let result = sqlx::query(GET_RP_LOGIN)
-        .bind(&req.tms_user_id)
+        .bind(&req.tms_identity)
         .fetch_optional(&mut *tx)
         .await?;
 

@@ -28,7 +28,7 @@ pub struct CreateUserHostsApi;
 #[derive(Object)]
 pub struct ReqCreateUserHosts
 {
-    tms_user_id: String,
+    tms_identity: String,
     host: String,
     host_account: String,
     ttl_minutes: i32,  // negative means i32::MAX
@@ -39,7 +39,7 @@ pub struct RespCreateUserHosts
 {
     result_code: String,
     result_msg: String,
-    tms_user_id: String,
+    tms_identity: String,
     host: String,
     host_account: String,
     expires_at: DateTime<Utc>,
@@ -51,8 +51,8 @@ impl RequestDebug for ReqCreateUserHosts {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    tms_user_id: ");
-        s.push_str(&self.tms_user_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
         s.push_str("\n    host_account: ");
@@ -130,9 +130,9 @@ impl CreateUserHostsApi {
 // ***************************************************************************
 impl RespCreateUserHosts {
     /// Create a new response.
-    fn new(result_code: &str, result_msg: String, tms_user_id: String, host: String, 
+    fn new(result_code: &str, result_msg: String, tms_identity: String, host: String, 
            host_account: String, expires_at: DateTime<Utc>,) -> Self {
-        Self {result_code: result_code.to_string(), result_msg, tms_user_id, host, host_account, expires_at,}}
+        Self {result_code: result_code.to_string(), result_msg, tms_identity: tms_identity, host, host_account, expires_at,}}
 
     /// Process the request.
     async fn process(http_req: &Request, req: &ReqCreateUserHosts) -> Result<TmsResponse, anyhow::Error> {
@@ -151,23 +151,23 @@ impl RespCreateUserHosts {
         // Create the input record.  Note that we save the hash of
         // the hex secret, but never the secret itself.  
         let input_record = UserHostInput::new(
-            req.tms_user_id.clone(),
+            req.tms_identity.clone(),
             req.host.clone(),
             req.host_account.clone(),
             expires_at.clone(),
-            now.clone(), 
+            now.clone(),
             now.clone(),
         );
 
         // Insert the new key record.
         insert_user_host(input_record, STRICT).await?;
         info!("Host mapping for user '{}' created with experation at {}.",
-              req.tms_user_id, expires_at.clone());
+              req.tms_identity, expires_at.clone());
         
         // Return the secret represented in hex.
-        Ok(make_http_201(Self::new("0", "success".to_string(), 
-                            req.tms_user_id.clone(), req.host.clone(), 
-                            req.host_account.clone(), expires_at,)))
+        Ok(make_http_201(Self::new("0", "success".to_string(),
+                                   req.tms_identity.clone(), req.host.clone(),
+                                   req.host_account.clone(), expires_at,)))
     }
 }
 
@@ -188,7 +188,7 @@ pub async fn insert_user_host(rec: UserHostInput, strict: bool) -> Result<u64> {
     
     // Create the insert statement.
     let result = sqlx::query(sql_query)
-        .bind(rec.tms_user_id)
+        .bind(rec.tms_identity)
         .bind(rec.host)
         .bind(rec.host_account)
         .bind(rec.expires_at)

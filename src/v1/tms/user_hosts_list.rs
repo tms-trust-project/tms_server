@@ -41,7 +41,7 @@ pub struct RespListUserHosts
 pub struct UserHostsListElement
 {
     id: i32,
-    tms_user_id: String,
+    tms_identity: String,
     host: String,
     host_account: String,
     expires_at: DateTime<Utc>,
@@ -124,9 +124,9 @@ impl ListUserHostsApi {
 impl UserHostsListElement {
     /// Create response elements.
     #[allow(clippy::too_many_arguments)]
-    fn new(id: i32, tms_user_id: String, host: String, host_account: String,
+    fn new(id: i32, tms_identity: String, host: String, host_account: String,
            expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) -> Self {
-        Self {id, tms_user_id, host, host_account, expires_at, created, updated}
+        Self {id, tms_identity, host, host_account, expires_at, created, updated}
     }
 }
 
