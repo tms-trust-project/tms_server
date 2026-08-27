@@ -18,6 +18,8 @@ INSERT INTO identity_provider_types (provider_type)
 VALUES ('globus');
 INSERT INTO identity_provider_types (provider_type)
 VALUES ('tacc_tapis');
+INSERT INTO identity_provider_types (provider_type)
+VALUES ('dummy_test');
 
 -- All cloud and resource IdPs
 -- Example cloud IdPs: UT Austin, UC San Diego, Univ of Pittsburgh, ACCESS
@@ -142,7 +144,7 @@ END $$;
 -- ================================================================================================
 ALTER TABLE IF EXISTS user_mfa RENAME TO resource_provider_logins;
 -- ------------------------------------------------------------------------------------------------
--- Rename column tms_user_id to tms_identity.
+-- Rename column tms_user_id to tms_identity for table resource_provider_logins.
 -- ------------------------------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -162,3 +164,14 @@ ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS last_login TIMESTA
 ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_uuid_account_key
     UNIQUE (tms_identity, provider_uuid, provider_account);
 ALTER TABLE resource_provider_logins ADD CONSTRAINT uuid_fkey FOREIGN KEY (provider_uuid) REFERENCES identity_providers(uuid);
+
+-- ------------------------------------------------------------------------------------------------
+-- Rename column tms_user_id to tms_identity for table user_hosts.
+-- ------------------------------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='user_hosts' and column_name='tms_user_id')
+  THEN
+ALTER TABLE user_hosts RENAME COLUMN tms_user_id TO tms_identity;
+END IF;
+END $$;

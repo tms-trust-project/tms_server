@@ -7,13 +7,13 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS};
+use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, GET_CLIENT, GET_IDP};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
 
 use crate::RUNTIME_CTX;
-use crate::utils::db_types::{ClientInput, PubkeyInput};
+use crate::utils::db_types::{Client, ClientInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
 use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RESERVATION_FOR_EXTEND,
@@ -21,9 +21,11 @@ use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RES
                            GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
                            SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
+const TEST_IDP_ID: &str = "test_dummy_idp";
 const TEST_USER: &str = "testuser";
 const TEST_HOST: &str = "testhost";
 const TEST_HOST_ACCOUNT: &str = "testhostaccount";
+const TEST_RP_ACCOUNT: &str = "testrpaccount";
 const TEST_FIXED_USER: &str  = "testuser101";
 const TEST_FIXED_FINGERPRINT: &str= "SHA256:wUKFDv4LAQo7OtMUZenzupG5DB95Dxi+n3s4rd/UQ00";
 const TEST_RECORD_CNT: i32 = 101;
@@ -281,12 +283,20 @@ pub async fn create_test_client() -> Result<u64> {
 // ---------------------------------------------------------------------------
 // create_test_data:
 // ---------------------------------------------------------------------------
-/** This function either experiences an error or returns true (false is never returned). */
+/*
+ This function either experiences an error or returns true (false is never returned).
+ Use now timestamp for created, updated and last_login
+ */
 pub async fn create_test_data() -> Result<u64> {
     // Max expires_at
     let max_tms_utc = DateTime::parse_from_rfc3339(MAX_TMS_UTC_STR).unwrap().with_timezone(&Utc);
     // Get the timestamp string.
     let now = timestamp_utc();
+
+    // TODO Look up provider uuid from identity_providers table. Use provider id = "dummy_test_idp"
+    // TODO Add sql to look up identity provider record
+    let dummy_idp = TEST_IDP_ID;
+    let provider_uuid = ?;
 
     // Create records for 101 test users in the test client. Do this in a txn
     // User 101 will have a fixed pubkey fingerprint to smoke test.
@@ -296,6 +306,7 @@ pub async fn create_test_data() -> Result<u64> {
         let test_user = format!("{}{:03}", TEST_USER, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
+        let test_rp_account = format!("{}{:03}", TEST_RP_ACCOUNT, n);
         let mut tx = RUNTIME_CTX.db.begin().await?;
 
         // Check for existing record. If found then continue;
@@ -306,13 +317,17 @@ pub async fn create_test_data() -> Result<u64> {
             .bind(test_user.clone())
             .fetch_one(&mut *tx).await?;
         if skip_create {continue};
-        info!("Creating delegation records for user: {} host: {} host_acct {}", test_user, test_host, test_host_acct);
+        info!("Creating delegation records for user: {} host: {} host_acct {} rp_account {}",
+              test_user, test_host, test_host_acct, test_rp_account);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)
             .bind(test_user.clone())
             .bind(max_tms_utc)
             .bind(DB_TRUE)
             .bind(now)
+            .bind(now)
+            .bind(test_rp_account)
+            .bind(provider_uuid)
             .bind(now)
             .execute(&mut *tx)
             .await?;
@@ -373,7 +388,7 @@ pub async fn create_test_keys() -> Result<u64> {
 // check_pubkey_dependencies:
 // ---------------------------------------------------------------------------
 /** When creating a public key or a reservation on a public key we must check
- * that the user's RP_LOGIN, user/host mapping and client delegation are currently 
+ * that the user's RP_LOGIN, user/host mapping and client delegation are currently
  * active.  Active means that the records exist in their respective tables, are
  * enabled and have not expired.
  * 
@@ -515,7 +530,7 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
  * 
  *  - rp_login - the user must have an rplogin record
  *  - user_hosts - the user must have established a link to the reservation's host
- *  - delegations - the user must have delegated access to the reservation's client 
+ *  - delegations - the user must have delegated access to the reservation's client
  * 
  * Validating these constraints before actually submitting the reservation extension
  * request allows us to return meaningful messages to users on error. The final arbiter, 
@@ -674,4 +689,34 @@ pub async fn set_test_enabled_internal(test_client: &String, enabled: bool) -> R
     // Commit the transaction.
     tx.commit().await?;
     Ok(updates)
+}
+
+// ***************************************************************************
+//                          Private Functions
+// ***************************************************************************
+async fn get_idp() -> Result<???Client> {
+    // Get a connection to the db and start a transaction.  Uncommited transactions 
+    // are automatically rolled back when they go out of scope. 
+    // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+
+    // Create the select statement.
+    let result = sqlx::query(GET_IDP)
+        .bind(???req.client_id.clone())
+        .fetch_optional(&mut *tx)
+        .await?;
+
+    // Commit the transaction.
+    tx.commit().await?;
+
+    // We may have found the client. 
+    match result {
+        Some(row) => {
+            Ok(Client::new(row.get(0), row.get(1), row.get(2), row.get(3), row.get(4),
+                           row.get(5), row.get(6)))
+        },
+        None => {
+            Err(anyhow!("NOT_FOUND"))
+        },
+    }
 }

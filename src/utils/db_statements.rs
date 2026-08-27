@@ -3,6 +3,13 @@
 
 pub const PLACEHOLDER: &str = "${PLACEHOLDER}";
 
+
+// ========================= identity_providers table =========================
+pub const GET_IDP: &str = concat!(
+  "SELECT uuid, id, name, provider_type FROM identity_providers WHERE id = $1",
+);
+
+
 // ========================= clients table =========================
 pub const INSERT_CLIENT: &str = concat!(
     "INSERT INTO clients (name, client_id, secret, enabled, created, updated) ",
@@ -44,8 +51,9 @@ pub const DELETE_CLIENT: &str = concat!(
 
 // ========================= resource_provider_logins table ========================
 pub const INSERT_RP_LOGIN: &str = concat!(
-    "INSERT INTO resource_provider_logins (tms_identity, expires_at, enabled, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5)",
+    "INSERT INTO resource_provider_logins ",
+    "(tms_identity, expires_at, enabled, created, updated, provider_account, provider_uuid, last_login) ",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 );
 
 pub const INSERT_RP_LOGIN_NOT_STRICT: &str = concat!(
