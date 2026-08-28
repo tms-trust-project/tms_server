@@ -1,5 +1,5 @@
 -- ================================================================================================
--- Add tables needed for TMS Portal backend. TMS portal and server will use the same DB
+-- Alter schema for TMS Portal backend. TMS portal and server will use the same DB
 -- ================================================================================================
 -- ---------------------------------------
 -- Identity Provider tables
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS identity_provider_types
     provider_type TEXT PRIMARY KEY            NOT NULL,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
-    );
+);
 ALTER TABLE identity_provider_types OWNER TO tms;
 -- TODO include this as part of migration? or maybe move to a seeding step?
 -- Insert hard-coded types
@@ -18,6 +18,8 @@ INSERT INTO identity_provider_types (provider_type)
 VALUES ('globus');
 INSERT INTO identity_provider_types (provider_type)
 VALUES ('tacc_tapis');
+INSERT INTO identity_provider_types (provider_type)
+VALUES ('danger_mode');
 INSERT INTO identity_provider_types (provider_type)
 VALUES ('dummy_test');
 
@@ -47,6 +49,28 @@ CREATE TABLE IF NOT EXISTS identity_providers
 ALTER TABLE identity_providers OWNER TO tms;
 ALTER TABLE identity_providers
     ADD CONSTRAINT fk_provider FOREIGN KEY (provider_type) REFERENCES identity_provider_types (provider_type);
+
+-- ---------------------------------------
+-- tms_identities table
+-- ---------------------------------------
+-- Whenever a user logs in and establishes their cloud identity through TMS we record it here.
+-- Note that because this is not a record of their last login there is no updated column.
+-- This is needed because for delegations we want to make sure we always reference a unique tms_identity.
+-- If all tables reference this as a Foreign Key this will ensure that tms_identity columns all reference the same
+--   unique identity unique within TMS
+CREATE TABLE IF NOT EXISTS tms_identities
+(
+    seq_id SERIAL PRIMARY KEY,
+    tms_identity TEXT NOT NULL,
+    created TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
+);
+ALTER TABLE tms_identities OWNER TO tms;
+
+-- TODO remove this insert
+-- TODO 'dangerUser@dangerModeIdP'
+--   temporary insert to accommodate test data. Also need related work done for upgrades.
+--   If we end up always needing for test data we should have the tms_server startup create it.
+INSERT INTO tms_identities (tms_identity) VALUES ('dangerUser@dangerModeIdP');
 
 -- ---------------------------------------
 -- keys table
@@ -119,40 +143,23 @@ CREATE TABLE IF NOT EXISTS issued_tokens
 -- Rename column app_name in clients table to name. app_name stands for "application client" but that is not
 -- the term used in many other related documents so it could be confusing. Also, this is what TMS portal uses.
 -- ------------------------------------------------------------------------------------------------
-DO $$
-BEGIN
-  IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='clients' and column_name='app_name')
-  THEN
 ALTER TABLE clients RENAME COLUMN app_name TO name;
-END IF;
-END $$;
 -- ------------------------------------------------------------------------------------------------
 -- Rename column client_secret to secret. This is simpler and matches what the portal code is using.
--- NOTE: TODO Keep column client_id as is because TMS server already has a column 'id' as a SERIAL primary key
+-- NOTE: Keep column client_id as is because TMS server already has a column 'id' as a SERIAL primary key
 -- ------------------------------------------------------------------------------------------------
-DO $$
-BEGIN
-  IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='clients' and column_name='client_secret')
-  THEN
-    ALTER TABLE clients RENAME COLUMN client_secret TO secret;
-  END IF;
-END $$;
+ALTER TABLE clients RENAME COLUMN client_secret TO secret;
 
 -- ================================================================================================
 -- Rename table user_mfa to resource_provider_logins to better reflect the purpose.
 --   This table records the last time the user logged into their resource provider account.
 -- ================================================================================================
 ALTER TABLE IF EXISTS user_mfa RENAME TO resource_provider_logins;
+
 -- ------------------------------------------------------------------------------------------------
 -- Rename column tms_user_id to tms_identity for table resource_provider_logins.
 -- ------------------------------------------------------------------------------------------------
-DO $$
-BEGIN
-  IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='resource_provider_logins' and column_name='tms_user_id')
-  THEN
-    ALTER TABLE resource_provider_logins RENAME COLUMN tms_user_id TO tms_identity;
-  END IF;
-END $$;
+ALTER TABLE resource_provider_logins RENAME COLUMN tms_user_id TO tms_identity;
 
 -- ================================================================================================
 -- Add columns and constraints to resource_provider_logins table
@@ -166,12 +173,26 @@ ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_uuid_account_key
 ALTER TABLE resource_provider_logins ADD CONSTRAINT uuid_fkey FOREIGN KEY (provider_uuid) REFERENCES identity_providers(uuid);
 
 -- ------------------------------------------------------------------------------------------------
+-- Add foreign key for tms_identity referencing tms_identities table
+-- ------------------------------------------------------------------------------------------------
+ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
+   FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
+
+-- ------------------------------------------------------------------------------------------------
 -- Rename column tms_user_id to tms_identity for table user_hosts.
 -- ------------------------------------------------------------------------------------------------
-DO $$
-BEGIN
-  IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='user_hosts' and column_name='tms_user_id')
-  THEN
 ALTER TABLE user_hosts RENAME COLUMN tms_user_id TO tms_identity;
-END IF;
-END $$;
+
+-- ---------------------------------------
+-- delegations table
+-- ---------------------------------------
+--Add column tms_identity and add foreign key
+--TODO: For upgrade, what about existing records? empty string? allow null?
+-- Automatically insert <tacc_username>@danger_mode_idp for the tms_identity
+ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUser@dangerModeIdP'
+    REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- ------------------------------------------------------------------------------------------------
+-- Rename column client_user_id to rp_account for delegations.
+-- ------------------------------------------------------------------------------------------------
+ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;

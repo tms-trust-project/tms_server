@@ -7,13 +7,15 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, GET_CLIENT, GET_IDP};
+use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS,
+                                  INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, GET_CLIENT,
+                                  GET_IDP_UUID, SEL_IDP_EXISTS};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
-
+use uuid::Uuid;
 use crate::RUNTIME_CTX;
-use crate::utils::db_types::{Client, ClientInput, PubkeyInput};
+use crate::utils::db_types::{Client, ClientInput, IdPInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
 use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RESERVATION_FOR_EXTEND,
@@ -22,6 +24,14 @@ use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RES
                            SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
 const TEST_IDP_ID: &str = "test_dummy_idp";
+const TEST_IDP_NAME: &str = "Dummy Test IdP";
+const TEST_IDP_CLIENT_ID: &str = "";
+const TEST_IDP_CLIENT_SECRET: &str = "";
+const TEST_IDP_REDIRECT_URL: &str = "";
+const TEST_IDP_TOKEN_URL: &str = "";
+const TEST_IDP_PROVIDER_TYPE: &str = "dummy_test";
+const TEST_IDP_SUPPORTS_LOGIN: bool = true;
+const TEST_IDP_SUPPORTS_RESOURCES: bool = false;
 const TEST_USER: &str = "testuser";
 const TEST_HOST: &str = "testhost";
 const TEST_HOST_ACCOUNT: &str = "testhostaccount";
@@ -45,6 +55,30 @@ const KEY_TYPE: KeyType = KeyType::Ed25519;
  * sure there are no other transactions that issue multiple SQL calls on different 
  * tables in a different order, which could lead to conflicts and deadlocks.
 */
+
+/*
+ * Insert a IdP record
+ */
+pub async fn insert_new_idp(rec: IdPInput) -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // Create the insert statement.
+    let result = sqlx::query(INSERT_CLIENT)
+        .bind(rec.id.clone())
+        .bind(rec.name.clone())
+        .bind(rec.client_id.clone())
+        .bind(rec.client_secret.clone())
+        .bind(rec.identity_redirect_url.clone())
+        .bind(rec.oauth2_token_url.clone())
+        .bind(rec.provider_type.clone())
+        .bind(rec.supports_login)
+        .bind(rec.supports_resources)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    info!("New IdP created. Id: {} ClientId: {} Name: {} ProviderType: {} SupportsLogin: {} SupportsResources: {}",
+          rec.id, rec.client_id, rec.name, rec.provider_type, rec.supports_login, rec.supports_resources);
+    Ok(result.rows_affected())
+}
 
 /*
  * Insert a client pubkey record
@@ -281,6 +315,39 @@ pub async fn create_test_client() -> Result<u64> {
 }
 
 // ---------------------------------------------------------------------------
+// create_test_idp:
+// ---------------------------------------------------------------------------
+/** This function either experiences an error or returns true (false is never returned). */
+pub async fn create_test_idp() -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // If client already exists then we are done
+    let skip_create: bool = sqlx::query_scalar(SEL_IDP_EXISTS)
+        .bind(TEST_IDP_ID)
+        .fetch_one(&mut *tx).await?;
+    if skip_create {return Ok(0)}
+
+    let test_idp_client_secret_hash: String = hash_hex_secret(&TEST_IDP_CLIENT_SECRET.to_string());
+    let now = timestamp_utc();
+    // Create the IdP
+    // Create the input record. Note we save the hash of the hex secret, but never the secret.
+    let idp_input = IdPInput::new(
+        TEST_IDP_ID.to_string(),
+        TEST_IDP_NAME.to_string(),
+        TEST_IDP_CLIENT_ID.to_string(),
+        test_idp_client_secret_hash,
+        TEST_IDP_REDIRECT_URL.to_string(),
+        TEST_IDP_TOKEN_URL.to_string(),
+        TEST_IDP_PROVIDER_TYPE.to_string(),
+        TEST_IDP_SUPPORTS_LOGIN,
+        TEST_IDP_SUPPORTS_RESOURCES,
+        now.clone(),
+        now.clone()
+    );
+    let inserts = insert_new_idp(idp_input).await?;
+    Ok(inserts)
+}
+
+// ---------------------------------------------------------------------------
 // create_test_data:
 // ---------------------------------------------------------------------------
 /*
@@ -293,10 +360,11 @@ pub async fn create_test_data() -> Result<u64> {
     // Get the timestamp string.
     let now = timestamp_utc();
 
-    // TODO Look up provider uuid from identity_providers table. Use provider id = "dummy_test_idp"
-    // TODO Add sql to look up identity provider record
-    let dummy_idp = TEST_IDP_ID;
-    let provider_uuid = ?;
+    // TODO Look up provider UUID using TEST_IDP_ID
+    // TODO  best way to get scalar uuid? To we need to conver to a string?
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    let test_idp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_IDP_ID).fetch_one(&mut *tx).await?;
+    tx.commit().await?;
 
     // Create records for 101 test users in the test client. Do this in a txn
     // User 101 will have a fixed pubkey fingerprint to smoke test.
@@ -327,7 +395,7 @@ pub async fn create_test_data() -> Result<u64> {
             .bind(now)
             .bind(now)
             .bind(test_rp_account)
-            .bind(provider_uuid)
+            .bind(test_idp_uuid)
             .bind(now)
             .execute(&mut *tx)
             .await?;
@@ -694,29 +762,3 @@ pub async fn set_test_enabled_internal(test_client: &String, enabled: bool) -> R
 // ***************************************************************************
 //                          Private Functions
 // ***************************************************************************
-async fn get_idp() -> Result<???Client> {
-    // Get a connection to the db and start a transaction.  Uncommited transactions 
-    // are automatically rolled back when they go out of scope. 
-    // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
-    let mut tx = RUNTIME_CTX.db.begin().await?;
-
-    // Create the select statement.
-    let result = sqlx::query(GET_IDP)
-        .bind(???req.client_id.clone())
-        .fetch_optional(&mut *tx)
-        .await?;
-
-    // Commit the transaction.
-    tx.commit().await?;
-
-    // We may have found the client. 
-    match result {
-        Some(row) => {
-            Ok(Client::new(row.get(0), row.get(1), row.get(2), row.get(3), row.get(4),
-                           row.get(5), row.get(6)))
-        },
-        None => {
-            Err(anyhow!("NOT_FOUND"))
-        },
-    }
-}

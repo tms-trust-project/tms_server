@@ -120,6 +120,63 @@ impl PubkeyRetrieval {
     }
 }
 
+/*
+    //TODO provide 9 columns total:
+    // "INSERT INTO identity_providers ",
+    //   "(id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url, provider_type,",
+    //   " supports_login, supports_resources, created, updated) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+    let idp_input = IdPInput::new(
+        TEST_IDP_ID.to_string(),
+        TEST_IDP_NAME.to_string(),
+        TEST_IDP_CLIENT_ID.to_string(),
+        test_idp_client_secret_hash,
+        TEST_IDP_REDIRECT_URL.to_string(),
+        TEST_IDP_TOKEN_URL.to_string(),
+        TEST_IDP_PROVIDER_TYPE.to_string(),
+        TEST_IDP_SUPPORTS_LOGIN,
+        TEST_IDP_SUPPORTS_RESOURCES,
+        now.clone(),
+        now.clone()
+    );
+ */
+// ---------------------------------------------------------------------------
+// identity_providers:
+// ---------------------------------------------------------------------------
+#[derive(Debug, Deserialize)]
+pub struct IdPInput {
+    pub id: String,
+    pub name: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub identity_redirect_url: String,
+    pub oauth2_token_url: String,
+    pub provider_type: String,
+    pub supports_login: bool,
+    pub supports_resources: bool,
+    pub created: DateTime<Utc>,
+    pub updated: DateTime<Utc>
+}
+impl IdPInput {
+    #[allow(dead_code, clippy::too_many_arguments)]
+    pub fn new(
+        id: String,
+        name: String,
+        client_id: String,
+        client_secret: String,
+        identity_redirect_url: String,
+        oauth2_token_url: String,
+        provider_type: String,
+        supports_login: bool,
+        supports_resources: bool,
+        created: DateTime<Utc>,
+        updated: DateTime<Utc>
+    )
+        -> IdPInput {
+        IdPInput { id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+                   provider_type, supports_login, supports_resources, created, updated }
+        }
+    }
+
 // ---------------------------------------------------------------------------
 // clients:
 // ---------------------------------------------------------------------------

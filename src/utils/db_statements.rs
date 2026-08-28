@@ -5,10 +5,26 @@ pub const PLACEHOLDER: &str = "${PLACEHOLDER}";
 
 
 // ========================= identity_providers table =========================
-pub const GET_IDP: &str = concat!(
-  "SELECT uuid, id, name, provider_type FROM identity_providers WHERE id = $1",
+
+pub const GET_IDP_UUID: &str = concat!("SELECT uuid FROM identity_providers WHERE id = $1");
+
+pub const INSERT_IDP: &str = concat!(
+"INSERT INTO identity_providers ",
+  "(id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url, provider_type,",
+  " supports_login, supports_resources, created, updated) ",
+  "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
 );
 
+// TODO/TBD Will tms_server ever need this?
+// pub const GET_IDP: &str = concat!(
+// "SELECT id, name, client_id, secret, enabled, created, updated ",
+// "FROM clients WHERE client_id = $1",
+// );
+
+
+pub const SEL_IDP_EXISTS: &str = concat!(
+"SELECT EXISTS(SELECT 1 FROM identity_providers WHERE id = $1)"
+);
 
 // ========================= clients table =========================
 pub const INSERT_CLIENT: &str = concat!(

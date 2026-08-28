@@ -185,11 +185,14 @@ async fn main() -> Result<(), std::io::Error> {
  * This function either experiences an error or returns true (false is never returned).
  */
 async fn tms_init_data() -> Result<bool> {
-    // Insert default records into database if they don't already exist.
-
+    // Insert default records into database if they do not already exist.
     // This call is a no-op except when the --install option is set.
     let inserts = db::create_default_admin().await.expect("Error creating default admin user.");
     info!("Number of admin user records created: {}.", inserts);
+
+    // Create test IdP if it does not already exist.
+    let inserts = db::create_test_idp().await.expect("Error creating test client.");
+    info!("Number of test IDPs created: {}.", inserts);
 
     // Create test client if it does not already exist.
     let inserts = db::create_test_client().await.expect("Error creating test client.");
