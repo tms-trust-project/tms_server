@@ -24,7 +24,7 @@ pub struct DeleteDelegationsApi;
 pub struct ReqDeleteDelegations
 {
     client_id: String,
-    client_user_id: String
+    rp_account: String
 }
 
 #[derive(Object, Debug)]
@@ -43,8 +43,8 @@ impl RequestDebug for ReqDeleteDelegations {
         s.push_str("  Request body:");
         s.push_str("\n    client_id: ");
         s.push_str(&self.client_id);
-        s.push_str("\n    client_user_id: ");
-        s.push_str(&self.client_user_id);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s
     }
 }
@@ -95,7 +95,7 @@ impl DeleteDelegationsApi {
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
             let msg = format!("ERROR: NOT AUTHORIZED to delete delegation for user {} to client {}.",
-                                      req.client_user_id, req.client_id);
+                                      req.rp_account, req.client_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -131,8 +131,8 @@ impl RespDeleteDelegations {
         
         // Log result and return response.
         let msg = 
-            if deletes < 1 {format!("Delegation to client {} NOT FOUND for user {} - Nothing deleted", req.client_id, req.client_user_id)}
-            else {format!("User delegation deleted for user {} and client {}", req.client_user_id, req.client_id)};
+            if deletes < 1 {format!("Delegation to client {} NOT FOUND for user {} - Nothing deleted", req.client_id, req.rp_account)}
+            else {format!("User delegation deleted for user {} and client {}", req.rp_account, req.client_id)};
         info!("{}", msg);
         Ok(make_http_200(RespDeleteDelegations::new("0", msg, deletes as u32)))
     }
@@ -156,7 +156,7 @@ async fn delete_delegation(req: &ReqDeleteDelegations) -> Result<u64> {
     // Issue the db delete call.
     let result = sqlx::query(DELETE_DELEGATION)
         .bind(&req.client_id)
-        .bind(&req.client_user_id)
+        .bind(&req.rp_account)
         .execute(&mut *tx)
         .await?;
     deletes += result.rows_affected();

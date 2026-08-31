@@ -12,7 +12,7 @@ use serde::Deserialize;
 pub struct Pubkey {
     pub id: i32,
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub host: String,
     pub host_account: String,
     pub public_key_fingerprint: String, 
@@ -30,7 +30,7 @@ pub struct Pubkey {
 #[derive(Debug, Deserialize)]
 pub struct PubkeyInput {
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub host: String,
     pub host_account: String,
     pub public_key_fingerprint: String, 
@@ -58,7 +58,7 @@ impl Pubkey {
     pub fn new(
         id: i32,
         client_id: String,
-        client_user_id: String,
+        rp_account: String,
         host: String,
         host_account: String,
         public_key_fingerprint: String,
@@ -74,7 +74,7 @@ impl Pubkey {
     ) 
     -> Pubkey {
         Pubkey {
-            id, client_id, client_user_id, host, host_account, public_key_fingerprint,
+            id, client_id, rp_account, host, host_account, public_key_fingerprint,
             public_key, key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, 
             expires_at, created, updated
         }
@@ -85,7 +85,7 @@ impl PubkeyInput {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_id: String,
-        client_user_id: String,
+        rp_account: String,
         host: String,
         host_account: String,
         public_key_fingerprint: String,
@@ -101,7 +101,7 @@ impl PubkeyInput {
     ) 
     -> PubkeyInput {
         PubkeyInput {
-            client_id, client_user_id, host, host_account, public_key_fingerprint, public_key,
+            client_id, rp_account, host, host_account, public_key_fingerprint, public_key,
             key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated
         }
     }
@@ -366,7 +366,7 @@ impl UserHostInput {
 pub struct Delegation {
     pub id: i32,
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub expires_at: DateTime<Utc>,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -375,7 +375,7 @@ pub struct Delegation {
 #[derive(Debug, Deserialize)]
 pub struct DelegationInput {
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub expires_at: DateTime<Utc>,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -386,14 +386,14 @@ impl Delegation {
     pub fn new(
         id: i32,
         client_id: String,
-        client_user_id: String,
+        rp_account: String,
         expires_at: DateTime<Utc>,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
     -> Delegation {
         Delegation {
-            id, client_id, client_user_id, expires_at, created, updated
+            id, client_id, rp_account, expires_at, created, updated
         }
     }
 }
@@ -402,14 +402,14 @@ impl DelegationInput {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         client_id: String,
-        client_user_id: String,
+        rp_account: String,
         expires_at: DateTime<Utc>,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
     -> DelegationInput {
         DelegationInput {
-            client_id, client_user_id, expires_at, created, updated
+            client_id, rp_account, expires_at, created, updated
         }
     }
 }
@@ -476,7 +476,7 @@ pub struct Reservation {
     pub resid: String,
     pub parent_resid: String,
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub host: String,
     pub public_key_fingerprint: String, 
     pub expires_at: DateTime<Utc>,
@@ -489,7 +489,7 @@ pub struct ReservationInput {
     pub resid: String,
     pub parent_resid: String,
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub host: String,
     pub public_key_fingerprint: String, 
     pub expires_at: DateTime<Utc>,
@@ -504,7 +504,7 @@ impl Reservation {
         resid: String,
         parent_resid: String,
         client_id: String,
-        client_user_id: String,
+        rp_account: String,
         host: String,
         public_key_fingerprint: String, 
         expires_at: DateTime<Utc>,
@@ -513,7 +513,7 @@ impl Reservation {
     ) 
     -> Reservation {
         Reservation {
-            id, resid, parent_resid, client_id, client_user_id, host,
+            id, resid, parent_resid, client_id, rp_account, host,
             public_key_fingerprint, expires_at, created, updated
         }
     }
@@ -525,7 +525,7 @@ impl ReservationInput {
         resid: String,
         parent_resid: String,
         client_id: String,
-        client_user_id: String,
+        rp_account: String,
         host: String,
         public_key_fingerprint: String, 
         expires_at: DateTime<Utc>,
@@ -534,7 +534,7 @@ impl ReservationInput {
     ) 
     -> ReservationInput {
         ReservationInput {
-            resid, parent_resid, client_id, client_user_id, host,
+            resid, parent_resid, client_id, rp_account, host,
             public_key_fingerprint, expires_at, created, updated
         }
     }

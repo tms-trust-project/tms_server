@@ -25,7 +25,7 @@ pub struct NewSshKeysApi;
 #[derive(Object)]
 pub struct ReqNewSshKeys
 {
-    client_user_id: String,
+    rp_account: String,
     host: String,
     host_account: String,
     num_uses: i32,     // negative means i32::MAX
@@ -54,8 +54,8 @@ impl RequestDebug for ReqNewSshKeys {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    client_user_id: ");
-        s.push_str(&self.client_user_id);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
         s.push_str("\n    host_account: ");
@@ -182,7 +182,7 @@ impl RespNewSshKeys {
             // Collect values required for dependency record insertions.
             let mvp_inputs = MVPDependencyParms {
                 client_id: req_ext.client_id.clone(),
-                client_user_id: req.client_user_id.clone(), host: req.host.clone(), 
+                rp_account: req.rp_account.clone(), host: req.host.clone(), 
                 host_account: req.host_account.clone(), 
             };
 
@@ -201,9 +201,9 @@ impl RespNewSshKeys {
         // --------------------- Check Expirations -----------------------
         // The 3 tables whose expiration times need to be checked before we create this key are:
         //
-        //  resource_provider_logins - use client_user_id to target unique record
-        //  delegations - use client_id and client_user_id to target unique record
-        //  user_hosts - use client_user_id, host and host_account to target unique record
+        //  resource_provider_logins - use rp_account to target unique record
+        //  delegations - use client_id and rp_account to target unique record
+        //  user_hosts - use rp_account, host and host_account to target unique record
         //
         // Each of the above tables are queried using values that define a unique index on the
         // target table. This guarantees that either 0 or 1 record will be returned. In the
@@ -212,7 +212,7 @@ impl RespNewSshKeys {
         //
         // This method returns a detailed error message that indicates which table did not contain
         // the required values and whether the error resulted from a missing or expired record.
-        match check_pubkey_dependencies(&req_ext.client_id, &req.client_user_id, &req.host,
+        match check_pubkey_dependencies(&req_ext.client_id, &req.rp_account, &req.host,
                                         &req.host_account).await
         {
             Ok(_) => (),
@@ -265,7 +265,7 @@ impl RespNewSshKeys {
         // Create the input record.
         let input_record = PubkeyInput::new(
             req_ext.client_id.clone(),
-            req.client_user_id.clone(), 
+            req.rp_account.clone(), 
             req.host.clone(), 
             req.host_account.clone(),
             keyinfo.public_key_fingerprint.clone(), 

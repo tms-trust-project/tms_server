@@ -16,7 +16,7 @@ const NOT_STRICT:bool = false;
 pub struct MVPDependencyParms
 {
     pub client_id: String,
-    pub client_user_id: String,
+    pub rp_account: String,
     pub host: String,
     pub host_account: String,
 }
@@ -49,11 +49,11 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
      let now = timestamp_utc();
 
     // --------------------- Insert rp_login record ------------------------
-    // Required inputs: client_user_id
+    // Required inputs: rp_account
     //
     // Create the input record.
     let input_record = RPLoginInput::new(
-        parms.client_user_id.clone(),
+        parms.rp_account.clone(),
         expires_at,
         DB_TRUE,
         now.clone(), 
@@ -65,17 +65,17 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     if count > 0 {
         insert_count += count;
         info!("MVP: RP_LOGIN for user '{}' created with expiration at {}.",
-            parms.client_user_id, expires_at);
+            parms.rp_account, expires_at);
     }
 
     // --------------------- Insert delegations record ---------------------
-    // Required inputs: client_id, client_user_id
+    // Required inputs: client_id, rp_account
     //
     // Create the input record.  Note that we save the hash of
     // the hex secret, but never the secret itself.  
     let input_record = DelegationInput::new(
         parms.client_id.clone(),
-        parms.client_user_id.clone(),
+        parms.rp_account.clone(),
         expires_at,
         now.clone(), 
         now.clone(),
@@ -86,16 +86,16 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     if count > 0 {
         insert_count += count;
         info!("MVP: Delegation for user '{}' to client '{}' created with expiration at {}.",
-              parms.client_user_id, parms.client_id, expires_at);
+              parms.rp_account, parms.client_id, expires_at);
     }
 
     // --------------------- Insert user_hosts record ---------------------
-    // Required inputs: client_user_id, host, host_account
+    // Required inputs: rp_account, host, host_account
     //
     // Create the input record.  Note that we save the hash of
     // the hex secret, but never the secret itself.  
     let input_record = UserHostInput::new(
-        parms.client_user_id.clone(),
+        parms.rp_account.clone(),
         parms.host.clone(),
         parms.host_account.clone(),
         expires_at,
@@ -108,7 +108,7 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     if count > 0 {
         insert_count += count;
         info!("MVP: Host mapping for user '{}' created with experation at {}.",
-                parms.client_user_id, expires_at);
+                parms.rp_account, expires_at);
     }
 
     Ok(insert_count)

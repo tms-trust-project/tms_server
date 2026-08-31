@@ -13,7 +13,7 @@ do
   HOST_USR=$(printf "%s%04d" "testhostuser" $i)
   echo "Inserting record for user $i with client username = $CLIENT_USR and host username = $HOST_USR"
   sqlite3 ~/.tms/database/tms.db << EOB
-  insert into delegations (tenant,client_id,client_user_id,expires_at,created,updated) values ('test','testclient1',"$CLIENT_USR",'+262142-12-31T23:59:59Z','2024-05-28T15:18:03Z','2024-05-28T15:18:03Z');
+  insert into delegations (tenant,client_id,rp_account,expires_at,created,updated) values ('test','testclient1',"$CLIENT_USR",'+262142-12-31T23:59:59Z','2024-05-28T15:18:03Z','2024-05-28T15:18:03Z');
   insert into resource_provider_login (tenant,tms_identity,expires_at,enabled,created,updated) values ('test',"$CLIENT_USR",'+262142-12-31T23:59:59Z','1','2024-05-28T15:18:03Z','2024-05-28T15:18:03Z');
   insert into user_hosts (tenant,tms_identity,host,host_account,expires_at,created,updated)  values ('test',"$CLIENT_USR",'testhost1',"$HOST_USR",'+262142-12-31T23:59:59Z','2024-05-28T15:18:03Z','2024-05-28T15:18:03Z')
 EOB

@@ -7,9 +7,7 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS,
-                                  INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, GET_CLIENT,
-                                  GET_IDP_UUID, SEL_IDP_EXISTS};
+use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, GET_CLIENT, GET_IDP_UUID, SEL_IDP_EXISTS, INSERT_IDP};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
@@ -62,7 +60,7 @@ const KEY_TYPE: KeyType = KeyType::Ed25519;
 pub async fn insert_new_idp(rec: IdPInput) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // Create the insert statement.
-    let result = sqlx::query(INSERT_CLIENT)
+    let result = sqlx::query(INSERT_IDP)
         .bind(rec.id.clone())
         .bind(rec.name.clone())
         .bind(rec.client_id.clone())
@@ -72,6 +70,8 @@ pub async fn insert_new_idp(rec: IdPInput) -> Result<u64> {
         .bind(rec.provider_type.clone())
         .bind(rec.supports_login)
         .bind(rec.supports_resources)
+        .bind(rec.created)
+        .bind(rec.updated)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
@@ -154,7 +154,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
         .bind(input_record.client_id)
-        .bind(input_record.client_user_id.clone())
+        .bind(input_record.rp_account.clone())
         .bind(input_record.host.clone())
         .bind(input_record.host_account)
         .bind(input_record.public_key_fingerprint.clone())
@@ -186,7 +186,7 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
         .bind(rec.client_id)
-        .bind(rec.client_user_id.clone())
+        .bind(rec.rp_account.clone())
         .bind(rec.host.clone())
         .bind(rec.host_account)
         .bind(rec.public_key_fingerprint)
@@ -204,7 +204,7 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
     // Commit the transaction.
     tx.commit().await?;
     info!("A key of type '{}' created for '{}' for host '{}' expires at {} and has {} remaining uses.", 
-            rec.key_type.clone(), rec.client_user_id, rec.host, rec.expires_at, rec.remaining_uses);
+            rec.key_type.clone(), rec.rp_account, rec.host, rec.expires_at, rec.remaining_uses);
     Ok(result.rows_affected())
 }
 
@@ -468,7 +468,7 @@ pub async fn create_test_keys() -> Result<u64> {
  * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http 
  * return code.
  */
-pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &String,
+pub async fn check_pubkey_dependencies(client_id: &String, rp_account: &String,
                                        host: &String, host_account: &String)
     -> Result<()>
 {
@@ -477,7 +477,7 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
 
     // -------- Check rp_login dependency
     let rplogin_row = sqlx::query(GET_RP_LOGIN_ACTIVE)
-        .bind(client_user_id)
+        .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -490,7 +490,7 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
                 let msg = format!("Required user RP_LOGIN record for user ID {} is disabled.",
-                                          client_user_id);
+                                          rp_account);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
@@ -498,13 +498,13 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
             // Check whether the rplogin has expired.
             if expires_at < timestamp_utc() {
                 let msg = format!("Required user RP_LOGIN record for user ID '{}' expired at {}.",
-                                          client_user_id, expires_at);
+                                          rp_account, expires_at);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Required user RP_LOGIN record not found for user ID {}.", client_user_id);
+            let msg = format!("Required user RP_LOGIN record not found for user ID {}.", rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
@@ -512,7 +512,7 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
 
     // -------- Check user_hosts dependency
     let host_row = sqlx::query(GET_USER_HOST_ACTIVE)
-        .bind(client_user_id)
+        .bind(rp_account)
         .bind(host)
         .bind(host_account)
         .fetch_optional(&mut *tx)
@@ -526,14 +526,14 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
                 // Check whether the user host mapping has expired.
                 if expires_at < timestamp_utc() {
                     let msg = format!("Required user host record for user {} with account {} on host {} expired at {}.",
-                                              client_user_id, host_account, host, expires_at);
+                                              rp_account, host_account, host, expires_at);
                     error!("{}", msg);
                     return Result::Err(anyhow!(msg));
                 }
             },
             None => {
                 let msg = format!("Required user host record not found for user {} with account {} on host {}.",
-                                          client_user_id, host_account, host);
+                                          rp_account, host_account, host);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
@@ -542,7 +542,7 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
     // -------- Check delegations dependency
     let delg_row = sqlx::query(GET_DELEGATION_ACTIVE)
         .bind(client_id)
-        .bind(client_user_id)
+        .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -553,15 +553,15 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
     
                 // Check whether the delegation has expired.
                 if expires_at < timestamp_utc() {
-                    let msg = format!("Required delegation record for client {} and client_user_id {} \
-                                              in expired at {}.", client_id, client_user_id, expires_at);
+                    let msg = format!("Required delegation record for client {} and rp_account {} \
+                                              in expired at {}.", client_id, rp_account, expires_at);
                     error!("{}", msg);
                     return Result::Err(anyhow!(msg));
                 }
             },
             None => {
-                let msg = format!("Required delegation record not found for client {} and client_user_id {}.",
-                                          client_id, client_user_id);
+                let msg = format!("Required delegation record not found for client {} and rp_account {}.",
+                                          client_id, rp_account);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
@@ -614,7 +614,7 @@ pub async fn check_pubkey_dependencies(client_id: &String, client_user_id: &Stri
  * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http 
  * return code.
  */
-pub async fn check_parent_reservation(resid: &String, client_id: &String, client_user_id: &String,
+pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_account: &String,
                                       host: &String, public_key_fingerprint: &String)
 -> Result<DateTime<Utc>>
 {
@@ -666,13 +666,13 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, client
 
     // -------- Check rp_login dependency
     let rplogin_row = sqlx::query(GET_RP_LOGIN_EXISTS)
-        .bind(client_user_id)
+        .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
     match rplogin_row {
         Some(_) => (),
         None => {
-            let msg = format!("No RP_LOGIN entry found for user {}.", client_user_id);
+            let msg = format!("No RP_LOGIN entry found for user {}.", rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
@@ -697,7 +697,7 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, client
     };
 
     let host_row = sqlx::query(GET_USER_HOST_EXISTS)
-        .bind(client_user_id)
+        .bind(rp_account)
         .bind(host)
         .bind(&host_account)
         .fetch_optional(&mut *tx)
@@ -706,7 +706,7 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, client
         Some(_) => (),
         None => {
             let msg = format!("No user/host mapping found for user {} for account {} on host {}.",
-                                        client_user_id, host_account, host);
+                                        rp_account, host_account, host);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
@@ -715,13 +715,13 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, client
     // -------- Check delegation dependency
     let delg_row = sqlx::query(GET_DELEGATION_EXISTS)
         .bind(client_id)
-        .bind(client_user_id)
+        .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
     match delg_row {
         Some(_) => (),
         None => {
-            let msg = format!("No delegation to client {} found for user {}.", client_id, client_user_id);
+            let msg = format!("No delegation to client {} found for user {}.", client_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }

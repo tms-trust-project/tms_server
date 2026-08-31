@@ -34,7 +34,7 @@ do
   # Create json request body and place it in tmp file
   TMP_FILE=$(mktemp)
   echo "{\"tenant\":\"${TENANT}\",\"client_id\":\"${CLIENT_ID}\",\"client_secret\":\"${CLIENT_SECRET}\"," > ${TMP_FILE}
-  echo "\"client_user_id\":\"${CLIENT_USR}\",\"host\":\"${HOST}\",\"host_account\":\"${HOST_USR}\"," >> ${TMP_FILE}
+  echo "\"rp_account\":\"${CLIENT_USR}\",\"host\":\"${HOST}\",\"host_account\":\"${HOST_USR}\"," >> ${TMP_FILE}
   echo "\"num_uses\":0,\"ttl_minutes\":0,\"key_type\":\"\"}" >> ${TMP_FILE}
 
   # Generate keypair and place output in a file

@@ -36,7 +36,7 @@ pub struct RespGetDelegations
     result_msg: String,
     id: i32,
     client_id: String,
-    client_user_id: String,
+    rp_account: String,
     expires_at: DateTime<Utc>,
     created: DateTime<Utc>,
     updated: DateTime<Utc>,
@@ -128,10 +128,10 @@ impl RespGetDelegations {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
     fn new(result_code: &str, result_msg: String, id: i32, client_id: String,
-           client_user_id: String, expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) 
+           rp_account: String, expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) 
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-                  id, client_id, client_user_id, expires_at, created, updated}
+                  id, client_id, rp_account, expires_at, created, updated}
         }
 
     /// Process the request.
@@ -144,7 +144,7 @@ impl RespGetDelegations {
         let db_result = get_delegation(req).await;
         match db_result {
             Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
-                                        u.client_id, u.client_user_id, u.expires_at, u.created, u.updated))),
+                                        u.client_id, u.rp_account, u.expires_at, u.created, u.updated))),
             Err(e) => {
                 // Determine if this is a real db error or just record not found.
                 let msg = e.to_string();

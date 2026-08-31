@@ -24,7 +24,7 @@ pub struct UpdateDelegationsApi;
 pub struct ReqUpdateDelegations
 {
     client_id: String,
-    client_user_id: String,
+    rp_account: String,
     ttl_minutes: i32,  // negative means i32::MAX
 }
 
@@ -45,8 +45,8 @@ impl RequestDebug for ReqUpdateDelegations {
         s.push_str("  Request body:");
         s.push_str("\n    client_id: ");
         s.push_str(&self.client_id);
-        s.push_str("\n    client_user_id: ");
-        s.push_str(&self.client_user_id);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s.push_str("\n    ttl_minutes: ");
         s.push_str(&self.ttl_minutes.to_string());
         s
@@ -98,7 +98,7 @@ async fn update_client_delegation(&self, http_req: &Request, req: Json<ReqUpdate
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to update delegation for client {} and user {}.", req.client_id, req.client_user_id);
+            let msg = format!("ERROR: NOT AUTHORIZED to update delegation for client {} and user {}.", req.client_id, req.rp_account);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -133,7 +133,7 @@ impl RespUpdateDelegations {
         let (updates, expires_msg) = update_user_host(req).await?;
         
         // Log result and return response.
-        let msg = format!("{} update(s) to user {} and client {} completed", updates, req.client_user_id, req.client_id);
+        let msg = format!("{} update(s) to user {} and client {} completed", updates, req.rp_account, req.client_id);
         info!("{}", msg);
         Ok(make_http_200(RespUpdateDelegations::new("0", msg, updates as i32, expires_msg)))
     }
@@ -165,7 +165,7 @@ async fn update_user_host(req: &ReqUpdateDelegations) -> Result<(u64, String)> {
         .bind(&expires_at)
         .bind(current_ts)
         .bind(&req.client_id)
-        .bind(&req.client_user_id)
+        .bind(&req.rp_account)
         .execute(&mut *tx)
         .await?;
     updates += result.rows_affected();

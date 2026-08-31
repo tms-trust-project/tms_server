@@ -42,7 +42,7 @@ pub struct DelegationsListElement
 {
     id: i32,
     client_id: String,
-    client_user_id: String,
+    rp_account: String,
     expires_at: DateTime<Utc>,
     created: DateTime<Utc>,
     updated: DateTime<Utc>,
@@ -123,9 +123,9 @@ impl ListDelegationsApi {
 impl DelegationsListElement {
     /// Create response elements.
     #[allow(clippy::too_many_arguments)]
-    fn new(id: i32, client_id: String, client_user_id: String,
+    fn new(id: i32, client_id: String, rp_account: String,
            expires_at: DateTime<Utc>, created: DateTime<Utc>, updated: DateTime<Utc>) -> Self {
-        Self {id, client_id, client_user_id, expires_at, created, updated}
+        Self {id, client_id, rp_account, expires_at, created, updated}
     }
 }
 

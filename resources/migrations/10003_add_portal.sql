@@ -29,7 +29,7 @@ VALUES ('dummy_test');
 CREATE TABLE IF NOT EXISTS identity_providers
 (
     uuid                  UUID PRIMARY KEY  NOT NULL DEFAULT gen_random_uuid(),
-    id                    TEXT              NOT NULL,
+    id                    TEXT              NOT NULL UNIQUE,
     name                  TEXT              NOT NULL,
     client_id             TEXT              NOT NULL,
     client_secret         TEXT              NOT NULL,
@@ -43,8 +43,7 @@ CREATE TABLE IF NOT EXISTS identity_providers
     supports_login        BOOLEAN           NOT NULL DEFAULT false,
     supports_resources    BOOLEAN           NOT NULL DEFAULT false,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
-    updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
-    UNIQUE (id)
+    updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 ALTER TABLE identity_providers OWNER TO tms;
 ALTER TABLE identity_providers
@@ -61,7 +60,7 @@ ALTER TABLE identity_providers
 CREATE TABLE IF NOT EXISTS tms_identities
 (
     seq_id SERIAL PRIMARY KEY,
-    tms_identity TEXT NOT NULL,
+    tms_identity TEXT NOT NULL UNIQUE,
     created TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 ALTER TABLE tms_identities OWNER TO tms;
@@ -164,19 +163,19 @@ ALTER TABLE resource_provider_logins RENAME COLUMN tms_user_id TO tms_identity;
 -- ================================================================================================
 -- Add columns and constraints to resource_provider_logins table
 -- ================================================================================================
-ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS provider_account TEXT NOT NULL DEFAULT '';
-ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS provider_uuid UUID NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_account TEXT NOT NULL DEFAULT '';
+ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_uuid UUID NOT NULL DEFAULT gen_random_uuid();
 ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc');
 
 ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_uuid_account_key
-    UNIQUE (tms_identity, provider_uuid, provider_account);
-ALTER TABLE resource_provider_logins ADD CONSTRAINT uuid_fkey FOREIGN KEY (provider_uuid) REFERENCES identity_providers(uuid);
+    UNIQUE (tms_identity, rp_uuid, rp_account);
+ALTER TABLE resource_provider_logins ADD CONSTRAINT uuid_fkey FOREIGN KEY (rp_uuid) REFERENCES identity_providers(uuid);
 
 -- ------------------------------------------------------------------------------------------------
 -- Add foreign key for tms_identity referencing tms_identities table
 -- ------------------------------------------------------------------------------------------------
 ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
-   FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
+    FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
 
 -- ------------------------------------------------------------------------------------------------
 -- Rename column tms_user_id to tms_identity for table user_hosts.
@@ -193,6 +192,8 @@ ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFA
     REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
 
 -- ------------------------------------------------------------------------------------------------
--- Rename column client_user_id to rp_account for delegations.
+-- Rename column client_user_id to rp_account for delegations, pubkeys and reservations.
 -- ------------------------------------------------------------------------------------------------
 ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
+ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
+ALTER TABLE reservations RENAME COLUMN client_user_id TO rp_account;

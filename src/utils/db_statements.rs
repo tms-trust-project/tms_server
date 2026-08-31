@@ -68,7 +68,7 @@ pub const DELETE_CLIENT: &str = concat!(
 // ========================= resource_provider_logins table ========================
 pub const INSERT_RP_LOGIN: &str = concat!(
     "INSERT INTO resource_provider_logins ",
-    "(tms_identity, expires_at, enabled, created, updated, provider_account, provider_uuid, last_login) ",
+    "(tms_identity, expires_at, enabled, created, updated, rp_account, rp_uuid, last_login) ",
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 );
 
@@ -146,50 +146,50 @@ pub const UPDATE_USER_HOST_EXPIRY: &str = concat!(
 
 // ========================= user_delegations table =================
 pub const INSERT_DELEGATIONS: &str = concat!(
-    "INSERT INTO delegations (client_id, client_user_id, expires_at, created, updated) ",
+    "INSERT INTO delegations (client_id, rp_account, expires_at, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5)",
 );
 
 pub const INSERT_DELEGATIONS_NOT_STRICT: &str = concat!(
-    "INSERT INTO delegations (client_id, client_user_id, expires_at, created, updated) ",
+    "INSERT INTO delegations (client_id, rp_account, expires_at, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
 );
 
 pub const GET_DELEGATION: &str = concat!(
-    "SELECT id, client_id, client_user_id, expires_at, created, updated ",
+    "SELECT id, client_id, rp_account, expires_at, created, updated ",
     "FROM delegations WHERE id = $1"
 );
 
 pub const GET_DELEGATION_ACTIVE: &str = concat!(
     "SELECT expires_at ",
-    "FROM delegations WHERE client_id = $1 AND client_user_id = $2"
+    "FROM delegations WHERE client_id = $1 AND rp_account = $2"
 );
 
 pub const GET_DELEGATION_EXISTS: &str = concat!(
-    "SELECT 1 FROM delegations WHERE client_id = $1 AND client_user_id = $2"
+    "SELECT 1 FROM delegations WHERE client_id = $1 AND rp_account = $2"
 );
 
 pub const SEL_DELEGATION_EXISTS: &str = concat!(
-    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND client_user_id = $2)"
+    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND rp_account = $2)"
 );
 
 pub const LIST_DELEGATIONS: &str = concat!(
-    "SELECT id, client_id, client_user_id, expires_at, created, updated ",
-    "FROM delegations ORDER BY client_id, client_user_id",
+    "SELECT id, client_id, rp_account, expires_at, created, updated ",
+    "FROM delegations ORDER BY client_id, rp_account",
 );
 
 pub const DELETE_DELEGATION: &str = concat!(
-    "DELETE FROM delegations WHERE client_id = $1 AND client_user_id = $2"
+    "DELETE FROM delegations WHERE client_id = $1 AND rp_account = $2"
 );
 
 pub const UPDATE_DELEGATION_EXPIRY: &str = concat!(
     "UPDATE delegations SET expires_at = $1, updated = $2 ",
-    "WHERE client_id = $3 AND client_user_id = $4",
+    "WHERE client_id = $3 AND rp_account = $4",
 );
 
 // ========================= pubkeys table =========================
 pub const INSERT_PUBKEYS: &str = concat!(
-    "INSERT INTO pubkeys (client_id, client_user_id, host, host_account, public_key_fingerprint, public_key, ",
+    "INSERT INTO pubkeys (client_id, rp_account, host, host_account, public_key_fingerprint, public_key, ",
     "key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated) ", 
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
 );
@@ -219,15 +219,15 @@ pub const SELECT_PUBKEY_RESERVATION_INFO: &str = concat!(
 );
 
 pub const GET_PUBKEY_TEMPLATE: &str = concat!(
-    "SELECT id, client_id, client_user_id, host, host_account, public_key_fingerprint, public_key, ",
+    "SELECT id, client_id, rp_account, host, host_account, public_key_fingerprint, public_key, ",
     "key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated ",
     "FROM pubkeys WHERE id = $1 ${PLACEHOLDER}",
 );
 
 pub const LIST_PUBKEYS_TEMPLATE: &str = concat!(
-    "SELECT id, client_id, client_user_id, host, host_account, public_key_fingerprint, public_key, ",
+    "SELECT id, client_id, rp_account, host, host_account, public_key_fingerprint, public_key, ",
     "key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated ",
-    "FROM pubkeys ${PLACEHOLDER} ORDER BY client_user_id, host, host_account",
+    "FROM pubkeys ${PLACEHOLDER} ORDER BY rp_account, host, host_account",
 );
 
 pub const UPDATE_MAX_USES: &str = concat!(
@@ -278,13 +278,13 @@ pub const LIST_HOSTS: &str = concat!(
 
 // ==================== reservations table =========================
 pub const INSERT_RESERVATIONS: &str = concat!(
-    "INSERT INTO reservations (resid, parent_resid, client_id, client_user_id, ",
+    "INSERT INTO reservations (resid, parent_resid, client_id, rp_account, ",
     "host, public_key_fingerprint, expires_at, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
 );
 
 pub const GET_RESERVATION: &str = concat!(
-    "SELECT id, resid, parent_resid, client_id, client_user_id, host, ",
+    "SELECT id, resid, parent_resid, client_id, rp_account, host, ",
     "public_key_fingerprint, expires_at, created, updated ",
     "FROM reservations WHERE resid = $1",
 );
