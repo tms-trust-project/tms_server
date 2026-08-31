@@ -26,7 +26,9 @@ pub struct GetRPLoginApi;
 #[derive(Object)]
 struct ReqGetRPLogin
 {
-    tms_identity: String
+    tms_identity: String,
+    rp_id: String,
+    rp_account: String
 }
 
 #[derive(Object, Debug)]
@@ -36,6 +38,8 @@ pub struct RespGetRPLogin
     result_msg: String,
     id: i32,
     tms_identity: String,
+    rp_id: String,
+    rp_account: String,
     expires_at: DateTime<Utc>,
     enabled: bool,
     created: DateTime<Utc>,
@@ -50,6 +54,10 @@ impl RequestDebug for ReqGetRPLogin {
         s.push_str("  Request body:");
         s.push_str("\n    tms_identity: ");
         s.push_str(&self.tms_identity);
+        s.push_str("\n    rp_id: ");
+        s.push_str(&self.rp_id);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s
     }
 }
@@ -90,10 +98,14 @@ fn make_http_500(msg: String) -> TmsResponse {
 // ***************************************************************************
 #[OpenApi]
 impl GetRPLoginApi {
-    #[oai(path = "/tms/rplogin/:tms_identity", method = "get")]
-    async fn get_rp_login_api(&self, http_req: &Request, tms_identity: Path<String>) -> TmsResponse {
+    #[oai(path = "/tms/rplogin/:tms_identity/:rp_id/:rp_account", method = "get")]
+    async fn get_rp_login_api(&self, http_req: &Request, tms_identity: Path<String>,
+                              rp_id: Path<String>, rp_account: Path<String>) -> TmsResponse {
         // Package the request parameters.
-        let req = ReqGetRPLogin {tms_identity: tms_identity.to_string()};
+        let req = ReqGetRPLogin {
+            tms_identity: tms_identity.to_string(), rp_id: rp_id.to_string(),
+            rp_account: rp_account.to_string()
+        };
         
         // -------------------- Authorize ----------------------------
         // Currently, only the admin can create a user resource provider login record.
@@ -127,11 +139,12 @@ impl GetRPLoginApi {
 impl RespGetRPLogin {
     /// Create a new response.
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: String, id: i32, tms_identity: String,
-            expires_at: DateTime<Utc>, enabled: bool, created: DateTime<Utc>, updated: DateTime<Utc>)
+    fn new(result_code: &str, result_msg: String, id: i32, tms_identity: String, rp_id: String,
+           rp_account: String, expires_at: DateTime<Utc>, enabled: bool,
+           created: DateTime<Utc>, updated: DateTime<Utc>)
     -> Self {
             Self {result_code: result_code.to_string(), result_msg, 
-                  id, tms_identity, expires_at, enabled, created, updated}
+                  id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated}
         }
 
     /// Process the request.
@@ -144,7 +157,8 @@ impl RespGetRPLogin {
         let db_result = get_rp_login(req).await;
         match db_result {
             Ok(u) => Ok(make_http_200(Self::new("0", "success".to_string(), u.id,
-                                                u.tms_identity, u.expires_at, u.enabled, u.created, u.updated))),
+                                                u.tms_identity, u.rp_id, u.rp_account, u.expires_at,
+                                                u.enabled, u.created, u.updated))),
             Err(e) => {
                 // Determine if this is a real db error or just record not found.
                 let msg = e.to_string();
@@ -170,6 +184,8 @@ async fn get_rp_login(req: &ReqGetRPLogin) -> Result<RPLogin> {
     // Create the select statement.
     let result = sqlx::query(GET_RP_LOGIN)
         .bind(&req.tms_identity)
+        .bind(&req.rp_id)
+        .bind(&req.rp_account)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -178,9 +194,9 @@ async fn get_rp_login(req: &ReqGetRPLogin) -> Result<RPLogin> {
 
     // We may have found the user resource provider login record.
     match result {
-        Some(row) => {
+        Some(row) => { // TODO what about id coming back from select?
             Ok(RPLogin::new(row.get(0), row.get(1), row.get(2), row.get(3), 
-                           row.get(4), row.get(5)))
+                           row.get(4), row.get(5), row.get(6), row.get(7)))
         },
         None => {
             Err(anyhow!("NOT_FOUND"))

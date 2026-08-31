@@ -8,13 +8,13 @@ use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
 use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS,
-                                  SEL_PUBKEY_EXISTS, GET_CLIENT, GET_IDP_UUID, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY};
+                                  SEL_PUBKEY_EXISTS, GET_IDP_UUID, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
 use uuid::Uuid;
 use crate::RUNTIME_CTX;
-use crate::utils::db_types::{Client, ClientInput, IdPInput, PubkeyInput};
+use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
 use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RESERVATION_FOR_EXTEND,
@@ -373,7 +373,6 @@ pub async fn create_test_data() -> Result<u64> {
     // Get a connection to the db and start a transaction.
     let mut insert_count = 0;
     for n in 1..=TEST_RECORD_CNT {
-        let test_tms_userbase = format!("{}{:03}", TEST_TMS_USER_BASE, n);
         let test_tms_identity = format!("{}{:03}@{}", TEST_TMS_USER_BASE, n, TEST_TMS_USER_DOMAIN);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);

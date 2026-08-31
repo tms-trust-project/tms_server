@@ -24,8 +24,7 @@ pub struct MVPDependencyParms
 }
 
 /** The Minimal Viable Product (MVP) version of TMS simplifies migration to TMS in 
- * existing environments that meet certain requirements.  Specifically, MVP 
- * supports the following:
+ * existing environments that meet certain requirements. Specifically, MVP supports the following:
  * 
  *  - Keys don't expire.
  *  - Note that to satisfy foreign key constraints, records must be created

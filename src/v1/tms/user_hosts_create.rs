@@ -145,7 +145,6 @@ impl RespCreateUserHosts {
 
         // Use the same current UTC timestamp in all related time caculations..
         let now = timestamp_utc();
-        let current_ts = timestamp_utc_to_str(now);
         let expires_at = calc_expires_at(now, ttl_minutes);
 
         // Create the input record.  Note that we save the hash of

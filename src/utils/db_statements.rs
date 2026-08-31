@@ -84,8 +84,8 @@ pub const INSERT_RP_LOGIN_NOT_STRICT: &str = concat!(
 );
 
 pub const GET_RP_LOGIN: &str = concat!(
-    "SELECT id, tms_identity, expires_at, enabled, created, updated ",
-    "FROM resource_provider_logins WHERE tms_identity = $1"
+    "SELECT id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated ",
+    "FROM resource_provider_logins WHERE tms_identity = $1 and rp_id = $2 and rp_account = $3"
 );
 
 pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
@@ -162,7 +162,7 @@ pub const INSERT_DELEGATIONS_NOT_STRICT: &str = concat!(
 );
 
 pub const GET_DELEGATION: &str = concat!(
-    "SELECT id, client_id, rp_account, expires_at, created, updated ",
+    "SELECT id, client_id, tms_identity, rp_account, expires_at, created, updated ",
     "FROM delegations WHERE id = $1"
 );
 
@@ -180,7 +180,7 @@ pub const SEL_DELEGATION_EXISTS: &str = concat!(
 );
 
 pub const LIST_DELEGATIONS: &str = concat!(
-    "SELECT id, client_id, rp_account, expires_at, created, updated ",
+    "SELECT id, client_id, tms_identity, rp_account, expires_at, created, updated ",
     "FROM delegations ORDER BY client_id, rp_account",
 );
 

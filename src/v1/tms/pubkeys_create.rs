@@ -185,7 +185,9 @@ impl RespNewSshKeys {
             // Collect values required for dependency record insertions.
             let mvp_inputs = MVPDependencyParms {
                 client_id: req_ext.client_id.clone(),
-                rp_account: req.rp_account.clone(), host: req.host.clone(), 
+                rp_id: req.rp_account.clone(),
+                rp_account: req.rp_account.clone(),
+                host: req.host.clone(), 
                 host_account: req.host_account.clone(), 
                 tms_identity: req.tms_identity.clone()
             };

@@ -158,7 +158,7 @@ impl RespListClient {
 // ---------------------------------------------------------------------------
 // list_clients:
 // ---------------------------------------------------------------------------
-async fn list_clients(authz_result: &AuthzResult, req: &ReqListClient) -> Result<Vec<ClientListElement>> {
+async fn list_clients(authz_result: &AuthzResult, _req: &ReqListClient) -> Result<Vec<ClientListElement>> {
     // Substitute the placeholder in the query template.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.

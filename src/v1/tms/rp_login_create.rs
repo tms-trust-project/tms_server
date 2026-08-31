@@ -20,17 +20,19 @@ use crate::utils::config::DB_TRUE;
 const STRICT:bool = true;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 pub struct CreateRPLoginApi;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 #[derive(Object)]
 pub struct ReqCreateRPLogin
 {
     tms_identity: String,
+    rp_id: String,
+    rp_account: String,
     ttl_minutes: i32,  // negative means i32::MAX
 }
 
@@ -40,6 +42,8 @@ pub struct RespCreateRPLogin
     result_code: String,
     result_msg: String,
     tms_identity: String,
+    rp_id: String,
+    rp_account: String,
     expires_at: DateTime<Utc>,
     enabled: bool,
 }
@@ -52,6 +56,10 @@ impl RequestDebug for ReqCreateRPLogin {
         s.push_str("  Request body:");
         s.push_str("\n    tms_identity: ");
         s.push_str(&self.tms_identity);
+        s.push_str("\n    rp_id: ");
+        s.push_str(&self.rp_id);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s.push_str("\n    tts_minutes: ");
         s.push_str(&self.ttl_minutes.to_string());
         s
@@ -125,8 +133,9 @@ impl CreateRPLoginApi {
 // ***************************************************************************
 impl RespCreateRPLogin {
     /// Create a new response.
-    fn new(result_code: &str, result_msg: String, tms_identity: String, expires_at: DateTime<Utc>, enabled: bool,) -> Self {
-        Self {result_code: result_code.to_string(), result_msg, tms_identity, expires_at, enabled,}}
+    fn new(result_code: &str, result_msg: String, tms_identity: String, rp_id: String,
+           rp_account: String, expires_at: DateTime<Utc>, enabled: bool,) -> Self {
+        Self {result_code: result_code.to_string(), result_msg, tms_identity, rp_id, rp_account, expires_at, enabled,}}
 
     /// Process the request.
     async fn process(http_req: &Request, req: &ReqCreateRPLogin) -> Result<TmsResponse, anyhow::Error> {
@@ -146,6 +155,8 @@ impl RespCreateRPLogin {
         // the hex secret, but never the secret itself.  
         let input_record = RPLoginInput::new(
             req.tms_identity.clone(),
+            req.rp_id.clone(),
+            req.rp_account.clone(),
             expires_at.clone(),
             DB_TRUE,
             now.clone(),
@@ -154,11 +165,12 @@ impl RespCreateRPLogin {
 
         // Insert the new key record.
         insert_rp_login(input_record, STRICT).await?;
-        info!("RP_LOGIN for user '{}' created with expiration at {}.", req.tms_identity, expires_at.clone());
+        info!("RP_LOGIN for tms_identity: {} rp_id: {} rp_account: {} expires_at: {}.",
+               req.tms_identity, req.rp_id, req.rp_account, expires_at.clone());
         
         // Return the secret represented in hex.
-        Ok(make_http_201(Self::new("0", "success".to_string(),
-                                   req.tms_identity.clone(), expires_at, true)))
+        Ok(make_http_201(Self::new("0", "success".to_string(), req.tms_identity.clone(),
+                                   req.rp_id.clone(), req.rp_account.clone(), expires_at, true)))
     }
 }
 
@@ -180,6 +192,8 @@ pub async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
     // Create the insert statement.
     let result = sqlx::query(sql_query)
         .bind(rec.tms_identity)
+        .bind(rec.rp_id)
+        .bind(rec.rp_account)
         .bind(rec.expires_at)
         .bind(rec.enabled)
         .bind(rec.created)
