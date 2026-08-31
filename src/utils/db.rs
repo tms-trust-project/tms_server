@@ -7,7 +7,8 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, GET_CLIENT, GET_IDP_UUID, SEL_IDP_EXISTS, INSERT_IDP};
+use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_USER_HOSTS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS,
+                                  SEL_PUBKEY_EXISTS, GET_CLIENT, GET_IDP_UUID, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
@@ -21,20 +22,21 @@ use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RES
                            GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
                            SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
-const TEST_IDP_ID: &str = "test_dummy_idp";
+const TEST_IDP_ID: &str = "danger_mode_idp";
 const TEST_IDP_NAME: &str = "Dummy Test IdP";
-const TEST_IDP_CLIENT_ID: &str = "";
-const TEST_IDP_CLIENT_SECRET: &str = "";
-const TEST_IDP_REDIRECT_URL: &str = "";
-const TEST_IDP_TOKEN_URL: &str = "";
+const TEST_IDP_CLIENT_ID: &str = "12345678-1234-1234-1234-abcdefghtest";
+const TEST_IDP_CLIENT_SECRET: &str = "DummyTestdf894adfduG89JRazpE6DCDvkrM";
+const TEST_IDP_REDIRECT_URL: &str = "https://auth.dummy.test.org/v2/oauth2/authorize";
+const TEST_IDP_TOKEN_URL: &str = "https://auth.dummy.test.org/v2/oauth2/token";
 const TEST_IDP_PROVIDER_TYPE: &str = "dummy_test";
 const TEST_IDP_SUPPORTS_LOGIN: bool = true;
 const TEST_IDP_SUPPORTS_RESOURCES: bool = false;
-const TEST_USER: &str = "testuser";
+const TEST_TMS_USER_BASE: &str = "testtmsuser";
+const TEST_TMS_USER_DOMAIN: &str = "DangerModeTestIdP";
 const TEST_HOST: &str = "testhost";
 const TEST_HOST_ACCOUNT: &str = "testhostaccount";
 const TEST_RP_ACCOUNT: &str = "testrpaccount";
-const TEST_FIXED_USER: &str  = "testuser101";
+const TEST_FIXED_HOST_ACCT: &str  = "testuser101";
 const TEST_FIXED_FINGERPRINT: &str= "SHA256:wUKFDv4LAQo7OtMUZenzupG5DB95Dxi+n3s4rd/UQ00";
 const TEST_RECORD_CNT: i32 = 101;
 const MAX_USES: i32 = i32::MAX;
@@ -108,7 +110,7 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
  * If asked to generate for 'testuser001' use a fixed pubkey fingerprint.
  * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
-pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String,
+pub async fn insert_new_test_pubkey_if_none(test_rp_acct: String, test_host: String,
                                             test_host_acct: String) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
@@ -127,7 +129,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
     };
     // Determine the fingerprint.
     let pubkey_fingerprint =
-        if test_user == TEST_FIXED_USER { String::from(TEST_FIXED_FINGERPRINT) }
+        if test_host_acct == TEST_FIXED_HOST_ACCT { String::from(TEST_FIXED_FINGERPRINT) }
         else { keyinfo.public_key_fingerprint };
     let now  = timestamp_utc();
     let expires_at  = calc_expires_at(now, MAX_TTL_MINUTES);
@@ -135,7 +137,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
     // Create the input record.
     let input_record = PubkeyInput::new(
         TEST_CLIENT.to_string(),
-        test_user.clone(),
+        test_rp_acct.clone(),
         test_host.clone(),
         test_host_acct.clone(),
         pubkey_fingerprint.clone(),
@@ -150,7 +152,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
         now.clone(),
     );
 
-    info!("Creating keypair for user: {} host: {} host_acct {}", test_user, test_host, test_host_acct);
+    info!("Creating keypair for rp_account: {} host: {} host_acct {}", test_rp_acct, test_host, test_host_acct);
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
         .bind(input_record.client_id)
@@ -171,7 +173,7 @@ pub async fn insert_new_test_pubkey_if_none(test_user: String, test_host: String
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("Created keypair for user: {} host: {} host_acct {}", test_user, test_host, test_host_acct);
+    info!("Created keypair for user: {} host: {} host_acct {}", test_rp_acct, test_host, test_host_acct);
     info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
 }
@@ -347,9 +349,10 @@ pub async fn create_test_idp() -> Result<u64> {
     Ok(inserts)
 }
 
-// ---------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // create_test_data:
-// ---------------------------------------------------------------------------
+// Create records in tables: tms_identities, resource_provider_logins, user_hosts, delegations
+// ------------------------------------------------------------------------------------------------
 /*
  This function either experiences an error or returns true (false is never returned).
  Use now timestamp for created, updated and last_login
@@ -360,18 +363,18 @@ pub async fn create_test_data() -> Result<u64> {
     // Get the timestamp string.
     let now = timestamp_utc();
 
-    // TODO Look up provider UUID using TEST_IDP_ID
-    // TODO  best way to get scalar uuid? To we need to conver to a string?
+    // Look up provider UUID using TEST_IDP_ID
     let mut tx = RUNTIME_CTX.db.begin().await?;
     let test_idp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_IDP_ID).fetch_one(&mut *tx).await?;
     tx.commit().await?;
 
     // Create records for 101 test users in the test client. Do this in a txn
-    // User 101 will have a fixed pubkey fingerprint to smoke test.
+    // User 101 will have a fixed pubkey fingerprint to support smoke test getPubKey scenario.
     // Get a connection to the db and start a transaction.
     let mut insert_count = 0;
     for n in 1..=TEST_RECORD_CNT {
-        let test_user = format!("{}{:03}", TEST_USER, n);
+        let test_tms_userbase = format!("{}{:03}", TEST_TMS_USER_BASE, n);
+        let test_tms_identity = format!("{}{:03}@{}", TEST_TMS_USER_BASE, n, TEST_TMS_USER_DOMAIN);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
         let test_rp_account = format!("{}{:03}", TEST_RP_ACCOUNT, n);
@@ -382,19 +385,27 @@ pub async fn create_test_data() -> Result<u64> {
         //       records reference the rp_login record as a foreign key.
         let skip_create: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
             .bind(TEST_CLIENT)
-            .bind(test_user.clone())
+            .bind(test_rp_account.clone())
             .fetch_one(&mut *tx).await?;
         if skip_create {continue};
-        info!("Creating delegation records for user: {} host: {} host_acct {} rp_account {}",
-              test_user, test_host, test_host_acct, test_rp_account);
+
+        // First create a TMS identity in table tms_identities
+        info!("Creating TMS identity record for TMS user: {}", test_tms_identity);
+        sqlx::query(INSERT_TMS_IDENTITY)
+            .bind(test_tms_identity.clone())
+            .execute(&mut *tx)
+            .await?;
+
+        info!("Creating delegation records for tms identity: {} host: {} host_acct {} rp_account {}",
+              test_tms_identity, test_host, test_host_acct, test_rp_account);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)
-            .bind(test_user.clone())
+            .bind(test_tms_identity.clone())
             .bind(max_tms_utc)
             .bind(DB_TRUE)
             .bind(now)
             .bind(now)
-            .bind(test_rp_account)
+            .bind(test_rp_account.clone())
             .bind(test_idp_uuid)
             .bind(now)
             .execute(&mut *tx)
@@ -402,7 +413,7 @@ pub async fn create_test_data() -> Result<u64> {
 
         // -------- Populate user_hosts
         sqlx::query(INSERT_USER_HOSTS)
-            .bind(test_user.clone())
+            .bind(test_tms_identity.clone())
             .bind(test_host.clone())
             .bind(test_host_acct.clone())
             .bind(max_tms_utc)
@@ -414,7 +425,8 @@ pub async fn create_test_data() -> Result<u64> {
         // -------- Populate delegations
         sqlx::query(INSERT_DELEGATIONS)
             .bind(TEST_CLIENT)
-            .bind(test_user.clone())
+            .bind(test_tms_identity.clone())
+            .bind(test_rp_account.clone())
             .bind(max_tms_utc)
             .bind(now)
             .bind(now)
@@ -423,7 +435,8 @@ pub async fn create_test_data() -> Result<u64> {
         insert_count += 1;
         // Commit the transaction.
         tx.commit().await?;
-        info!("Created delegation records for user: {} host: {} host_acct {}", test_user, test_host, test_host_acct);
+        info!("Created delegation records for tms identity: {} host: {} host_acct {}",
+              test_tms_identity, test_host, test_host_acct);
     }
 
     Ok(insert_count)
@@ -440,13 +453,13 @@ pub async fn create_test_keys() -> Result<u64> {
     // For each test user create one pubkey entry, ignore generated private key
     let mut insert_count = 0;
     for n in 1..=TEST_RECORD_CNT {
-        let test_user = format!("{}{:03}", TEST_USER, n);
+        let test_rp_acct = format!("{}{:03}", TEST_RP_ACCOUNT, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
 
         // Create a new test pubkey for user if none exists.
         // This should return 0 if one already exists and 1 if a new one was created
-        let inserts = insert_new_test_pubkey_if_none(test_user, test_host, test_host_acct).await?;
+        let inserts = insert_new_test_pubkey_if_none(test_rp_acct, test_host, test_host_acct).await?;
         insert_count += inserts;
     }
     Ok(insert_count)

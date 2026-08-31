@@ -191,14 +191,14 @@ async fn tms_init_data() -> Result<bool> {
     info!("Number of admin user records created: {}.", inserts);
 
     // Create test IdP if it does not already exist.
-    let inserts = db::create_test_idp().await.expect("Error creating test client.");
+    let inserts = db::create_test_idp().await.expect("Error creating test IdP.");
     info!("Number of test IDPs created: {}.", inserts);
 
     // Create test client if it does not already exist.
     let inserts = db::create_test_client().await.expect("Error creating test client.");
     info!("Number of test clients created: {}.", inserts);
 
-    // Create test delegation, resource_provider_logins and user_host records if they do not already exist.
+    // Create test tms_identities, delegation, resource_provider_logins and user_host records if they do not already exist.
     let inserts = db::create_test_data().await.expect("Error creating delegation records for test users.");
     info!("Number of test delegation related records created: {}.", inserts);
 

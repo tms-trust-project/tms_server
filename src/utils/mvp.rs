@@ -16,6 +16,8 @@ const NOT_STRICT:bool = false;
 pub struct MVPDependencyParms
 {
     pub client_id: String,
+    pub tms_identity: String,
+    pub rp_id: String,
     pub rp_account: String,
     pub host: String,
     pub host_account: String,
@@ -49,10 +51,12 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
      let now = timestamp_utc();
 
     // --------------------- Insert rp_login record ------------------------
-    // Required inputs: rp_account
+    // Required inputs: tms_identity, rp_id, rp_account, enabled
     //
     // Create the input record.
     let input_record = RPLoginInput::new(
+        parms.tms_identity.clone(),
+        parms.rp_id.clone(),
         parms.rp_account.clone(),
         expires_at,
         DB_TRUE,
@@ -64,17 +68,18 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let count = insert_rp_login(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP: RP_LOGIN for user '{}' created with expiration at {}.",
-            parms.rp_account, expires_at);
+        info!("MVP: RP_LOGIN created for tms_identity: {} rp_id: {} rp_account: {} expires_at: {}.",
+              parms.tms_identity, parms.rp_id, parms.rp_account, expires_at);
     }
 
     // --------------------- Insert delegations record ---------------------
-    // Required inputs: client_id, rp_account
+    // Required inputs: client_id, rp_account, tms_identity
     //
     // Create the input record.  Note that we save the hash of
     // the hex secret, but never the secret itself.  
     let input_record = DelegationInput::new(
         parms.client_id.clone(),
+        parms.tms_identity.clone(),
         parms.rp_account.clone(),
         expires_at,
         now.clone(), 

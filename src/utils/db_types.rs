@@ -248,6 +248,8 @@ impl ClientInput {
 pub struct RPLogin {
     pub id: i32,
     pub tms_identity: String,
+    pub rp_id: String,
+    pub rp_account: String,
     pub expires_at: DateTime<Utc>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
@@ -257,6 +259,8 @@ pub struct RPLogin {
 #[derive(Debug, Deserialize)]
 pub struct RPLoginInput {
     pub tms_identity: String,
+    pub rp_id: String,
+    pub rp_account: String,
     pub expires_at: DateTime<Utc>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
@@ -268,16 +272,15 @@ impl RPLogin {
     pub fn new(
         id: i32,
         tms_identity: String,
+        rp_id: String,
+        rp_account: String,
         expires_at: DateTime<Utc>,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     )
         -> RPLogin {
-        RPLogin {
-            id,
-            tms_identity, expires_at, enabled, created, updated
-        }
+        RPLogin { id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated }
     }
 }
 
@@ -285,15 +288,15 @@ impl RPLoginInput {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         tms_identity: String,
+        rp_id: String,
+        rp_account: String,
         expires_at: DateTime<Utc>,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
     -> RPLoginInput {
-        RPLoginInput {
-            tms_identity: tms_identity, expires_at, enabled, created, updated
-        }
+        RPLoginInput { tms_identity, rp_id, rp_account, expires_at, enabled, created, updated }
     }
 }
 
@@ -366,6 +369,7 @@ impl UserHostInput {
 pub struct Delegation {
     pub id: i32,
     pub client_id: String,
+    pub tms_identity: String,
     pub rp_account: String,
     pub expires_at: DateTime<Utc>,
     pub created: DateTime<Utc>,
@@ -375,6 +379,7 @@ pub struct Delegation {
 #[derive(Debug, Deserialize)]
 pub struct DelegationInput {
     pub client_id: String,
+    pub tms_identity: String,
     pub rp_account: String,
     pub expires_at: DateTime<Utc>,
     pub created: DateTime<Utc>,
@@ -386,15 +391,14 @@ impl Delegation {
     pub fn new(
         id: i32,
         client_id: String,
+        tms_identity: String,
         rp_account: String,
         expires_at: DateTime<Utc>,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
-    ) 
+    )
     -> Delegation {
-        Delegation {
-            id, client_id, rp_account, expires_at, created, updated
-        }
+        Delegation { id, client_id, tms_identity, rp_account, expires_at, created, updated }
     }
 }
 
@@ -402,15 +406,14 @@ impl DelegationInput {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         client_id: String,
+        tms_identity: String,
         rp_account: String,
         expires_at: DateTime<Utc>,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
-    ) 
+    )
     -> DelegationInput {
-        DelegationInput {
-            client_id, rp_account, expires_at, created, updated
-        }
+        DelegationInput { client_id, tms_identity, rp_account, expires_at, created, updated }
     }
 }
 

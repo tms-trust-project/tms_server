@@ -26,6 +26,12 @@ pub const SEL_IDP_EXISTS: &str = concat!(
 "SELECT EXISTS(SELECT 1 FROM identity_providers WHERE id = $1)"
 );
 
+// ========================= tms_identities table ========================
+pub const INSERT_TMS_IDENTITY: &str = concat!(
+"INSERT INTO tms_identities (tms_identity) VALUES ($1)"
+);
+
+
 // ========================= clients table =========================
 pub const INSERT_CLIENT: &str = concat!(
     "INSERT INTO clients (name, client_id, secret, enabled, created, updated) ",
@@ -146,13 +152,13 @@ pub const UPDATE_USER_HOST_EXPIRY: &str = concat!(
 
 // ========================= user_delegations table =================
 pub const INSERT_DELEGATIONS: &str = concat!(
-    "INSERT INTO delegations (client_id, rp_account, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5)",
+    "INSERT INTO delegations (client_id, tms_identity, rp_account, expires_at, created, updated) ",
+    "VALUES ($1, $2, $3, $4, $5, $6)",
 );
 
 pub const INSERT_DELEGATIONS_NOT_STRICT: &str = concat!(
-    "INSERT INTO delegations (client_id, rp_account, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
+    "INSERT INTO delegations (client_id, tms_identity, rp_account, expires_at, created, updated) ",
+    "VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
 );
 
 pub const GET_DELEGATION: &str = concat!(

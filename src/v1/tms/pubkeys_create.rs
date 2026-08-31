@@ -25,12 +25,13 @@ pub struct NewSshKeysApi;
 #[derive(Object)]
 pub struct ReqNewSshKeys
 {
+    tms_identity: String,
     rp_account: String,
     host: String,
     host_account: String,
     num_uses: i32,     // negative means i32::MAX
     ttl_minutes: i32,  // negative means i32::MAX
-    key_type: Option<String>,  // RSA, ECDSA, ED25519, DEFAULT (=ED25519)   
+    key_type: Option<String>,  // RSA, ECDSA, ED25519, DEFAULT (=ED25519)
 }
 
 #[derive(Object, Debug)]
@@ -54,6 +55,8 @@ impl RequestDebug for ReqNewSshKeys {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s.push_str("\n    rp_account: ");
         s.push_str(&self.rp_account);
         s.push_str("\n    host: ");
@@ -184,6 +187,7 @@ impl RespNewSshKeys {
                 client_id: req_ext.client_id.clone(),
                 rp_account: req.rp_account.clone(), host: req.host.clone(), 
                 host_account: req.host_account.clone(), 
+                tms_identity: req.tms_identity.clone()
             };
 
             // Insert records into the resource_provider_logins, user_hosts and delegations tables

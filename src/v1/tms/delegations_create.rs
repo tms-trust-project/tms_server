@@ -28,6 +28,7 @@ pub struct CreateDelegationsApi;
 pub struct ReqCreateDelegations
 {
     client_id: String,
+    tms_identity: String,
     rp_account: String,
     ttl_minutes: i32,  // negative means i32::MAX
 }
@@ -38,6 +39,7 @@ pub struct RespCreateDelegations
     result_code: String,
     result_msg: String,
     client_id: String,
+    tms_identity: String,
     rp_account: String,
     expires_at: DateTime<Utc>,
 }
@@ -50,6 +52,8 @@ impl RequestDebug for ReqCreateDelegations {
         s.push_str("  Request body:");
         s.push_str("\n    client_id: ");
         s.push_str(&self.client_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
         s.push_str("\n    rp_account: ");
         s.push_str(&self.rp_account);
         s.push_str("\n    tts_minutes: ");
@@ -125,9 +129,9 @@ impl CreateDelegationsApi {
 // ***************************************************************************
 impl RespCreateDelegations {
     /// Create a new response.
-    fn new(result_code: &str, result_msg: String, client_id: String, rp_account: String, 
-           expires_at: DateTime<Utc>,) -> Self {
-        Self {result_code: result_code.to_string(), result_msg, client_id, rp_account, expires_at,}}
+    fn new(result_code: &str, result_msg: String, client_id: String, tms_identity: String,
+           rp_account: String, expires_at: DateTime<Utc>,) -> Self {
+        Self {result_code: result_code.to_string(), result_msg, client_id, tms_identity, rp_account, expires_at,}}
 
     /// Process the request.
     async fn process(http_req: &Request, req: &ReqCreateDelegations) -> Result<TmsResponse, anyhow::Error> {
@@ -146,6 +150,7 @@ impl RespCreateDelegations {
         // the hex secret, but never the secret itself.  
         let input_record = DelegationInput::new(
             req.client_id.clone(),
+            req.tms_identity.clone(),
             req.rp_account.clone(),
             expires_at.clone(),
             now.clone(),
@@ -154,12 +159,12 @@ impl RespCreateDelegations {
 
         // Insert the new key record.
         insert_delegation(input_record, STRICT).await?;
-        info!("Delegation for user '{}' to client '{}' created with expiration at {}.",
-              req.rp_account, req.client_id, expires_at);
+        info!("Delegation for client '{}' tms identity '{}' with rp_account '{}' created with expiration at {}.",
+              req.client_id, req.tms_identity, req.rp_account, expires_at);
         
         // Return the secret represented in hex.
         Ok(make_http_201(Self::new("0", "success".to_string(), 
-                         req.client_id.clone(), req.rp_account.clone(), expires_at,)))
+                         req.client_id.clone(), req.tms_identity.clone(), req.rp_account.clone(), expires_at,)))
     }
 }
 
@@ -181,6 +186,7 @@ pub async fn insert_delegation(rec: DelegationInput, strict: bool) -> Result<u64
     // Create the insert statement.
     let result = sqlx::query(sql_query)
         .bind(rec.client_id)
+        .bind(rec.tms_identity)
         .bind(rec.rp_account)
         .bind(rec.expires_at)
         .bind(rec.created)
