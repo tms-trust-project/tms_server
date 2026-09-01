@@ -162,6 +162,8 @@ async fn update_rp_login(req: &ReqUpdateRPLogin) -> Result<u64> {
         .bind(req.enabled)
         .bind(current_ts)
         .bind(&req.tms_identity)
+        .bind(&req.rp_id)
+        .bind(&req.rp_acct)
         .execute(&mut *tx)
         .await?;
     updates += result.rows_affected();

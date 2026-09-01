@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS tms_identities
 );
 ALTER TABLE tms_identities OWNER TO tms;
 
--- TODO For existing MVP legacy "donger mode" records created for TMS 0.3 and earlier, we need to
+-- TODO For existing MVP legacy "danger mode" records created for TMS 0.3 and earlier, we need to
 --      add TMS identities for every record in the user_mfa, delegations and user_hosts table.
 -- TODO Select all distinct client_user_id records from user_mfa and delegations and for each create a new
 --   tms_identity record in tms_identities.
@@ -187,7 +187,7 @@ ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_uuid_account_key UN
 ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_rp_id FOREIGN KEY (rp_id) REFERENCES identity_providers(id);
 
 -- ------------------------------------------------------------------------------------------------
--- Rename column tms_user_id to tms_identity for table user_hosts.
+-- user_hosts table
 -- ------------------------------------------------------------------------------------------------
 ALTER TABLE user_hosts RENAME COLUMN tms_user_id TO tms_identity;
 
@@ -205,12 +205,18 @@ ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'da
 -- For delegations table (tms_identity, rp_id, rp_account) uniquely identify the record
 CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_rpid_rpaccount_idx ON delegations (tms_identity, rp_id, rp_account);
 
--- ------------------------------------------------------------------------------------------------
--- Rename column client_user_id to rp_account and add column rp_id for pubkeys and reservations.
--- ------------------------------------------------------------------------------------------------
+-- ---------------------------------------
+-- pubkeys table
+-- ---------------------------------------
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
-ALTER TABLE reservations RENAME COLUMN client_user_id TO rp_account;
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUser@dangerModeIdP'
+    REFERENCES tms_identities(tms_identity);
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
+
+-- ---------------------------------------
+-- reservations table
+-- ---------------------------------------
+ALTER TABLE reservations RENAME COLUMN client_user_id TO rp_account;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
 
 -- ------------------------------------------------------------------------------------------------
@@ -225,4 +231,5 @@ ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
 ALTER TABLE user_hosts ADD CONSTRAINT fk_tms_identity
     FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
 
-
+-- TODO Now that all columns are added for existing MVP legacy "danger mode" records created for TMS 0.3 and earlier,
+--  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account

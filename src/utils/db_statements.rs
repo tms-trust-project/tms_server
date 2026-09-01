@@ -80,8 +80,8 @@ pub const INSERT_RP_LOGIN: &str = concat!(
 );
 
 pub const INSERT_RP_LOGIN_NOT_STRICT: &str = concat!(
-    "INSERT INTO resource_provider_logins (tms_identity, expires_at, enabled, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
+    "INSERT INTO resource_provider_logins (tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login) ",
+    "VALUES ($1, $2, $3, $4, $5, $7, $8) ON CONFLICT DO NOTHING",
 );
 
 pub const GET_RP_LOGIN: &str = concat!(
@@ -95,15 +95,15 @@ pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
 );
 
 pub const GET_RP_LOGIN_EXISTS: &str = concat!(
-    "SELECT 1 FROM resource_provider_logins WHERE tms_identity = $1"
+    "SELECT 1 FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
 
 pub const UPDATE_RP_LOGIN_ENABLED: &str = concat!(
-    "UPDATE resource_provider_logins SET enabled = $1, updated = $2 WHERE tms_identity = $3"
+    "UPDATE resource_provider_logins SET enabled = $1, updated = $2 WHERE tms_identity = $3 AND rp_id = $4 AND rp_account = $5"
 );
 
 pub const DELETE_RP_LOGIN: &str = concat!(
-    "DELETE FROM resource_provider_logins WHERE tms_identity = $1"
+    "DELETE FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
 
 // Secret elided.
@@ -169,11 +169,11 @@ pub const GET_DELEGATION: &str = concat!(
 
 pub const GET_DELEGATION_ACTIVE: &str = concat!(
     "SELECT expires_at ",
-    "FROM delegations WHERE client_id = $1 AND rp_account = $2"
+    "FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4"
 );
 
 pub const GET_DELEGATION_EXISTS: &str = concat!(
-    "SELECT 1 FROM delegations WHERE client_id = $1 AND rp_account = $2"
+    "SELECT 1 FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4"
 );
 
 pub const SEL_DELEGATION_EXISTS: &str = concat!(
@@ -196,9 +196,10 @@ pub const UPDATE_DELEGATION_EXPIRY: &str = concat!(
 
 // ========================= pubkeys table =========================
 pub const INSERT_PUBKEYS: &str = concat!(
-    "INSERT INTO pubkeys (client_id, rp_account, host, host_account, public_key_fingerprint, public_key, ",
-    "key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated) ", 
-    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+    "INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+      "public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
+      "initial_ttl_minutes, expires_at, created, updated) ",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
 );
 
 pub const SELECT_PUBKEY: &str = concat!(

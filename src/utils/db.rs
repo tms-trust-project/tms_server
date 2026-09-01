@@ -112,7 +112,7 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
  * If asked to generate for 'testuser001' use a fixed pubkey fingerprint.
  * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
-pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_id: String,
+pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_acct: String,
                                             test_host: String, test_host_acct: String) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
@@ -140,8 +140,8 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_i
     let input_record = PubkeyInput::new(
         TEST_CLIENT.to_string(),
         test_tms_identity.clone(),
-        test_rp_id.clone(),
         TEST_RP_ID.to_string(),
+        test_rp_acct.clone(),
         test_host.clone(),
         test_host_acct.clone(),
         pubkey_fingerprint.clone(),
@@ -409,11 +409,11 @@ pub async fn create_test_data() -> Result<u64> {
 
     // Look up resource and identity provider UUIDs
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    let test_idp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_IDP_ID).fetch_one(&mut *tx).await?;
+    let _test_idp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_IDP_ID).fetch_one(&mut *tx).await?;
     tx.commit().await?;
     // Look up resource provider UUID using TEST_RP_ID
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    let test_rp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_RP_ID).fetch_one(&mut *tx).await?;
+    let _test_rp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_RP_ID).fetch_one(&mut *tx).await?;
     tx.commit().await?;
 
     // Create records for 101 test users in the test client. Do this in a txn
@@ -611,6 +611,8 @@ pub async fn check_pubkey_dependencies(client_id: &String, tms_identity: &String
     // -------- Check delegations dependency
     let delg_row = sqlx::query(GET_DELEGATION_ACTIVE)
         .bind(client_id)
+        .bind(tms_identity)
+        .bind(rp_id)
         .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
@@ -622,15 +624,15 @@ pub async fn check_pubkey_dependencies(client_id: &String, tms_identity: &String
     
                 // Check whether the delegation has expired.
                 if expires_at < timestamp_utc() {
-                    let msg = format!("Required delegation record for client {} and rp_account {} \
-                                              in expired at {}.", client_id, rp_account, expires_at);
+                    let msg = format!("Required delegation record has expired. ClientId: {} TmsId: {} RpId: {} RpAcct: {} ExpiredAt: {}.",
+                                             client_id, tms_identity, rp_id, rp_account, expires_at);
                     error!("{}", msg);
                     return Result::Err(anyhow!(msg));
                 }
             },
             None => {
-                let msg = format!("Required delegation record not found for client {} and rp_account {}.",
-                                          client_id, rp_account);
+                let msg = format!("Required delegation record not found. ClientId: {} TmsId: {} RpId: {} RpAcct: {}",
+                                          client_id, tms_identity, rp_id, rp_account);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
@@ -679,13 +681,13 @@ pub async fn check_pubkey_dependencies(client_id: &String, tms_identity: &String
  * The resid parameter designates the candidate parent reservation for a new extended reservation.
  * The client_id are used to guarantee that clients can only extend their own reservations.
  * The host specifies the where the public key represented by the public_key_fingerprint can be applied.
- *   
+ *   TODO: Add tms_identity, rp_id and rp_account for user_hosts
  * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http 
  * return code.
  */
-pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_account: &String,
-                                      host: &String, public_key_fingerprint: &String)
--> Result<DateTime<Utc>>
+pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_identity: &String,
+                                      rp_id: &String, rp_account: &String, host: &String,
+                                      public_key_fingerprint: &String) -> Result<DateTime<Utc>>
 {
     // Get a connection to the db and start a transaction.
     let mut tx = RUNTIME_CTX.db.begin().await?;
@@ -735,13 +737,16 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_acc
 
     // -------- Check rp_login dependency
     let rplogin_row = sqlx::query(GET_RP_LOGIN_EXISTS)
+        .bind(tms_identity)
+        .bind(rp_id)
         .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
     match rplogin_row {
         Some(_) => (),
         None => {
-            let msg = format!("No RP_LOGIN entry found for user {}.", rp_account);
+            let msg = format!("No RP_LOGIN entry found. TmsId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
@@ -758,7 +763,7 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_acc
     let host_account: String = match pkey_row {
         Some(h) => h.get(0),
         None => {
-            let msg = format!("Unable to retrieve host account from pubkey record for client {} on host {} with fingerprint {}.",
+            let msg = format!("Unable to retrieve host account from pubkey record. ClientId: {} Host: {} PubKeyFingerprint: {}.",
                                         client_id, host, public_key_fingerprint);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
@@ -766,7 +771,9 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_acc
     };
 
     let host_row = sqlx::query(GET_USER_HOST_EXISTS)
-        .bind(rp_account)
+        .bind(tms_identity)
+        // .bind(rp_id) TODO
+        // .bind(rp_account) TODO
         .bind(host)
         .bind(&host_account)
         .fetch_optional(&mut *tx)
@@ -774,8 +781,8 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_acc
     match host_row {
         Some(_) => (),
         None => {
-            let msg = format!("No user/host mapping found for user {} for account {} on host {}.",
-                                        rp_account, host_account, host);
+            let msg = format!("No user/host mapping found. TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {}",
+                                     tms_identity, rp_id, rp_account, host_account, host);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
@@ -784,13 +791,16 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, rp_acc
     // -------- Check delegation dependency
     let delg_row = sqlx::query(GET_DELEGATION_EXISTS)
         .bind(client_id)
+        .bind(tms_identity)
+        .bind(rp_id)
         .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
     match delg_row {
         Some(_) => (),
         None => {
-            let msg = format!("No delegation to client {} found for user {}.", client_id, rp_account);
+            let msg = format!("No delegation record found. ClientId: {} TmsId: {} RpId: {} RpAcct: {}",
+                                     client_id, tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }

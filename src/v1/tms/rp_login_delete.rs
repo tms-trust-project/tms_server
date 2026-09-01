@@ -150,6 +150,8 @@ async fn delete_rp_login(req: &ReqDeleteRPLogin) -> Result<u64> {
     // Issue the db delete call.
     let result = sqlx::query(DELETE_RP_LOGIN)
         .bind(&req.tms_identity)
+        .bind(&req.rp_id)
+        .bind(&req.rp_account)
         .execute(&mut *tx)
         .await?;
     deletes += result.rows_affected();
