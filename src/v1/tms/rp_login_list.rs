@@ -155,7 +155,7 @@ impl RespListRPlogin {
 // ---------------------------------------------------------------------------
 // list_rp_logins:
 // ---------------------------------------------------------------------------
-async fn list_rp_logins(req: &ReqListRPlogin) -> Result<Vec<RPloginListElement>> {
+async fn list_rp_logins(_req: &ReqListRPlogin) -> Result<Vec<RPloginListElement>> {
     // Get a connection to the db and start a transaction.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.

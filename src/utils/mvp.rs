@@ -59,7 +59,8 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
         parms.rp_account.clone(),
         expires_at,
         DB_TRUE,
-        now.clone(), 
+        now.clone(),
+        now.clone(),
         now.clone(),
     );
 
@@ -79,10 +80,11 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let input_record = DelegationInput::new(
         parms.client_id.clone(),
         parms.tms_identity.clone(),
+        parms.rp_id.clone(),
         parms.rp_account.clone(),
         expires_at,
-        now.clone(), 
         now.clone(),
+        now.clone()
     );
 
     // Insert the new record if it doesn't already exist.

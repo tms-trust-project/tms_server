@@ -9,10 +9,8 @@ use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::{INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
 use crate::utils::db_types::RPLoginInput;
 use crate::utils::authz::{authorize, AuthzTypes};
-use crate::utils::tms_utils::{self, timestamp_utc, timestamp_utc_to_str, calc_expires_at, 
-                              RequestDebug};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
 use log::{error, info};
-
 use crate::RUNTIME_CTX;
 use crate::utils::config::DB_TRUE;
 
@@ -148,7 +146,6 @@ impl RespCreateRPLogin {
 
         // Use the same current UTC timestamp in all related time caculations..
         let now = timestamp_utc();
-        let current_ts = timestamp_utc_to_str(now);
         let expires_at = calc_expires_at(now, ttl_minutes);
 
         // Create the input record.  Note that we save the hash of
@@ -161,12 +158,13 @@ impl RespCreateRPLogin {
             DB_TRUE,
             now.clone(),
             now.clone(),
+            now // TODO/TBD this is last_login. Just use now? Or allow for it to be passed in somehow?
         );
 
         // Insert the new key record.
         insert_rp_login(input_record, STRICT).await?;
-        info!("RP_LOGIN for tms_identity: {} rp_id: {} rp_account: {} expires_at: {}.",
-               req.tms_identity, req.rp_id, req.rp_account, expires_at.clone());
+        info!("RP_LOGIN for tms_identity: {} rp_id: {} rp_account: {} expires_at: {} last_login: {}.",
+               req.tms_identity, req.rp_id, req.rp_account, expires_at.clone(), now);
         
         // Return the secret represented in hex.
         Ok(make_http_201(Self::new("0", "success".to_string(), req.tms_identity.clone(),

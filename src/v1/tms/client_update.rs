@@ -6,7 +6,7 @@ use anyhow::Result;
 
 use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::{UPDATE_CLIENT_ENABLED};
-use crate::utils::tms_utils::{self, RequestDebug, timestamp_utc, timestamp_utc_to_str};
+use crate::utils::tms_utils::{self, RequestDebug, timestamp_utc};
 use crate::utils::authz::{authorize, AuthzTypes};
 use log::{error, info};
 

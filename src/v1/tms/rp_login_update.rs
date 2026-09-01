@@ -13,18 +13,21 @@ use log::{error, info};
 use crate::RUNTIME_CTX;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 pub struct UpdateRPLoginApi;
 
 // ***************************************************************************
-//                          Request/Response Definiions
+//                          Request/Response Definitions
 // ***************************************************************************
 #[derive(Object)]
 pub struct ReqUpdateRPLogin
 {
     tms_identity: String,
+    rp_id: String,
+    rp_account: String,
     enabled: bool,
+    // TODO need to add last_login? expires_at?
 }
 
 #[derive(Object, Debug)]
@@ -46,6 +49,10 @@ impl RequestDebug for ReqUpdateRPLogin {
         s.push_str("  Request body:");
         s.push_str("\n    tms_identity: ");
         s.push_str(&self.tms_identity);
+        s.push_str("\n    rp_id: ");
+        s.push_str(&self.rp_id);
+        s.push_str("\n    rp_acount: ");
+        s.push_str(&self.rp_account);
         s.push_str("\n    enabled: ");
         s.push_str(enabled.as_str());
         s
@@ -97,7 +104,8 @@ async fn update_rp_login(&self, http_req: &Request, req: Json<ReqUpdateRPLogin>)
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to update resource provider login for user {}.", req.tms_identity);
+            let msg = format!("ERROR: NOT AUTHORIZED to update resource provider login. TmsId: {} RpId: {} RpAcct: {}",
+                                     req.tms_identity, req.rp_id, req.rp_account);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -132,7 +140,8 @@ impl RespUpdateRPLogin {
         let updates = update_rp_login(req).await?;
         
         // Log result and return response.
-        let msg = format!("{} update(s) to tms_identity {} completed, enabled = {}", updates, req.tms_identity, req.enabled);
+        let msg = format!("{} update(s) completed. TmsId: {} RpId: {} RpAcct: {} Enabled: {}",
+                                 updates, req.tms_identity, req.rp_id, req.rp_account, req.enabled);
         info!("{}", msg);
         Ok(make_http_200(RespUpdateRPLogin::new("0", msg, updates as i32)))
     }
@@ -163,7 +172,7 @@ async fn update_rp_login(req: &ReqUpdateRPLogin) -> Result<u64> {
         .bind(current_ts)
         .bind(&req.tms_identity)
         .bind(&req.rp_id)
-        .bind(&req.rp_acct)
+        .bind(&req.rp_account)
         .execute(&mut *tx)
         .await?;
     updates += result.rows_affected();

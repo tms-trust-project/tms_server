@@ -23,7 +23,9 @@ pub struct DeleteRPLoginApi;
 #[derive(Object)]
 pub struct ReqDeleteRPLogin
 {
-    tms_identity: String
+    tms_identity: String,
+    rp_id: String,
+    rp_account: String
 }
 
 #[derive(Object, Debug)]
@@ -42,6 +44,10 @@ impl RequestDebug for ReqDeleteRPLogin {
         s.push_str("  Request body:");
         s.push_str("\n    tms_identity: ");
         s.push_str(&self.tms_identity);
+        s.push_str("\n    rp_id: ");
+        s.push_str(&self.rp_id);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s
     }
 }
@@ -77,10 +83,12 @@ fn make_http_500(msg: String) -> TmsResponse {
 // ***************************************************************************
 #[OpenApi]
 impl DeleteRPLoginApi {
-    #[oai(path = "/tms/rplogin/del/:tms_identity", method = "delete")]
-    async fn delete_rp_login_api(&self, http_req: &Request, tms_identity: Path<String>) -> TmsResponse {
+    #[oai(path = "/tms/rplogin/del/:tms_identity/:rp_id/:rp_acct", method = "delete")]
+    async fn delete_rp_login_api(&self, http_req: &Request, tms_identity: Path<String>, rp_id: Path<String>,
+                                 rp_account: Path<String>) -> TmsResponse {
         // Package the request parameters.
-        let req = ReqDeleteRPLogin { tms_identity: tms_identity.to_string()};
+        let req = ReqDeleteRPLogin { tms_identity: tms_identity.to_string(),
+                                     rp_id: rp_id.to_string(), rp_account: rp_account.to_string() };
 
         // -------------------- Authorize ----------------------------
         // Currently, only the admin can delete a user rp_login record.
@@ -89,7 +97,8 @@ impl DeleteRPLoginApi {
         let allowed = [AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED to delete resource provider login for user {}.", req.tms_identity);
+            let msg = format!("ERROR: NOT AUTHORIZED to delete resource provider login. TmsId: {} RpId: {} RpAcct: {}.",
+                                     req.tms_identity, req.rp_id, req.rp_account);
             error!("{}", msg);
             return make_http_401(msg);
         }
@@ -125,8 +134,10 @@ impl RespDeleteRPLogin {
         
         // Log result and return response.
         let msg = 
-            if deletes < 1 {format!("RP_LOGIN {} NOT FOUND - Nothing deleted", req.tms_identity)}
-            else {format!("RP_LOGIN {} deleted", req.tms_identity)};
+            if deletes < 1 {format!("RP_LOGIN NOT FOUND - Nothing deleted. TmsId: {} RpId: {} RpAcct: {}",
+                                    req.tms_identity, req.rp_id, req.rp_account)}
+            else {format!("RP_LOGIN deleted. TmsId: {} RpId: {} RpAcct: {}",
+                          req.tms_identity, req.rp_id, req.rp_account)};
         info!("{}", msg);
         Ok(make_http_200(RespDeleteRPLogin::new("0", msg, deletes as u32)))
     }

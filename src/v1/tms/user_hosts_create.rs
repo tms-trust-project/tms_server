@@ -9,7 +9,7 @@ use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::{INSERT_USER_HOSTS, INSERT_USER_HOSTS_NOT_STRICT};
 use crate::utils::db_types::UserHostInput;
 use crate::utils::authz::{authorize, AuthzTypes};
-use crate::utils::tms_utils::{self, timestamp_utc, timestamp_utc_to_str, calc_expires_at, RequestDebug};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;

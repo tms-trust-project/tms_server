@@ -130,7 +130,7 @@ impl CreateDelegationsApi {
 impl RespCreateDelegations {
     /// Create a new response.
     fn new(result_code: &str, result_msg: String, client_id: String, tms_identity: String,
-           rp_account: String, expires_at: DateTime<Utc>,) -> Self {
+           rp_id: String, rp_account: String, expires_at: DateTime<Utc>,) -> Self {
         Self {result_code: result_code.to_string(), result_msg, client_id, tms_identity, rp_account, expires_at,}}
 
     /// Process the request.
@@ -142,7 +142,7 @@ impl RespCreateDelegations {
         // The ttl can be negative, which means maximum ttl.
         let ttl_minutes = if req.ttl_minutes < 0 {i32::MAX} else {req.ttl_minutes};
 
-        // Use the same current UTC timestamp in all related time caculations..
+        // Use the same current UTC timestamp in all related time calculations.
         let now = timestamp_utc();
         let expires_at = calc_expires_at(now, ttl_minutes);
 
@@ -151,6 +151,7 @@ impl RespCreateDelegations {
         let input_record = DelegationInput::new(
             req.client_id.clone(),
             req.tms_identity.clone(),
+            req.rp_id.clone(),
             req.rp_account.clone(),
             expires_at.clone(),
             now.clone(),

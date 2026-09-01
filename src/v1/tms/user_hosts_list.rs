@@ -157,7 +157,7 @@ impl RespListUserHosts {
 // ---------------------------------------------------------------------------
 // list_hosts_users:
 // ---------------------------------------------------------------------------
-async fn list_hosts_users(req: &ReqListUserHosts) -> Result<Vec<UserHostsListElement>> {
+async fn list_hosts_users(_req: &ReqListUserHosts) -> Result<Vec<UserHostsListElement>> {
     // Get a connection to the db and start a transaction.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.

@@ -157,7 +157,7 @@ impl RespListDelegations {
 // ---------------------------------------------------------------------------
 // list_delegations:
 // ---------------------------------------------------------------------------
-async fn list_delegations(req: &ReqListDelegations) -> Result<Vec<DelegationsListElement>> {
+async fn list_delegations(_req: &ReqListDelegations) -> Result<Vec<DelegationsListElement>> {
     // Get a connection to the db and start a transaction.  Uncommited transactions 
     // are automatically rolled back when they go out of scope. 
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.

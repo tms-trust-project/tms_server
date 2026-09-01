@@ -194,9 +194,10 @@ async fn get_rp_login(req: &ReqGetRPLogin) -> Result<RPLogin> {
 
     // We may have found the user resource provider login record.
     match result {
-        Some(row) => { // TODO what about id coming back from select?
+        Some(row) => {
             Ok(RPLogin::new(row.get(0), row.get(1), row.get(2), row.get(3), 
-                           row.get(4), row.get(5), row.get(6), row.get(7)))
+                            row.get(4), row.get(5), row.get(6), row.get(7),
+                            row.get(8)))
         },
         None => {
             Err(anyhow!("NOT_FOUND"))
