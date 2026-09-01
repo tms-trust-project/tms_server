@@ -220,6 +220,12 @@ ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 
     REFERENCES tms_identities(tms_identity);
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
 
+-- Fix up constraints. After alterations above there are problems
+--   After renaming we end up with pubkeys_client_user_id_fkey as FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity)
+ALTER TABLE pubkeys DROP CONSTRAINT pubkeys_client_user_id_fkey;
+-- And pubkeys_client_user_id_host_host_account_fkey is FOREIGN KEY (rp_account, host, host_account) REFERENCES user_hosts(tms_identity, host, host_account)
+ALTER TABLE pubkeys DROP CONSTRAINT pubkeys_client_user_id_host_host_account_fkey;
+ALTER TABLE pubkeys ADD FOREIGN KEY(tms_identity, host, host_account) REFERENCES user_hosts(tms_identity, host, host_account);
 -- ---------------------------------------
 -- reservations table
 -- ---------------------------------------
@@ -239,6 +245,6 @@ ALTER TABLE user_hosts ADD CONSTRAINT fk_tms_identity
     FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
 
 -- TODO Now that all columns are added for existing MVP legacy "danger mode" records created for TMS 0.3 and earlier,
---  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
+--  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account    add TMS identities for every record in the user_mfa, delegations and user_hosts table.
 
 -- TODO "delegations_client_user_id_fkey" FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE
