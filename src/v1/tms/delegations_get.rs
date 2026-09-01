@@ -180,8 +180,9 @@ async fn get_delegation(req: &ReqGetDelegations) -> Result<Delegation> {
     // We may have found the user host.
     match result {
         Some(row) => {
-            Ok(Delegation::new(row.get(0), row.get(1), row.get(2), 
-                               row.get(3),row.get(4), row.get(5), row.get(6)))
+            Ok(Delegation::new(row.get(0), row.get(1), row.get(2),
+                               row.get(3),row.get(4), row.get(5), row.get(6),
+                               row.get(7)))
         },
         None => {
             Err(anyhow!("NOT_FOUND"))

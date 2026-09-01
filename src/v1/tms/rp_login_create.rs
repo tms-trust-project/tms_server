@@ -101,7 +101,7 @@ fn make_http_500(msg: String) -> TmsResponse {
 #[OpenApi]
 impl CreateRPLoginApi {
     #[oai(path = "/tms/rPLogin", method = "post")]
-    async fn create_client(&self, http_req: &Request, req: Json<ReqCreateRPLogin>) -> TmsResponse {
+    async fn create_rp_login(&self, http_req: &Request, req: Json<ReqCreateRPLogin>) -> TmsResponse {
         // -------------------- Authorize ----------------------------
         // Currently, only the admin can create a user rp_login record.
         // When user authentication is implemented, we'll add user-own 
