@@ -85,7 +85,7 @@ ALTER TABLE tms_identities OWNER TO tms;
 --
 
 --  Create a TMS identity with a special name to act as a potential fallback for MVP legacy danger mode records.
-INSERT INTO tms_identities (tms_identity) VALUES ('dangerUser@dangerModeIdP');
+INSERT INTO tms_identities (tms_identity) VALUES ('dangerUserUnknown@dangerModeIdP');
 
 -- ---------------------------------------
 -- keys table
@@ -200,10 +200,10 @@ ALTER TABLE user_hosts RENAME COLUMN tms_user_id TO tms_identity;
 -- probably due to all the renaming above. Below we create the correct one for tms_identity when adding the coloumn
 ALTER TABLE delegations DROP CONSTRAINT delegations_client_user_id_fkey;
 --TODO: For upgrade, what about existing records? empty string? allow null?
--- Automatically insert <tacc_username>@danger_mode_idp for the tms_identity
+-- Automatically insert <tacc_username>@danger_mode_idp for the tms_identity?
 --Add column tms_identity with foreign key reference to tms_identities
 -- NOTE: The hard coded string here must match the one used above for the tms_identities table.
-ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUser@dangerModeIdP'
+ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUserUnknown@dangerModeIdP'
     REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
 ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
@@ -216,7 +216,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_rpid_rpaccount_idx ON delega
 -- pubkeys table
 -- ---------------------------------------
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
-ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUser@dangerModeIdP'
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUserUnknown@dangerModeIdP'
     REFERENCES tms_identities(tms_identity);
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
 
@@ -245,6 +245,5 @@ ALTER TABLE user_hosts ADD CONSTRAINT fk_tms_identity
     FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
 
 -- TODO Now that all columns are added for existing MVP legacy "danger mode" records created for TMS 0.3 and earlier,
---  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account    add TMS identities for every record in the user_mfa, delegations and user_hosts table.
-
--- TODO "delegations_client_user_id_fkey" FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE
+--  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
+--    ????add TMS identities for every record in the user_mfa, delegations and user_hosts table.
