@@ -15,7 +15,7 @@ ALTER TABLE identity_provider_types OWNER TO tms;
 --
 -- Insert hard-coded types
 -- TODO Might be able to create globus and tacc_tapis as part of a seeding step, but dander_mode
---      should probably always be created here for migration from TMS 0.3.
+--   should always be created here for migration from TMS 0.3.
 INSERT INTO identity_provider_types (provider_type) VALUES ('globus');
 INSERT INTO identity_provider_types (provider_type) VALUES ('tacc_tapis');
 INSERT INTO identity_provider_types (provider_type) VALUES ('danger_mode');
@@ -36,23 +36,31 @@ CREATE TABLE IF NOT EXISTS identity_providers
     oauth2_public_key     TEXT,
     oidc_user_info_url    TEXT,
     scope                 TEXT,
-    provider_type         TEXT              NOT NULL,
+    provider_type         TEXT              NOT NULL REFERENCES identity_provider_types(provider_type) ON UPDATE CASCADE ON DELETE CASCADE,
     supports_login        BOOLEAN           NOT NULL DEFAULT false,
     supports_resources    BOOLEAN           NOT NULL DEFAULT false,
     created               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
     updated               TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 ALTER TABLE identity_providers OWNER TO tms;
-ALTER TABLE identity_providers
-    ADD CONSTRAINT fk_provider FOREIGN KEY (provider_type) REFERENCES identity_provider_types (provider_type);
 
 --
--- Create identity_provider to be used as resource provider for existing MVP legacy "danger mode" records.
+-- Create an identity_provider to be used as resource provider for existing MVP legacy "danger mode" records.
+-- Only TACC is running TMS server 0.3 and the RP is always strictly just TACC.
+-- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
+--   tenants which use TACC ldap for authentication.
 INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
-VALUES ('danger_mode_idp', 'DangerMode IdP', '12345678-1234-1234-1234-dangermode123', 'DangerModezf9afuG9RzpE6DCDvkrM',
-        'https://auth.danger.dummy.org/v2/oauth2/authorize', 'https://auth.danger.dummy.org/v2/oauth2/token',
-        'danger_mode', true, false);
+VALUES ('danger_mode_tacc_rp', 'DangerMode TACC Resource Provider', '12345678-1234-1234-1234-dangermode123',
+        'DangerModeZf9afuG9RzpE6DCDvkrM', 'https://auth.danger.fake.org/v2/oauth2/authorize',
+        'https://auth.danger.fake.org/v2/oauth2/token', 'danger_mode', false, false);
+--
+-- Create an identity_provider to be used as placeholder to be used when adding columns that are NOT NULL.
+-- This should not be in place permanently, it should get replaced during an upgrade.
+INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+                                provider_type, supports_login, supports_resources)
+VALUES ('danger_mode_unknown', 'DangerMode Unkown RP', '12345678-1234-1234-dangermodeunkown',
+        'DangerModeUnknownZRzpE6DCDvkrM', '', '', 'danger_mode', false, false);
 
 -- ---------------------------------------
 -- tms_identities table
@@ -171,9 +179,8 @@ ALTER TABLE resource_provider_logins RENAME COLUMN tms_user_id TO tms_identity;
 -- ================================================================================================
 -- Add columns and constraints to resource_provider_logins table
 -- ================================================================================================
--- TODO/TBD Is the empty string OK for rp_account?
-ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_account TEXT NOT NULL DEFAULT '';
-ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_id NOT NULL DEFAULT 'danger_mode';
+ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
+ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_account TEXT NOT NULL DEFAULT 'danger_user_unknown';
 ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc');
 
 ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_uuid_account_key UNIQUE (tms_identity, rp_id, rp_account);
@@ -193,22 +200,25 @@ ALTER TABLE user_hosts RENAME COLUMN tms_user_id TO tms_identity;
 -- NOTE: The hard coded string here must match the one used above for the tms_identities table.
 ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUser@dangerModeIdP'
     REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
+ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
+-- For delegations table (tms_identity, rp_id, rp_account) uniquely identify the record
+CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_rpid_rpaccount_idx ON delegations (tms_identity, rp_id, rp_account);
 
 -- ------------------------------------------------------------------------------------------------
--- Rename column client_user_id to rp_account for delegations, pubkeys and reservations.
+-- Rename column client_user_id to rp_account and add column rp_id for pubkeys and reservations.
 -- ------------------------------------------------------------------------------------------------
-ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
 ALTER TABLE reservations RENAME COLUMN client_user_id TO rp_account;
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
 
 -- ------------------------------------------------------------------------------------------------
--- Add foreign keys for tms_identity referencing tms_identities table for tables
---    resource_provider_logins, delegations, user_hosts
+-- Add foreign keys for tms_identity referencing tms_identities table for tables resource_provider_logins and user_hosts
 -- Each tms_identity in each table must represent an identity in the tms_identities table.
--- NOTE: For delegations this is done above when adding the new column to the table.
--- As also mentioned above, this is needed because for delegations and the other tables we want to make sure we always
--- reference a unique tms_identity. If all tables reference this as a Foreign Key this will ensure that tms_identity
--- columns all reference the same unique identity unique within TMS
+-- As also mentioned above, this is needed because we want to make sure we always reference a unique tms_identity.
+-- If all tables reference this as a foreign key this will ensure that tms_identity columns all reference the same
+-- unique identity unique within TMS
 -- ------------------------------------------------------------------------------------------------
 ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
     FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);

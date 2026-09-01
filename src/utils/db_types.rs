@@ -254,6 +254,7 @@ pub struct RPLogin {
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
+    pub last_login: DateTime<Utc>
 }
 
 #[derive(Debug, Deserialize)]
@@ -265,6 +266,7 @@ pub struct RPLoginInput {
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
+    pub last_login: DateTime<Utc>
 }
 
 impl RPLogin {
@@ -278,9 +280,10 @@ impl RPLogin {
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
+        last_login: DateTime<Utc>
     )
         -> RPLogin {
-        RPLogin { id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated }
+        RPLogin { id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login }
     }
 }
 
@@ -294,9 +297,10 @@ impl RPLoginInput {
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
-    ) 
+        last_login: DateTime<Utc>
+    )
     -> RPLoginInput {
-        RPLoginInput { tms_identity, rp_id, rp_account, expires_at, enabled, created, updated }
+        RPLoginInput { tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login }
     }
 }
 

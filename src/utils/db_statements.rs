@@ -27,8 +27,9 @@ pub const SEL_IDP_EXISTS: &str = concat!(
 );
 
 // ========================= tms_identities table ========================
+// NOTE: We just need one in this table for referencing, so OK if it already exists.
 pub const INSERT_TMS_IDENTITY: &str = concat!(
-"INSERT INTO tms_identities (tms_identity) VALUES ($1)"
+"INSERT INTO tms_identities (tms_identity) VALUES ($1) ON CONFLICT DO NOTHING"
 );
 
 
@@ -74,7 +75,7 @@ pub const DELETE_CLIENT: &str = concat!(
 // ========================= resource_provider_logins table ========================
 pub const INSERT_RP_LOGIN: &str = concat!(
     "INSERT INTO resource_provider_logins ",
-    "(tms_identity, expires_at, enabled, created, updated, rp_account, rp_uuid, last_login) ",
+    "(tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login) ",
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 );
 

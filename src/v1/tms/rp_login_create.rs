@@ -198,6 +198,7 @@ pub async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
         .bind(rec.enabled)
         .bind(rec.created)
         .bind(rec.updated)
+        .bind(rec.last_login)
         .execute(&mut *tx)
         .await?;
 

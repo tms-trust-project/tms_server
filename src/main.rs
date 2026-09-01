@@ -194,6 +194,10 @@ async fn tms_init_data() -> Result<bool> {
     let inserts = db::create_test_idp().await.expect("Error creating test IdP.");
     info!("Number of test IDPs created: {}.", inserts);
 
+    // Create test RP if it does not already exist.
+    let inserts = db::create_test_rp().await.expect("Error creating test resource provider.");
+    info!("Number of test resource providers created: {}.", inserts);
+
     // Create test client if it does not already exist.
     let inserts = db::create_test_client().await.expect("Error creating test client.");
     info!("Number of test clients created: {}.", inserts);

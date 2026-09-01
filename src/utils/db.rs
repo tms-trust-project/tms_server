@@ -23,12 +23,14 @@ use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RES
                            SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
 const TEST_IDP_ID: &str = "danger_mode_idp";
-const TEST_IDP_NAME: &str = "Dummy Test IdP";
+const TEST_IDP_NAME: &str = "Fake Test IdP";
 const TEST_IDP_CLIENT_ID: &str = "12345678-1234-1234-1234-abcdefghtest";
-const TEST_IDP_CLIENT_SECRET: &str = "DummyTestdf894adfduG89JRazpE6DCDvkrM";
-const TEST_IDP_REDIRECT_URL: &str = "https://auth.dummy.test.org/v2/oauth2/authorize";
-const TEST_IDP_TOKEN_URL: &str = "https://auth.dummy.test.org/v2/oauth2/token";
-const TEST_IDP_PROVIDER_TYPE: &str = "dummy_test";
+const TEST_IDP_CLIENT_SECRET: &str = "FakeTestdf894adfduG89JRazpE6DCDvkrM";
+const TEST_IDP_REDIRECT_URL: &str = "https://auth.fake.test.org/v2/oauth2/authorize";
+const TEST_IDP_TOKEN_URL: &str = "https://auth.fake.test.org/v2/oauth2/token";
+const TEST_IDP_PROVIDER_TYPE: &str = "fake_test";
+const TEST_RP_ID: &str = "test_fake_rp";
+const TEST_RP_NAME: &str = "Fake Test RP";
 const TEST_IDP_SUPPORTS_LOGIN: bool = true;
 const TEST_IDP_SUPPORTS_RESOURCES: bool = false;
 const TEST_TMS_USER_BASE: &str = "testtmsuser";
@@ -125,7 +127,7 @@ pub async fn insert_new_test_pubkey_if_none(test_rp_acct: String, test_host: Str
     // Generate the new key pair.
     let keyinfo = match keygen::generate_key(KEY_TYPE) {
         Ok(k) => k,
-        Err(e) => { return Result::Err(anyhow!(e)); }
+        Err(e) => { return Err(anyhow!(e)); }
     };
     // Determine the fingerprint.
     let pubkey_fingerprint =
@@ -349,6 +351,39 @@ pub async fn create_test_idp() -> Result<u64> {
     Ok(inserts)
 }
 
+// ---------------------------------------------------------------------------
+// create_test_idp:
+// ---------------------------------------------------------------------------
+/** This function either experiences an error or returns true (false is never returned). */
+pub async fn create_test_rp() -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // If client already exists then we are done
+    let skip_create: bool = sqlx::query_scalar(SEL_IDP_EXISTS)
+        .bind(TEST_RP_ID)
+        .fetch_one(&mut *tx).await?;
+    if skip_create {return Ok(0)}
+
+    let test_idp_client_secret_hash: String = hash_hex_secret(&TEST_IDP_CLIENT_SECRET.to_string());
+    let now = timestamp_utc();
+    // Create the RP
+    // Create the input record. Note we save the hash of the hex secret, but never the secret.
+    let idp_input = IdPInput::new(
+        TEST_RP_ID.to_string(),
+        TEST_RP_NAME.to_string(),
+        TEST_IDP_CLIENT_ID.to_string(),
+        test_idp_client_secret_hash,
+        TEST_IDP_REDIRECT_URL.to_string(),
+        TEST_IDP_TOKEN_URL.to_string(),
+        TEST_IDP_PROVIDER_TYPE.to_string(),
+        TEST_IDP_SUPPORTS_LOGIN,
+        TEST_IDP_SUPPORTS_RESOURCES,
+        now.clone(),
+        now.clone()
+    );
+    let inserts = insert_new_idp(idp_input).await?;
+    Ok(inserts)
+}
+
 // ------------------------------------------------------------------------------------------------
 // create_test_data:
 // Create records in tables: tms_identities, resource_provider_logins, user_hosts, delegations
@@ -363,9 +398,13 @@ pub async fn create_test_data() -> Result<u64> {
     // Get the timestamp string.
     let now = timestamp_utc();
 
-    // Look up provider UUID using TEST_IDP_ID
+    // Look up resource and identity provider UUIDs
     let mut tx = RUNTIME_CTX.db.begin().await?;
     let test_idp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_IDP_ID).fetch_one(&mut *tx).await?;
+    tx.commit().await?;
+    // Look up resource provider UUID using TEST_RP_ID
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    let test_rp_uuid: Uuid = sqlx::query_scalar(GET_IDP_UUID).bind(TEST_RP_ID).fetch_one(&mut *tx).await?;
     tx.commit().await?;
 
     // Create records for 101 test users in the test client. Do this in a txn
@@ -380,7 +419,7 @@ pub async fn create_test_data() -> Result<u64> {
         let mut tx = RUNTIME_CTX.db.begin().await?;
 
         // Check for existing record. If found then continue;
-        // Note: checking for a delegation record is  enough since the delegation and user_hosts
+        // Note: checking for a delegation record is enough since the delegation and user_hosts
         //       records reference the rp_login record as a foreign key.
         let skip_create: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
             .bind(TEST_CLIENT)
@@ -395,17 +434,17 @@ pub async fn create_test_data() -> Result<u64> {
             .execute(&mut *tx)
             .await?;
 
-        info!("Creating delegation records for tms identity: {} host: {} host_acct {} rp_account {}",
-              test_tms_identity, test_host, test_host_acct, test_rp_account);
+        info!("Creating test records for tms identity: {} host: {} host_acct {} rp_id: {} rp_account {}",
+              test_tms_identity, test_host, test_host_acct, TEST_RP_ID, test_rp_account);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)
             .bind(test_tms_identity.clone())
+            .bind(TEST_RP_ID)
+            .bind(test_rp_account.clone())
             .bind(max_tms_utc)
             .bind(DB_TRUE)
             .bind(now)
             .bind(now)
-            .bind(test_rp_account.clone())
-            .bind(test_idp_uuid)
             .bind(now)
             .execute(&mut *tx)
             .await?;
