@@ -112,8 +112,8 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
  * If asked to generate for 'testuser001' use a fixed pubkey fingerprint.
  * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
-pub async fn insert_new_test_pubkey_if_none(test_rp_acct: String, test_host: String,
-                                            test_host_acct: String) -> Result<u64> {
+pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_acct: String,
+                                            test_host: String, test_host_acct: String) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
     // Check for existing record, create only if needed
@@ -154,10 +154,13 @@ pub async fn insert_new_test_pubkey_if_none(test_rp_acct: String, test_host: Str
         now.clone(),
     );
 
-    info!("Creating keypair for rp_account: {} host: {} host_acct {}", test_rp_acct, test_host, test_host_acct);
+    info!("Creating keypair for ClientId: {} TmsId: {} RPId: {} RPAcct: {} Host: {} HostAcct: {}",
+          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
         .bind(input_record.client_id)
+        .bind(input_record.tms_identity.clone())
+        .bind(TEST_RP_ID)
         .bind(input_record.rp_account.clone())
         .bind(input_record.host.clone())
         .bind(input_record.host_account)
@@ -190,6 +193,8 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
         .bind(rec.client_id)
+        .bind(rec.tms_identity)
+        .bind(rec.rp_id.clone())
         .bind(rec.rp_account.clone())
         .bind(rec.host.clone())
         .bind(rec.host_account)
@@ -207,8 +212,8 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("A key of type '{}' created for '{}' for host '{}' expires at {} and has {} remaining uses.", 
-            rec.key_type.clone(), rec.rp_account, rec.host, rec.expires_at, rec.remaining_uses);
+    info!("pubkey record created. ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
+           rec.client_id, rec.tms_identity, rec.rp_id, rec.rp_account, rec.host, rec.expires_at, rec.remaining_uses, rec.key_type);
     Ok(result.rows_affected())
 }
 
@@ -491,13 +496,14 @@ pub async fn create_test_keys() -> Result<u64> {
     // For each test user create one pubkey entry, ignore generated private key
     let mut insert_count = 0;
     for n in 1..=TEST_RECORD_CNT {
+        let test_tms_identity = format!("{}{:03}@{}", TEST_TMS_USER_BASE, n, TEST_TMS_USER_DOMAIN);
         let test_rp_acct = format!("{}{:03}", TEST_RP_ACCOUNT, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
 
         // Create a new test pubkey for user if none exists.
         // This should return 0 if one already exists and 1 if a new one was created
-        let inserts = insert_new_test_pubkey_if_none(test_rp_acct, test_host, test_host_acct).await?;
+        let inserts = insert_new_test_pubkey_if_none(test_tms_identity, test_rp_acct, test_host, test_host_acct).await?;
         insert_count += inserts;
     }
     Ok(insert_count)
