@@ -26,6 +26,7 @@ pub struct NewSshKeysApi;
 pub struct ReqNewSshKeys
 {
     tms_identity: String,
+    rp_id: String,
     rp_account: String,
     host: String,
     host_account: String,
@@ -218,7 +219,7 @@ impl RespNewSshKeys {
         //
         // This method returns a detailed error message that indicates which table did not contain
         // the required values and whether the error resulted from a missing or expired record.
-        match check_pubkey_dependencies(&req_ext.client_id, &req.rp_account, &req.host,
+        match check_pubkey_dependencies(&req_ext.client_id, &req.rp_id, &req.rp_account, &req.host,
                                         &req.host_account).await
         {
             Ok(_) => (),
@@ -271,6 +272,7 @@ impl RespNewSshKeys {
         // Create the input record.
         let input_record = PubkeyInput::new(
             req_ext.client_id.clone(),
+            req.rp_id.clone(),
             req.rp_account.clone(), 
             req.host.clone(), 
             req.host_account.clone(),

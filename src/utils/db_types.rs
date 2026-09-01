@@ -12,6 +12,7 @@ use serde::Deserialize;
 pub struct Pubkey {
     pub id: i32,
     pub client_id: String,
+    pub tms_identity: String,
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
@@ -31,6 +32,7 @@ pub struct Pubkey {
 #[derive(Debug, Deserialize)]
 pub struct PubkeyInput {
     pub client_id: String,
+    pub tms_identity: String,
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
@@ -60,6 +62,7 @@ impl Pubkey {
     pub fn new(
         id: i32,
         client_id: String,
+        tms_identity: String,
         rp_id: String,
         rp_account: String,
         host: String,
@@ -77,7 +80,7 @@ impl Pubkey {
     ) 
     -> Pubkey {
         Pubkey {
-            id, client_id, rp_id, rp_account, host, host_account, public_key_fingerprint,
+            id, client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint,
             public_key, key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, 
             expires_at, created, updated
         }
@@ -88,6 +91,7 @@ impl PubkeyInput {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_id: String,
+        tms_identity: String,
         rp_id: String,
         rp_account: String,
         host: String,
@@ -105,7 +109,7 @@ impl PubkeyInput {
     ) 
     -> PubkeyInput {
         PubkeyInput {
-            client_id, rp_id, rp_account, host, host_account, public_key_fingerprint, public_key,
+            client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint, public_key,
             key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated
         }
     }
@@ -491,6 +495,7 @@ pub struct Reservation {
     pub resid: String,
     pub parent_resid: String,
     pub client_id: String,
+    pub tms_identity: String,
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
@@ -505,6 +510,7 @@ pub struct ReservationInput {
     pub resid: String,
     pub parent_resid: String,
     pub client_id: String,
+    pub tms_identity: String,
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
@@ -521,6 +527,7 @@ impl Reservation {
         resid: String,
         parent_resid: String,
         client_id: String,
+        tms_identity: String,
         rp_id: String,
         rp_account: String,
         host: String,
@@ -531,7 +538,7 @@ impl Reservation {
     ) 
     -> Reservation {
         Reservation {
-            id, resid, parent_resid, client_id, rp_id, rp_account, host,
+            id, resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
             public_key_fingerprint, expires_at, created, updated
         }
     }
@@ -543,6 +550,7 @@ impl ReservationInput {
         resid: String,
         parent_resid: String,
         client_id: String,
+        tms_identity: String,
         rp_id: String,
         rp_account: String,
         host: String,
@@ -553,9 +561,8 @@ impl ReservationInput {
     ) 
     -> ReservationInput {
         ReservationInput {
-            resid, parent_resid, client_id, rp_id, rp_account, host,
+            resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
             public_key_fingerprint, expires_at, created, updated
         }
     }
 }
-

@@ -91,7 +91,7 @@ pub const GET_RP_LOGIN: &str = concat!(
 
 pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
     "SELECT expires_at, enabled ",
-    "FROM resource_provider_logins WHERE tms_identity = $1"
+    "FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
 
 pub const GET_RP_LOGIN_EXISTS: &str = concat!(
@@ -177,7 +177,7 @@ pub const GET_DELEGATION_EXISTS: &str = concat!(
 );
 
 pub const SEL_DELEGATION_EXISTS: &str = concat!(
-    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND rp_account = $2)"
+    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4))"
 );
 
 pub const LIST_DELEGATIONS: &str = concat!(

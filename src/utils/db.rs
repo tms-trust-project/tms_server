@@ -112,7 +112,7 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
  * If asked to generate for 'testuser001' use a fixed pubkey fingerprint.
  * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
-pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_acct: String,
+pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_id: String,
                                             test_host: String, test_host_acct: String) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
@@ -139,7 +139,9 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
     // Create the input record.
     let input_record = PubkeyInput::new(
         TEST_CLIENT.to_string(),
-        test_rp_acct.clone(),
+        test_tms_identity.clone(),
+        test_rp_id.clone(),
+        TEST_RP_ID.to_string(),
         test_host.clone(),
         test_host_acct.clone(),
         pubkey_fingerprint.clone(),
@@ -178,7 +180,8 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("Created keypair for user: {} host: {} host_acct {}", test_rp_acct, test_host, test_host_acct);
+    info!("Created keypair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {}",
+          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
     info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
 }
@@ -192,14 +195,14 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
-        .bind(rec.client_id)
-        .bind(rec.tms_identity)
+        .bind(rec.client_id.clone())
+        .bind(rec.tms_identity.clone())
         .bind(rec.rp_id.clone())
         .bind(rec.rp_account.clone())
         .bind(rec.host.clone())
-        .bind(rec.host_account)
-        .bind(rec.public_key_fingerprint)
-        .bind(rec.public_key)
+        .bind(rec.host_account.clone())
+        .bind(rec.public_key_fingerprint.clone())
+        .bind(rec.public_key.clone())
         .bind(rec.key_type.clone())
         .bind(rec.key_bits)
         .bind(rec.max_uses)
@@ -212,8 +215,9 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("pubkey record created. ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
-           rec.client_id, rec.tms_identity, rec.rp_id, rec.rp_account, rec.host, rec.expires_at, rec.remaining_uses, rec.key_type);
+    info!("pubkey record created. ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
+           rec.client_id, rec.tms_identity, rec.rp_id, rec.rp_account, rec.host, rec.host_account,
+           rec.expires_at, rec.remaining_uses, rec.key_type);
     Ok(result.rows_affected())
 }
 
@@ -428,19 +432,21 @@ pub async fn create_test_data() -> Result<u64> {
         //       records reference the rp_login record as a foreign key.
         let skip_create: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
             .bind(TEST_CLIENT)
+            .bind(test_tms_identity.clone())
+            .bind(TEST_RP_ID)
             .bind(test_rp_account.clone())
             .fetch_one(&mut *tx).await?;
         if skip_create {continue};
 
         // First create a TMS identity in table tms_identities
-        info!("Creating TMS identity record for TMS user: {}", test_tms_identity);
+        info!("Creating TMS identity record for TMS user: {}", test_tms_identity.clone());
         sqlx::query(INSERT_TMS_IDENTITY)
             .bind(test_tms_identity.clone())
             .execute(&mut *tx)
             .await?;
 
-        info!("Creating test records for tms identity: {} host: {} host_acct {} rp_id: {} rp_account {}",
-              test_tms_identity, test_host, test_host_acct, TEST_RP_ID, test_rp_account);
+        info!("Creating test records for tms identity: {} rp_id: {} rp_account {} host: {} host_acct {}",
+              test_tms_identity, TEST_RP_ID, test_rp_account, test_host, test_host_acct);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)
             .bind(test_tms_identity.clone())
@@ -469,6 +475,7 @@ pub async fn create_test_data() -> Result<u64> {
         sqlx::query(INSERT_DELEGATIONS)
             .bind(TEST_CLIENT)
             .bind(test_tms_identity.clone())
+            .bind(TEST_RP_ID)
             .bind(test_rp_account.clone())
             .bind(max_tms_utc)
             .bind(now)
@@ -503,7 +510,8 @@ pub async fn create_test_keys() -> Result<u64> {
 
         // Create a new test pubkey for user if none exists.
         // This should return 0 if one already exists and 1 if a new one was created
-        let inserts = insert_new_test_pubkey_if_none(test_tms_identity, test_rp_acct, test_host, test_host_acct).await?;
+        let inserts = insert_new_test_pubkey_if_none(test_tms_identity, test_rp_acct,
+                                                          test_host, test_host_acct).await?;
         insert_count += inserts;
     }
     Ok(insert_count)
@@ -512,21 +520,19 @@ pub async fn create_test_keys() -> Result<u64> {
 // ---------------------------------------------------------------------------
 // check_pubkey_dependencies:
 // ---------------------------------------------------------------------------
-/** When creating a public key or a reservation on a public key we must check
- * that the user's RP_LOGIN, user/host mapping and client delegation are currently
- * active.  Active means that the records exist in their respective tables, are
- * enabled and have not expired.
+/**
+ * When creating a public key or a reservation on a public key we must check that the user's
+ * RP_LOGIN, user/host mapping and client delegation are currently active. Active means that the
+ * records exist in their respective tables, are enabled and have not expired.
  * 
- * We return as soon as we encounter any dependency that cannot be fulfilled or
- * any other type of error.  The database transaction is read-only, so exiting
- * abruptly causes the transaction to roll back, which frees up the database 
- * just as commit.
+ * We return as soon as we encounter any dependency that cannot be fulfilled or any other type of
+ * error. The database transaction is read-only, so exiting abruptly causes the transaction to roll
+ * back, which frees up the database just as commit.
  * 
- * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http 
- * return code.
+ * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http return code.
  */
-pub async fn check_pubkey_dependencies(client_id: &String, rp_account: &String,
-                                       host: &String, host_account: &String)
+pub async fn check_pubkey_dependencies(client_id: &String, tms_identity: &String, rp_id: &String,
+                                       rp_account: &String, host: &String, host_account: &String)
     -> Result<()>
 {
     // Get a connection to the db and start a transaction.
@@ -534,6 +540,8 @@ pub async fn check_pubkey_dependencies(client_id: &String, rp_account: &String,
 
     // -------- Check rp_login dependency
     let rplogin_row = sqlx::query(GET_RP_LOGIN_ACTIVE)
+        .bind(tms_identity)
+        .bind(rp_id)
         .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
@@ -546,30 +554,34 @@ pub async fn check_pubkey_dependencies(client_id: &String, rp_account: &String,
 
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
-                let msg = format!("Required user RP_LOGIN record for user ID {} is disabled.",
-                                          rp_account);
+                let msg = format!("Required RP_LOGIN record is disabled. TmsId: {} RpId: {} RpAcct: {}",
+                                         tms_identity, rp_id, rp_account);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
 
             // Check whether the rplogin has expired.
             if expires_at < timestamp_utc() {
-                let msg = format!("Required user RP_LOGIN record for user ID '{}' expired at {}.",
-                                          rp_account, expires_at);
+                let msg = format!("Required RP_LOGIN record has expired. TmsId: {} RpId: {} RpAcct: {} ExpiredAt: {}.",
+                                          tms_identity, rp_id, rp_account, expires_at);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Required user RP_LOGIN record not found for user ID {}.", rp_account);
+            let msg = format!("Required user RP_LOGIN record not found. msId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
     };
 
     // -------- Check user_hosts dependency
+    // TODO/TBD: Do we need to add rp_id and rp_account to user_hosts? tms_identity is already there.
     let host_row = sqlx::query(GET_USER_HOST_ACTIVE)
-        .bind(rp_account)
+        .bind(tms_identity)
+        // .bind(rp_id)
+        // .bind(rp_account)
         .bind(host)
         .bind(host_account)
         .fetch_optional(&mut *tx)
@@ -582,15 +594,15 @@ pub async fn check_pubkey_dependencies(client_id: &String, rp_account: &String,
     
                 // Check whether the user host mapping has expired.
                 if expires_at < timestamp_utc() {
-                    let msg = format!("Required user host record for user {} with account {} on host {} expired at {}.",
-                                              rp_account, host_account, host, expires_at);
+                    let msg = format!("Required user host record has expired. TmsId: {} Host: {} HostAcct: {} ExpiredAt: {}",
+                                              tms_identity, host, host_account, expires_at);
                     error!("{}", msg);
                     return Result::Err(anyhow!(msg));
                 }
             },
             None => {
-                let msg = format!("Required user host record not found for user {} with account {} on host {}.",
-                                          rp_account, host_account, host);
+                let msg = format!("Required user host record not found. TmsId: {} Host: {} HostAcct: {}",
+                                          tms_identity, host_account, host);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
