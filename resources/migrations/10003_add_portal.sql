@@ -194,6 +194,11 @@ ALTER TABLE user_hosts RENAME COLUMN tms_user_id TO tms_identity;
 -- ---------------------------------------
 -- delegations table
 -- ---------------------------------------
+-- Drop constraint delegations_client_user_id_fkey
+-- Somehow it becomes:
+--      delegations_client_user_id_fkey: FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity)
+-- probably due to all the renaming above. Below we create the correct one for tms_identity when adding the coloumn
+ALTER TABLE delegations DROP CONSTRAINT delegations_client_user_id_fkey;
 --TODO: For upgrade, what about existing records? empty string? allow null?
 -- Automatically insert <tacc_username>@danger_mode_idp for the tms_identity
 --Add column tms_identity with foreign key reference to tms_identities
@@ -204,6 +209,8 @@ ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
 ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
 -- For delegations table (tms_identity, rp_id, rp_account) uniquely identify the record
 CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_rpid_rpaccount_idx ON delegations (tms_identity, rp_id, rp_account);
+
+
 
 -- ---------------------------------------
 -- pubkeys table
@@ -233,3 +240,5 @@ ALTER TABLE user_hosts ADD CONSTRAINT fk_tms_identity
 
 -- TODO Now that all columns are added for existing MVP legacy "danger mode" records created for TMS 0.3 and earlier,
 --  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
+
+-- TODO "delegations_client_user_id_fkey" FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE

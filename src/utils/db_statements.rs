@@ -183,7 +183,7 @@ pub const GET_DELEGATION_EXISTS: &str = concat!(
 );
 
 pub const SEL_DELEGATION_EXISTS: &str = concat!(
-    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4))"
+    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4)"
 );
 
 //TODO
