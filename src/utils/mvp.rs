@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use crate::utils::db_types::{DelegationInput, RPLoginInput, UserHostInput};
+use crate::utils::db_types::{DelegationInput, RPLoginInput};
 use crate::utils::tms_utils::{timestamp_utc};
 use crate::v1::tms::delegations_create::insert_delegation;
 use crate::v1::tms::rp_login_create::insert_rp_login;
-use crate::v1::tms::user_hosts_create::insert_user_host;
 use log::info;
 use crate::utils::config::DB_TRUE;
 use crate::utils::tms_utils;
@@ -28,12 +27,11 @@ pub struct MVPDependencyParms
  * 
  *  - Keys don't expire.
  *  - Note that to satisfy foreign key constraints, records must be created
- *      in the following order: rp_login, delegations, user_host
+ *      in the following order: rp_login, delegations
  *  - Key dependency records are automatically created in these tables:
  *      - rp_login - non-expiring RP_LOGIN set up for user
  *      - delegations - delegation established between user and client 
- *      - user_host - user binding created to host_account
- *  
+ *
  * When the enable_mvp flag is turned on in the configuration file, clients can
  * create keys without prior configuration in the above 3 tables. TMS will
  * automatically create those records based on the input to the key create call,
@@ -94,28 +92,5 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
         info!("MVP: Delegation for user '{}' to client '{}' created with expiration at {}.",
               parms.rp_account, parms.client_id, expires_at);
     }
-
-    // --------------------- Insert user_hosts record ---------------------
-    // Required inputs: rp_account, host, host_account
-    //
-    // Create the input record.  Note that we save the hash of
-    // the hex secret, but never the secret itself.  
-    let input_record = UserHostInput::new(
-        parms.rp_account.clone(),
-        parms.host.clone(),
-        parms.host_account.clone(),
-        expires_at,
-        now.clone(), 
-        now.clone(),
-    );
-
-    // Insert the new record if it doesn't already exist.
-    let count = insert_user_host(input_record, NOT_STRICT).await?;
-    if count > 0 {
-        insert_count += count;
-        info!("MVP: Host mapping for user '{}' created with experation at {}.",
-                parms.rp_account, expires_at);
-    }
-
     Ok(insert_count)
 }

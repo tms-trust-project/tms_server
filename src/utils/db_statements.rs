@@ -6,8 +6,6 @@ pub const PLACEHOLDER: &str = "${PLACEHOLDER}";
 
 // ========================= identity_providers table =========================
 
-pub const GET_IDP_UUID: &str = concat!("SELECT uuid FROM identity_providers WHERE id = $1");
-
 pub const INSERT_IDP: &str = concat!(
 "INSERT INTO identity_providers ",
   "(id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url, provider_type,",
@@ -112,48 +110,6 @@ pub const DELETE_RP_LOGIN: &str = concat!(
 pub const LIST_RP_LOGIN: &str = concat!(
     "SELECT id, tms_identity, expires_at, enabled, created, updated ",
     "FROM resource_provider_logins ORDER BY tms_identity",
-);
-
-// ========================= user_hosts table =======================
-pub const INSERT_USER_HOSTS: &str = concat!(
-    "INSERT INTO user_hosts (tms_identity, host, host_account, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6)",
-);
-
-pub const INSERT_USER_HOSTS_NOT_STRICT: &str = concat!(
-    "INSERT INTO user_hosts (tms_identity, host, host_account, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
-);
-
-pub const GET_USER_HOST: &str = concat!(
-    "SELECT id, tms_identity, host, host_account, expires_at, created, updated ",
-    "FROM user_hosts WHERE id = $1"
-);
-
-pub const GET_USER_HOST_ACTIVE: &str = concat!(
-    "SELECT expires_at ",
-    "FROM user_hosts WHERE tms_identity = $1 AND host = $2 AND host_account = $3"
-);
-
-// TODO
-pub const GET_USER_HOST_EXISTS: &str = concat!(
-    "SELECT 1 FROM user_hosts WHERE tms_identity = $1 AND host = $2 AND host_account = $3"
-);
-
-// TODO
-pub const DELETE_USER_HOST: &str = concat!(
-    "DELETE FROM user_hosts WHERE tms_identity = $1 AND host = $2 AND host_account = $3"
-);
-
-// TODO
-pub const LIST_USER_HOSTS: &str = concat!(
-    "SELECT id, tms_identity, host, host_account, expires_at, created, updated ",
-    "FROM user_hosts ORDER BY tms_identity, host, host_account",
-);
-
-pub const UPDATE_USER_HOST_EXPIRY: &str = concat!(
-    "UPDATE user_hosts SET expires_at = $1, updated = $2 ",
-    "WHERE tms_identity = $3 AND host = $4 AND host_account = $5",
 );
 
 // ========================= user_delegations table =================

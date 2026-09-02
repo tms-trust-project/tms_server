@@ -130,7 +130,7 @@ impl RespUpdateDelegations {
         tms_utils::debug_request(http_req, req);
 
         // Insert the new key record.
-        let (updates, expires_msg) = update_user_host(req).await?;
+        let (updates, expires_msg) = update_delegations(req).await?;
         
         // Log result and return response.
         let msg = format!("{} update(s) to user {} and client {} completed", updates, req.rp_account, req.client_id);
@@ -143,9 +143,9 @@ impl RespUpdateDelegations {
 //                          Private Functions
 // ***************************************************************************
 // ---------------------------------------------------------------------------
-// update_user_host:
+// update_delegations:
 // ---------------------------------------------------------------------------
-async fn update_user_host(req: &ReqUpdateDelegations) -> Result<(u64, String)> {
+async fn update_delegations(req: &ReqUpdateDelegations) -> Result<(u64, String)> {
     // Get timestamp.
     let now = timestamp_utc();
     let current_ts = timestamp_utc_to_str(now);

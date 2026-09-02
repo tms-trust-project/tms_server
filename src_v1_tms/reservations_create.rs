@@ -227,7 +227,6 @@ impl RespCreateReservation {
         //
         //  rp_login - use tenant and rp_account to target unique record
         //  delegations - use tenant, client_id and rp_account to target unique record
-        //  user_hosts - use tenant, rp_account, host and host_account to target unique record
         //
         // Each of the above tables is queried using values that define a unique index on that
         // target table.  This guarantees that either 0 or 1 records will be returned.  In the 

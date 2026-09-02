@@ -1,6 +1,5 @@
 #!/bin/bash
 # Create ssh key pairs for users and store results in json files
-# Data for each user must already be seeded in the user_hosts table.
 #-- Example data for case
 #--   tms tenant = test, app client = testclient1
 #--   host=testhost1, tms user=testuser0001, host login user=testuser0001

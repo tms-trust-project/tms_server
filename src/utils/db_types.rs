@@ -313,67 +313,6 @@ impl RPLoginInput {
 }
 
 // ---------------------------------------------------------------------------
-// user_host:
-// ---------------------------------------------------------------------------
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct UserHost {
-    pub id: i32,
-    pub tms_identity: String,
-    pub host: String,
-    pub host_account: String,
-    pub expires_at: DateTime<Utc>,
-    pub created: DateTime<Utc>,
-    pub updated: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UserHostInput {
-    pub tms_identity: String,
-    pub host: String,
-    pub host_account: String,
-    pub expires_at: DateTime<Utc>,
-    pub created: DateTime<Utc>,
-    pub updated: DateTime<Utc>,
-}
-
-impl UserHost {
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new(
-        id: i32,
-        tms_identity: String,
-        host: String,
-        host_account: String,
-        expires_at: DateTime<Utc>,
-        created: DateTime<Utc>,
-        updated: DateTime<Utc>,
-    )
-        -> UserHost {
-        UserHost {
-            id,
-            tms_identity, host, host_account, expires_at, created, updated
-        }
-    }
-}
-
-impl UserHostInput {
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new(
-        tms_identity: String,
-        host: String,
-        host_account: String,
-        expires_at: DateTime<Utc>,
-        created: DateTime<Utc>,
-        updated: DateTime<Utc>,
-    )
-        -> UserHostInput {
-        UserHostInput {
-            tms_identity, host, host_account, expires_at, created, updated
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // delegation:
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]

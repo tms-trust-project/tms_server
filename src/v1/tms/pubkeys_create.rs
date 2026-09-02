@@ -193,7 +193,7 @@ impl RespNewSshKeys {
                 tms_identity: req.tms_identity.clone()
             };
 
-            // Insert records into the resource_provider_logins, user_hosts and delegations tables
+            // Insert records into the resource_provider_logins and delegations tables
             // that the key pair we are about to create depends on.
             match create_pubkey_dependencies(mvp_inputs).await {
                 Ok(inserts) => info!("{} MVP dependency records inserted.", inserts),
@@ -210,7 +210,6 @@ impl RespNewSshKeys {
         //
         //  resource_provider_logins - use rp_account to target unique record
         //  delegations - use client_id and rp_account to target unique record
-        //  user_hosts - use rp_account, host and host_account to target unique record
         //
         // Each of the above tables are queried using values that define a unique index on the
         // target table. This guarantees that either 0 or 1 record will be returned. In the
@@ -219,8 +218,7 @@ impl RespNewSshKeys {
         //
         // This method returns a detailed error message that indicates which table did not contain
         // the required values and whether the error resulted from a missing or expired record.
-        match check_pubkey_dependencies(&req_ext.client_id, &req.tms_identity, &req.rp_id,
-                                        &req.rp_account, &req.host, &req.host_account).await
+        match check_pubkey_dependencies(&req.tms_identity, &req.rp_id, &req.rp_account).await
         {
             Ok(_) => (),
             Err(e) => {
