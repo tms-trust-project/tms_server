@@ -14,7 +14,6 @@ fi
 # Assign the image tag
 TAG=$1
 
-docker run --name tms_sleep --user "tms" -d --rm \
-  --volume tms_server_vol:/home/tms \
-  tapis/tms_server:${TAG} \
-  /bin/bash -c "sleep 10000"
+# Start up a container that stays up for one week
+docker run --name tms_sleep --user "tms" -d --rm --volume tms_server_vol:/home/tms tapis/tms_server:${TAG} \
+    /bin/bash -c "sleep 6048000"

@@ -38,8 +38,8 @@ const TEST_TMS_USER_DOMAIN: &str = "DangerModeTestIdP";
 const TEST_HOST: &str = "testhost";
 const TEST_HOST_ACCOUNT: &str = "testhostaccount";
 const TEST_RP_ACCOUNT: &str = "testrpaccount";
-const TEST_FIXED_HOST_ACCT: &str  = "testuser101";
-const TEST_FIXED_FINGERPRINT: &str= "SHA256:wUKFDv4LAQo7OtMUZenzupG5DB95Dxi+n3s4rd/UQ00";
+const TEST_FIXED_RP_ACCT: &str  = "testrpaccount101";
+const TEST_FIXED_FINGERPRINT: &str= "SHA256:0EddP3z8IwV4YqzewwoiJVyfKhmFj4VlsDBZqCaan24";
 const TEST_RECORD_CNT: i32 = 101;
 const MAX_USES: i32 = i32::MAX;
 const MAX_TTL_MINUTES: i32 = i32::MAX;
@@ -131,7 +131,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
     };
     // Determine the fingerprint.
     let pubkey_fingerprint =
-        if test_host_acct == TEST_FIXED_HOST_ACCT { String::from(TEST_FIXED_FINGERPRINT) }
+        if test_rp_acct == TEST_FIXED_RP_ACCT { String::from(TEST_FIXED_FINGERPRINT) }
         else { keyinfo.public_key_fingerprint };
     let now  = timestamp_utc();
     let expires_at  = calc_expires_at(now, MAX_TTL_MINUTES);
