@@ -258,7 +258,6 @@ pub struct RPLogin {
     pub tms_identity: String,
     pub rp_id: String,
     pub rp_account: String,
-    pub expires_at: DateTime<Utc>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -270,7 +269,6 @@ pub struct RPLoginInput {
     pub tms_identity: String,
     pub rp_id: String,
     pub rp_account: String,
-    pub expires_at: DateTime<Utc>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -284,14 +282,13 @@ impl RPLogin {
         tms_identity: String,
         rp_id: String,
         rp_account: String,
-        expires_at: DateTime<Utc>,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
         last_login: DateTime<Utc>
     )
         -> RPLogin {
-        RPLogin { id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login }
+        RPLogin { id, tms_identity, rp_id, rp_account, enabled, created, updated, last_login }
     }
 }
 
@@ -301,14 +298,13 @@ impl RPLoginInput {
         tms_identity: String,
         rp_id: String,
         rp_account: String,
-        expires_at: DateTime<Utc>,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
         last_login: DateTime<Utc>
     )
     -> RPLoginInput {
-        RPLoginInput { tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login }
+        RPLoginInput { tms_identity, rp_id, rp_account, enabled, created, updated, last_login }
     }
 }
 

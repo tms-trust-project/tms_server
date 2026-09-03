@@ -12,7 +12,6 @@ use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_RP_
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
-use uuid::Uuid;
 use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
 use crate::utils::keygen;
@@ -441,7 +440,6 @@ pub async fn create_test_data() -> Result<u64> {
             .bind(test_tms_identity.clone())
             .bind(TEST_RP_ID)
             .bind(test_rp_account.clone())
-            .bind(max_tms_utc)// TODO this column is gone
             .bind(DB_TRUE)
             .bind(now)
             .bind(now)
@@ -526,21 +524,12 @@ pub async fn check_pubkey_dependencies(tms_identity: &String, rp_id: &String, rp
     match rplogin_row {
         Some(row) => {
             // Unpack row.
-            let expires_at: DateTime<Utc> = row.get(0);
-            let enabled: bool = row.get(1);
+            let enabled: bool = row.get(0);
 
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
                 let msg = format!("Required RP_LOGIN record is disabled. TmsId: {} RpId: {} RpAcct: {}",
                                   tms_identity, rp_id, rp_account);
-                error!("{}", msg);
-                return Result::Err(anyhow!(msg));
-            }
-
-            // Check whether the rplogin has expired.
-            if expires_at < timestamp_utc() {
-                let msg = format!("Required RP_LOGIN record has expired. TmsId: {} RpId: {} RpAcct: {} ExpiredAt: {}.",
-                                  tms_identity, rp_id, rp_account, expires_at);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }

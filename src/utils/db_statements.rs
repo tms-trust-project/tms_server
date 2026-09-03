@@ -73,22 +73,22 @@ pub const DELETE_CLIENT: &str = concat!(
 // ========================= resource_provider_logins table ========================
 pub const INSERT_RP_LOGIN: &str = concat!(
     "INSERT INTO resource_provider_logins ",
-    "(tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login) ",
-    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    "(tms_identity, rp_id, rp_account, enabled, created, updated, last_login) ",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7)",
 );
 
 pub const INSERT_RP_LOGIN_NOT_STRICT: &str = concat!(
-    "INSERT INTO resource_provider_logins (tms_identity, rp_id, rp_account, expires_at, enabled, created, updated, last_login) ",
-    "VALUES ($1, $2, $3, $4, $5, $7, $8) ON CONFLICT DO NOTHING",
+    "INSERT INTO resource_provider_logins (tms_identity, rp_id, rp_account, enabled, created, updated, last_login) ",
+    "VALUES ($1, $2, $3, $4, $5, $7) ON CONFLICT DO NOTHING",
 );
 
 pub const GET_RP_LOGIN: &str = concat!(
-    "SELECT id, tms_identity, rp_id, rp_account, expires_at, enabled, created, updated ",
+    "SELECT id, tms_identity, rp_id, rp_account, enabled, created, updated ",
     "FROM resource_provider_logins WHERE tms_identity = $1 and rp_id = $2 and rp_account = $3"
 );
 
 pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
-    "SELECT expires_at, enabled ",
+    "SELECT enabled ",
     "FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
 
@@ -108,7 +108,7 @@ pub const DELETE_RP_LOGIN: &str = concat!(
 // Secret elided.
 // TODO
 pub const LIST_RP_LOGIN: &str = concat!(
-    "SELECT id, tms_identity, expires_at, enabled, created, updated ",
+    "SELECT id, tms_identity, enabled, created, updated ",
     "FROM resource_provider_logins ORDER BY tms_identity",
 );
 
