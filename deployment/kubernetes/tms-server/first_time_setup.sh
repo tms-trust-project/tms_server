@@ -48,7 +48,7 @@ echo "---------------------------------------------------"
 kubectl apply -f tms-server-ingress.yml
 
 echo "---------------------------------------------------"
-echo " Seeding initial config for tms-portal"
+echo " Seeding initial config for tms-portal if init file present"
 echo "---------------------------------------------------"
 TMS_PORTAL_SQL_FILE="$HOME/tms-portal/init.sql"
 if [ -r "$TMS_PORTAL_SQL_FILE" ]; then
@@ -59,7 +59,18 @@ if [ -r "$TMS_PORTAL_SQL_FILE" ]; then
   cat "$TMS_PORTAL_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
 else
   echo "NOTE: TMS Portal init sql file not found. Initial seeding for tms-portal will not be done"
-  echo "File: $TMS_PORTAL_SQL_FILE Portal init sql file not found. Initial seeding for tms-portal will not be done"
+  echo "File: $TMS_PORTAL_SQL_FILE Portal init sql file not found."
+fi
+
+echo "---------------------------------------------------"
+echo " Seeding test allowed_redirects if init file present"
+echo "---------------------------------------------------"
+TMS_TEST_SQL_FILE="$HOME/tms-portal/init_test_allowed_redirects.sql"
+if [ -r "$TMS_TEST_SQL_FILE" ]; then
+  cat "$TMS_TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
+else
+  echo "NOTE: Seed file for test allowed redirects not found. Skipping."
+  echo "File: $TMS_TMS_TEST_SQL_FILE init sql file not found."
 fi
 
 # Bring down tms-portal if we have a deploy file for it
