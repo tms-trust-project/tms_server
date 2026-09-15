@@ -23,7 +23,7 @@ pub struct MVPDependencyParms
 }
 
 /**
- * The Danger Mode - Minimal Viable Product (MVP) version of TMS simplifies migration to TMS in
+ * The Danger/Implicit Trust Mode - Minimal Viable Product (MVP) version of TMS simplifies migration to TMS in
  * existing environments that meet certain requirements. Specifically, MVP supports the following:
  * 
  *  - Keys never expire.

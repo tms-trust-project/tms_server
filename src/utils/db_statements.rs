@@ -106,33 +106,34 @@ pub const LIST_RP_LOGIN: &str = concat!(
 );
 
 // ========================= user_delegations table =================
-pub const INSERT_DELEGATIONS: &str = concat!(
-    "INSERT INTO delegations (client_id, tms_identity, rp_id, rp_account, expires_at, created, updated) ",
+pub const INSERT_DELEGATION: &str = concat!(
+    "INSERT INTO delegations (tms_identity, client_id, rp_id, rp_account, expires_at, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5, $6, $7)",
 );
 
-pub const INSERT_DELEGATIONS_NOT_STRICT: &str = concat!(
-    "INSERT INTO delegations (client_id, tms_identity, rp_id, rp_account, expires_at, created, updated) ",
+pub const INSERT_DELEGATION_NOT_STRICT: &str = concat!(
+    "INSERT INTO delegations (tms_identity, client_id, rp_id, rp_account, expires_at, created, updated) ",
     "VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
 );
 
-pub const GET_DELEGATION: &str = concat!(
-    "SELECT id, client_id, tms_identity, rp_id, rp_account, expires_at, created, updated ",
+pub const GET_DELEGATION_BY_ID: &str = concat!(
+    "SELECT id, tms_identity, client_id, rp_id, rp_account, expires_at, created, updated ",
     "FROM delegations WHERE id = $1"
+);
+
+pub const GET_DELEGATION: &str = concat!(
+    "SELECT id, tms_identity, client_id, rp_id, rp_account, expires_at, created, updated ",
+    "FROM delegations WHERE tms_identity = $1 AND client_id = $2 AND rp_id = $3 AND rp_account = $4"
 );
 
 pub const GET_DELEGATION_ACTIVE: &str = concat!(
     "SELECT expires_at ",
-    "FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4"
-);
-
-
-pub const GET_DELEGATION_EXISTS: &str = concat!(
-    "SELECT 1 FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4"
+    "FROM delegations WHERE tms_identity = $1 AND client_id = $2 AND rp_id = $3 AND rp_account = $4"
 );
 
 pub const SEL_DELEGATION_EXISTS: &str = concat!(
-    "SELECT EXISTS(SELECT 1 FROM delegations WHERE client_id = $1 AND tms_identity = $2 AND rp_id = $3 AND rp_account = $4)"
+    "SELECT EXISTS(SELECT 1 FROM delegations ",
+    "WHERE tms_identity = $1 AND client_id = $2 AND rp_id = $3 AND rp_account = $4)"
 );
 
 pub const LIST_DELEGATIONS: &str = concat!(
@@ -140,15 +141,14 @@ pub const LIST_DELEGATIONS: &str = concat!(
     "FROM delegations ORDER BY client_id, rp_id, rp_account",
 );
 
-
 pub const DELETE_DELEGATION: &str = concat!(
-    "DELETE FROM delegations WHERE client_id = $1 AND rp_account = $2"
+    "DELETE FROM delegations ",
+    "WHERE tms_identity = $1 AND client_id = $2 AND rp_id = $3 AND rp_account = $4"
 );
-
 
 pub const UPDATE_DELEGATION_EXPIRY: &str = concat!(
     "UPDATE delegations SET expires_at = $1, updated = $2 ",
-    "WHERE client_id = $3 AND rp_account = $4",
+    "WHERE tms_identity = $3 AND client_id = $4 AND rp_id = $5 AND rp_account = $6",
 );
 
 // ========================= pubkeys table =========================

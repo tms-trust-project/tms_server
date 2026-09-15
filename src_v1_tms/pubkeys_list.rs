@@ -196,8 +196,8 @@ async fn list_pubkeys(authz_result: &AuthzResult, req: &ReqListPubkeys) -> Resul
     // Substitute the placeholder in the query template.
     let sql_query = sql_substitute_client_constraint(LIST_PUBKEYS_TEMPLATE, authz_result); 
     
-    // Get a connection to the db and start a transaction.  Uncommited transactions 
-    // are automatically rolled back when they go out of scope. 
+    // Get a connection to the db and start a transaction.  Uncommited transactions
+    // are automatically rolled back when they go out of scope.
     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
     let mut tx = RUNTIME_CTX.db.begin().await?;
     

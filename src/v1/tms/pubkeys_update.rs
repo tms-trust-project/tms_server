@@ -96,9 +96,6 @@ enum TmsResponse {
 fn make_http_200(resp: RespUpdatePubkey) -> TmsResponse {
     TmsResponse::Http200(Json(resp))
 }
-fn make_http_400(msg: String) -> TmsResponse {
-    TmsResponse::Http400(Json(HttpResult::new(400.to_string(), msg)))
-}
 fn make_http_401(msg: String) -> TmsResponse {
     TmsResponse::Http401(Json(HttpResult::new(401.to_string(), msg)))
 }
@@ -125,7 +122,7 @@ impl UpdatePubkeyApi {
         let allowed = [AuthzTypes::ClientOwn, AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR NOT AUTHORIZED to update client {}.", req.client_id);
+            let msg = format!("ERROR. Not authorized to update client {}.", req.client_id);
             error!("{}", msg);
             return make_http_401(msg);
         }
