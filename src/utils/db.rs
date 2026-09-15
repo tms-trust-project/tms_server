@@ -7,7 +7,7 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
@@ -493,7 +493,7 @@ pub async fn create_test_keys() -> Result<u64> {
 // ---------------------------------------------------------------------------
 // check_pubkey_dependencies:
 // ---------------------------------------------------------------------------
-/*TODO
+/*
  * Before creating an ssh keypair we must first check that the tms_identity has a valid rp_login
  *   record and a delegation record for the given rp_id and rp_account.
  *
@@ -503,13 +503,13 @@ pub async fn create_test_keys() -> Result<u64> {
  * 
  * Note that a message that contains "INTERNAL ERROR:" should trigger a 500 http return code.
  */
-pub async fn check_login_delegation(tms_identity: &String, rp_id: &String, rp_account: &String)
+pub async fn check_login_delegation(tms_identity: &String, client_id: &String, rp_id: &String, rp_account: &String)
                                     -> Result<()>
 {
     // Get a connection to the db and start a transaction.
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
-    // -------- Check rp_login dependency
+    // -------- Check rp_login
     let rplogin_row = sqlx::query(GET_RP_LOGIN_ACTIVE)
         .bind(tms_identity)
         .bind(rp_id)
@@ -523,19 +523,48 @@ pub async fn check_login_delegation(tms_identity: &String, rp_id: &String, rp_ac
             let enabled: bool = row.get(0);
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
-                let msg = format!("Required RP_LOGIN record is disabled. TmsId: {} RpId: {} RpAcct: {}",
-                                  tms_identity, rp_id, rp_account);
+                let msg = format!("Resource provider login record is disabled. TmsId: {} RpId: {} RpAcct: {}",
+                                         tms_identity, rp_id, rp_account);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Required user resource provider login record not found. TmsId: {} RpId: {} RpAcct: {}",
-                              tms_identity, rp_id, rp_account);
+            let msg = format!("Resource provider login record not found. TmsId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
     };
+
+    // -------- Check delegation
+    let delg_row = sqlx::query(GET_DELEGATION_ACTIVE)
+        .bind(tms_identity)
+        .bind(rp_id)
+        .bind(client_id)
+        .bind(rp_account)
+        .fetch_optional(&mut *tx)
+        .await?;
+    match delg_row {
+        Some(row) => {
+            // Check expiry
+            let expires_at: DateTime<Utc> = row.get(0);
+            if expires_at < timestamp_utc() {
+                let msg = format!("Delegation record has expired. TmsId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
+                                         tms_identity, client_id, rp_id, rp_account, expires_at);
+                error!("{}", msg);
+                return Result::Err(anyhow!(msg));
+            }
+        },
+        None => {
+            let msg = format!("Delegation record not found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, client_id, rp_id, rp_account);
+            error!("{}", msg);
+            return Result::Err(anyhow!(msg));
+        }
+    };
+
+
     // Commit the transaction.
     tx.commit().await?;
 

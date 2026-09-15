@@ -207,7 +207,7 @@ impl RespNewSshKeys {
         //
         // This method returns either Ok or a message indicating why a new ssh keypair is not
         //   being created for the tms_identity.
-        match check_login_delegation(&req.tms_identity, &req.rp_id, &req.rp_account).await
+        match check_login_delegation(&req.tms_identity, &req_ext.client_id, &req.rp_id, &req.rp_account).await
         {
             Ok(_) => (),
             Err(e) => {
@@ -215,7 +215,7 @@ impl RespNewSshKeys {
                 error!("{}", msg);
                 if msg.contains("INTERNAL ERROR:") { return Ok(make_http_500(msg)); }
                 else { return Ok(make_http_403(msg)); }
-            } 
+            }
         }
 
         // ------------------------ Generate Keys ------------------------
