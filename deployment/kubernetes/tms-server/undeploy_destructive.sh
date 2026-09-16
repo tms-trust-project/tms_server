@@ -2,6 +2,12 @@
 #
 # Destructive uninstall of TMS DB and TMS server
 #
+PrgName=$(basename "$0")
+# Determine absolute path to location from which we are running and change to that directory.
+RUN_DIR=$(pwd)
+PRG_RELPATH=$(dirname "$0")
+cd "$PRG_RELPATH"/. || exit
+PRG_PATH=$(pwd)
 echo "---------------------------------------------------"
 echo " Destructive uninstall of TMS DB and Server"
 echo "---------------------------------------------------"
@@ -39,18 +45,19 @@ kubectl apply -f tms-drop-db.yml
 kubectl wait --timeout=200s --for=condition=complete job/tms-drop-db
 
 # Bring down tms-portal if we have a deploy file for it
-TMS_PORTAL_DEPLOY="$HOME/tms-portal/deployment/deploy.yml"
-if [ -f "$TMS_PORTAL_DEPLOY" ]; then
+TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
+if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
  echo "---------------------------------------------------"
- echo " Undeploying TMS portal"
+ echo " Un-deploying TMS portal"
  echo "---------------------------------------------------"
-  kubectl apply -f $TMS_PORTAL_DEPLOY
-  kubectl wait --for=delete deploy/tms-portal
+  cd ${TMS_PORTAL_DEPLOY_DIR} || exit
+  ./burndown
 else
  echo "---------------------------------------------------"
- echo " Skipping undeploy of TMS portal"
+ echo " Skipping undeploy of TMS portal. Directory not found. Directory: $TMS_PORTAL_DEPLOY_DIR"
  echo "---------------------------------------------------"
 fi
+cd $PRG_PATH || exit
 echo
 echo "---------------------------------------------------"
 echo " Undeploying TMS server and removing PVC"

@@ -79,8 +79,9 @@ if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
  echo "---------------------------------------------------"
  echo " Re-deploying TMS portal"
  echo "---------------------------------------------------"
-  ${TMS_PORTAL_DEPLOY_DIR}/burndown
-  ${TMS_PORTAL_DEPLOY_DIR}/burnup
+  cd ${TMS_PORTAL_DEPLOY_DIR}
+  ./burndown
+  ./burnup
 else
  echo "---------------------------------------------------"
  echo " Skipping deploy of TMS portal. Directory not found. Directory: $TMS_PORTAL_DEPLOY_DIR"
