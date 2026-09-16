@@ -50,12 +50,12 @@ kubectl apply -f tms-server-ingress.yml
 echo "---------------------------------------------------"
 echo " Seeding initial config for tms-portal if init file present"
 echo "---------------------------------------------------"
-TMS_PORTAL_SQL_FILE="$HOME/tms-portal/init.sql"
+TMS_PORTAL_SQL_FILE="$HOME/tms-portal/local/init.sql"
 if [ -r "$TMS_PORTAL_SQL_FILE" ]; then
   # re-generate the init sql
   $HOME/src_git/tms_portal/deploy/createConfigData.sh \
-     -v $HOME/tms-portal/deployment/tms_portal_vars.sh -o $HOME/tms-portal/init.sql
-  # Seed config for tms-portal from file $HOME/tms-portal/init.sql
+     -v $HOME/tms-portal/deployment/tms_portal_vars.sh -o $HOME/tms-portal/local/init.sql
+  # Seed config for tms-portal from file $HOME/tms-portal/local/init.sql
   cat "$TMS_PORTAL_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
 else
   echo "NOTE: TMS Portal init sql file not found. Initial seeding for tms-portal will not be done"
@@ -65,7 +65,7 @@ fi
 echo "---------------------------------------------------"
 echo " Seeding test allowed_redirects if init file present"
 echo "---------------------------------------------------"
-TMS_TEST_SQL_FILE="$HOME/tms-portal/init_test_allowed_redirects.sql"
+TMS_TEST_SQL_FILE="$HOME/tms-portal/local/init_test.sql"
 if [ -r "$TMS_TEST_SQL_FILE" ]; then
   cat "$TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
 else
@@ -74,14 +74,15 @@ else
 fi
 
 # Bring down tms-portal if we have a deploy file for it
-TMS_PORTAL_DEPLOY="$HOME/tms-portal/deployment/deploy.yml"
-if [ -f "$TMS_PORTAL_DEPLOY" ]; then
+TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
+if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
  echo "---------------------------------------------------"
- echo " Deploying TMS portal"
+ echo " Re-deploying TMS portal"
  echo "---------------------------------------------------"
-  kubectl apply -f $TMS_PORTAL_DEPLOY
+  ${TMS_PORTAL_DEPLOY_DIR}/burndown
+  ${TMS_PORTAL_DEPLOY_DIR}/burnup
 else
  echo "---------------------------------------------------"
- echo " Skipping deploy of TMS portal"
+ echo " Skipping deploy of TMS portal. Directory not found. Directory: $TMS_PORTAL_DEPLOY_DIR"
  echo "---------------------------------------------------"
 fi
