@@ -225,6 +225,16 @@ DROP TABLE IF EXISTS user_hosts;
 -- ---------------------------------------
 -- delegations table
 -- ---------------------------------------
+-- TODO/TBD Also drop column expires_at as is being done for resource_provider_logins table?
+-- TODO -- Drop column expires_at. No longer needed/relevant?
+-- -- ???Eventually we might have some type of policies table to support RPs specifying expiry?
+--    Or keep as is for now so it is easy/quick for tms-server to check validity of delegation.
+--    Currently (for MVP) it is essentially forever. Can always drop it later.
+--    Possibly will end up maintaining this by simply removing the delegation based on some policy
+--    rather than having an expiry.
+--    
+-- ALTER TABLE delegations DROP COLUMN IF EXISTS expires_at;
+
 -- Notes on the "why" for some of these changes.
 --   What is needed to authorize CRUD calls for this table? tms_identity, rp_id, rp_account
 --     - since we must already trust the TMS client (i.e. Tapis client) we can allow the client to provide these.
@@ -244,8 +254,8 @@ ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFA
 --      See similar note below under pubkeys table
 ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
 ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
--- For delegations table (tms_identity, rp_id, rp_account) uniquely identify the record
-CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_rpid_rpaccount_idx ON delegations (tms_identity, rp_id, rp_account);
+-- For delegations table (tms_identity, client_id, rp_id, rp_account) uniquely identify the record
+CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_cltid_rpid_rpacct_idx ON delegations (tms_identity, client_id, rp_id, rp_account);
 
 -- ---------------------------------------
 -- pubkeys table

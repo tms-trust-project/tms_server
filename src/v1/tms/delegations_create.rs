@@ -5,7 +5,7 @@ use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use crate::utils::errors::HttpResult;
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_DELEGATIONS_NOT_STRICT};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_DELEGATION_NOT_STRICT};
 use crate::utils::db_types::DelegationInput;
 use crate::utils::authz::{authorize, AuthzTypes};
 use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
@@ -179,18 +179,13 @@ impl RespCreateDelegations {
 // insert_delegation:
 // ---------------------------------------------------------------------------
 pub async fn insert_delegation(rec: DelegationInput, strict: bool) -> Result<u64> {
-    // Choose the query based on strictness requirement.
-    let sql_query = if strict {INSERT_DELEGATIONS} else {INSERT_DELEGATIONS_NOT_STRICT};
-
-    // Get a connection to the db and start a transaction.  Uncommited transactions 
-    // are automatically rolled back when they go out of scope. 
-    // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    
+    // Choose the query based on strictness requirement.
+    let sql_query = if strict { INSERT_DELEGATION } else { INSERT_DELEGATION_NOT_STRICT };
     // Create the insert statement.
     let result = sqlx::query(sql_query)
-        .bind(rec.client_id)
         .bind(rec.tms_identity)
+        .bind(rec.client_id)
         .bind(rec.rp_id)
         .bind(rec.rp_account)
         .bind(rec.expires_at)
@@ -198,7 +193,6 @@ pub async fn insert_delegation(rec: DelegationInput, strict: bool) -> Result<u64
         .bind(rec.updated)
         .execute(&mut *tx)
         .await?;
-
     // Commit the transaction.
     tx.commit().await?;
 

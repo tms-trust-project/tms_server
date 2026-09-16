@@ -7,7 +7,7 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATIONS, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
 
 use log::error;
@@ -15,7 +15,7 @@ use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
-use super::db_statements::{GET_DELEGATION_ACTIVE, GET_DELEGATION_EXISTS, GET_RESERVATION_FOR_EXTEND,
+use super::db_statements::{GET_DELEGATION, GET_RESERVATION_FOR_EXTEND,
                            GET_RP_LOGIN_ACTIVE, GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
                            SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
@@ -189,9 +189,6 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
  * Insert a new pubkey record
  */
 pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
-    // Get a connection to the db and start a transaction.  Uncommited transactions 
-    // are automatically rolled back when they go out of scope. 
-    // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS)
@@ -419,8 +416,8 @@ pub async fn create_test_data() -> Result<u64> {
         // Check for existing record. If found then continue;
         // Note: checking for a delegation record is enough since the delegation records reference the rp_login record as a foreign key.
         let skip_create: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
-            .bind(TEST_CLIENT)
             .bind(test_tms_identity.clone())
+            .bind(TEST_CLIENT)
             .bind(TEST_RP_ID)
             .bind(test_rp_account.clone())
             .fetch_one(&mut *tx).await?;
@@ -448,9 +445,9 @@ pub async fn create_test_data() -> Result<u64> {
             .await?;
 
         // -------- Populate delegations
-        sqlx::query(INSERT_DELEGATIONS)
-            .bind(TEST_CLIENT)
+        sqlx::query(INSERT_DELEGATION)
             .bind(test_tms_identity.clone())
+            .bind(TEST_CLIENT)
             .bind(TEST_RP_ID)
             .bind(test_rp_account.clone())
             .bind(max_tms_utc)
@@ -496,24 +493,23 @@ pub async fn create_test_keys() -> Result<u64> {
 // ---------------------------------------------------------------------------
 // check_pubkey_dependencies:
 // ---------------------------------------------------------------------------
-/**
- * When creating a public key or a reservation on a public key we must check that the user's
- * RP_LOGIN and client delegation are currently active. Active means that the records exist in their
- *   respective tables, are enabled and have not expired.
+/*
+ * Before creating an ssh keypair we must first check that the tms_identity has a valid rp_login
+ *   record and a delegation record for the given rp_id and rp_account.
+ *
+ * We return as soon as we encounter an error or determine the action is not authorized.
+ * The database transaction is read-only, so exiting abruptly causes the transaction to roll back,
+ *   which frees up the database just as commit.
  * 
- * We return as soon as we encounter any dependency that cannot be fulfilled or any other type of
- * error. The database transaction is read-only, so exiting abruptly causes the transaction to roll
- * back, which frees up the database just as commit.
- * 
- * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http return code.
+ * Note that a message that contains "INTERNAL ERROR:" should trigger a 500 http return code.
  */
-pub async fn check_pubkey_dependencies(tms_identity: &String, rp_id: &String, rp_account: &String)
-    -> Result<()>
+pub async fn check_login_delegation(tms_identity: &String, client_id: &String, rp_id: &String, rp_account: &String)
+                                    -> Result<()>
 {
     // Get a connection to the db and start a transaction.
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
-    // -------- Check rp_login dependency
+    // -------- Check rp_login
     let rplogin_row = sqlx::query(GET_RP_LOGIN_ACTIVE)
         .bind(tms_identity)
         .bind(rp_id)
@@ -525,22 +521,50 @@ pub async fn check_pubkey_dependencies(tms_identity: &String, rp_id: &String, rp
         Some(row) => {
             // Unpack row.
             let enabled: bool = row.get(0);
-
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
-                let msg = format!("Required RP_LOGIN record is disabled. TmsId: {} RpId: {} RpAcct: {}",
-                                  tms_identity, rp_id, rp_account);
+                let msg = format!("Resource provider login record is disabled. TmsId: {} RpId: {} RpAcct: {}",
+                                         tms_identity, rp_id, rp_account);
                 error!("{}", msg);
                 return Result::Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Required user RP_LOGIN record not found. msId: {} RpId: {} RpAcct: {}",
-                              tms_identity, rp_id, rp_account);
+            let msg = format!("Resource provider login record not found. TmsId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }
     };
+
+    // -------- Check delegation
+    let delg_row = sqlx::query(GET_DELEGATION_ACTIVE)
+        .bind(tms_identity)
+        .bind(rp_id)
+        .bind(client_id)
+        .bind(rp_account)
+        .fetch_optional(&mut *tx)
+        .await?;
+    match delg_row {
+        Some(row) => {
+            // Check expiry
+            let expires_at: DateTime<Utc> = row.get(0);
+            if expires_at < timestamp_utc() {
+                let msg = format!("Delegation record has expired. TmsId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
+                                         tms_identity, client_id, rp_id, rp_account, expires_at);
+                error!("{}", msg);
+                return Result::Err(anyhow!(msg));
+            }
+        },
+        None => {
+            let msg = format!("Delegation record not found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, client_id, rp_id, rp_account);
+            error!("{}", msg);
+            return Result::Err(anyhow!(msg));
+        }
+    };
+
+
     // Commit the transaction.
     tx.commit().await?;
 
@@ -654,9 +678,9 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_id
     };
 
     // -------- Check delegation dependency
-    let delg_row = sqlx::query(GET_DELEGATION_EXISTS)
-        .bind(client_id)
+    let delg_row = sqlx::query(GET_DELEGATION)
         .bind(tms_identity)
+        .bind(client_id)
         .bind(rp_id)
         .bind(rp_account)
         .fetch_optional(&mut *tx)
@@ -664,8 +688,8 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_id
     match delg_row {
         Some(_) => (),
         None => {
-            let msg = format!("No delegation record found. ClientId: {} TmsId: {} RpId: {} RpAcct: {}",
-                                     client_id, tms_identity, rp_id, rp_account);
+            let msg = format!("No delegation record found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
+                                     tms_identity, client_id, rp_id, rp_account);
             error!("{}", msg);
             return Result::Err(anyhow!(msg));
         }

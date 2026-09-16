@@ -50,14 +50,11 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl VersionApi {
     #[oai(path = "/tms/version", method = "get")]
     async fn get_version(&self) -> TmsResponse {
-        match RespVersion::process() {
-            Ok(r) => r,
-            Err(e) => {
-                let msg = "ERROR: ".to_owned() + e.to_string().as_str();
-                error!("{}", msg);
-                make_http_500(msg)
-            }
-        }
+        RespVersion::process().unwrap_or_else(|e| {
+            let msg = "ERROR: ".to_owned() + e.to_string().as_str();
+            error!("{}", msg);
+            make_http_500(msg)
+        })
     }
 }
 
