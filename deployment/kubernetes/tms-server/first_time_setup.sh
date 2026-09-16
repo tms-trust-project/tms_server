@@ -67,7 +67,7 @@ echo " Seeding test allowed_redirects if init file present"
 echo "---------------------------------------------------"
 TMS_TEST_SQL_FILE="$HOME/tms-portal/init_test_allowed_redirects.sql"
 if [ -r "$TMS_TEST_SQL_FILE" ]; then
-  cat "$TMS_TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
+  cat "$TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
 else
   echo "NOTE: Seed file for test allowed redirects not found. Skipping."
   echo "File: $TMS_TMS_TEST_SQL_FILE init sql file not found."
