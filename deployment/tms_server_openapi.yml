@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) server provides for management of credentials by a trusted application client.
-  version: '0.3.0'
+    The Trust Manager System (TMS) server provides for management of credentials by application clients.
+  version: '0.4.0'
   termsOfService: "https://tapis-project.org"
   contact:
     name: "TMS Server - CICSupport"
@@ -157,15 +157,23 @@ components:
     ReqNewSshKeypair:
       type: object
       required:
-        - client_user_id
+        - tms_identity
+        - rp_id
+        - rp_account
         - host
         - host_account
         - num_uses
         - ttl_minutes
       properties:
-        client_user_id:
+        tms_identity:
           type: string
-          description: User associated with the Resource Provider
+          description: Username associated with TMS login
+        rp_id:
+          type: string
+          description: Resource provider Id.
+        rp_account:
+          type: string
+          description: Resource provider account.
         host:
           type: string
           description: FQDN for the host where the user has an account.

@@ -189,9 +189,15 @@ pub const GET_PUBKEY_TEMPLATE: &str = concat!(
     "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
       "public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated ",
-    " FROM pubkeys WHERE id = $1 ${PLACEHOLDER}",
+    "FROM pubkeys WHERE id = $1 ${PLACEHOLDER}",
 );
 
+pub const GET_PUBKEY: &str = concat!(
+    "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+      "public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
+      "initial_ttl_minutes, expires_at, created, updated ",
+    "FROM pubkeys WHERE public_key_fingerprint = $1"
+);
 
 pub const LIST_PUBKEYS_TEMPLATE: &str = concat!(
     "SELECT id, client_id, rp_id, rp_account, host, host_account, public_key_fingerprint, public_key, ",

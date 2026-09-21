@@ -9,7 +9,7 @@ use crate::utils::authz::{authorize, AuthzTypes, get_client_id_header};
 use crate::utils::errors::HttpResult;
 use crate::utils::keygen::{self, KeyType};
 use crate::utils::db_types::PubkeyInput;
-use crate::utils::db::check_login_delegation;
+use crate::utils::db::check_rplogin_delegation;
 use crate::utils::db::insert_new_pubkey;
 use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
 use crate::utils::mvp::{MVPDependencyParms, create_pubkey_dependencies};
@@ -207,14 +207,16 @@ impl RespNewSshKeys {
         //
         // This method returns either Ok or a message indicating why a new ssh keypair is not
         //   being created for the tms_identity.
-        match check_login_delegation(&req.tms_identity, &req_ext.client_id, &req.rp_id, &req.rp_account).await
+        match check_rplogin_delegation(&req.tms_identity, &req_ext.client_id, &req.rp_id, &req.rp_account).await
         {
             Ok(_) => (),
-            Err(e) => {
-                let msg = format!("Missing or expired login or delegation: {}", e);
-                error!("{}", msg);
-                if msg.contains("INTERNAL ERROR:") { return Ok(make_http_500(msg)); }
-                else { return Ok(make_http_403(msg)); }
+            Err(err) => {
+                let err_msg = err.to_string();
+                error!("{}", err_msg);
+                if err_msg.contains("INTERNAL ERROR:") { return Ok(make_http_500(err_msg)); }
+                let msg =
+                    format!("Permission denied. Missing or expired login or delegation. ErrMsg: {}", err_msg);
+                return Ok(make_http_403(msg));
             }
         }
 
