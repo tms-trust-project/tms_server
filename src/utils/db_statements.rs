@@ -159,11 +159,6 @@ pub const INSERT_PUBKEYS: &str = concat!(
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
 );
 
-pub const SELECT_PUBKEY: &str = concat!(
-    "SELECT public_key, remaining_uses, expires_at FROM pubkeys ",
-    "WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3",
-);
-
 pub const SEL_PUBKEY_EXISTS: &str = concat!(
 "SELECT EXISTS(SELECT 1 FROM pubkeys WHERE host_account = $1 AND host = $2)"
 );
@@ -189,9 +184,15 @@ pub const GET_PUBKEY_TEMPLATE: &str = concat!(
     "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
       "public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated ",
-    " FROM pubkeys WHERE id = $1 ${PLACEHOLDER}",
+    "FROM pubkeys WHERE id = $1 ${PLACEHOLDER}",
 );
 
+pub const GET_PUBKEY: &str = concat!(
+    "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+      "public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
+      "initial_ttl_minutes, expires_at, created, updated ",
+    "FROM pubkeys WHERE public_key_fingerprint = $1"
+);
 
 pub const LIST_PUBKEYS_TEMPLATE: &str = concat!(
     "SELECT id, client_id, rp_id, rp_account, host, host_account, public_key_fingerprint, public_key, ",

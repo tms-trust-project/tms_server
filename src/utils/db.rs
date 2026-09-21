@@ -5,11 +5,13 @@ use log::{info};
 use std::io::{self, Write};
 use chrono::{Utc, DateTime};
 use sqlx::Row;
-
-use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR, timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE};
-use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET};
-
+use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR,
+                              timestamp_utc_to_str, calc_expires_at};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS,
+                                  SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY,
+                                  SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE};
+use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP,
+                           TEST_CLIENT_SECRET};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
@@ -503,8 +505,8 @@ pub async fn create_test_keys() -> Result<u64> {
  * 
  * Note that a message that contains "INTERNAL ERROR:" should trigger a 500 http return code.
  */
-pub async fn check_login_delegation(tms_identity: &String, client_id: &String, rp_id: &String, rp_account: &String)
-                                    -> Result<()>
+pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String, rp_id: &String,
+                                      rp_account: &String) -> Result<()>
 {
     // Get a connection to the db and start a transaction.
     let mut tx = RUNTIME_CTX.db.begin().await?;

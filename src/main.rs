@@ -137,9 +137,7 @@ async fn main() -> Result<(), std::io::Error> {
         let cert = RUNTIME_CTX.tms_dirs.certs_dir.clone() + TMSS_CERT_FILE;
         poem::Server::new(
             TcpListener::bind(addr).openssl_tls(
-                OpensslTlsConfig::new()
-                        .cert_from_file(cert)
-                        .key_from_file(key)
+                OpensslTlsConfig::new().cert_from_file(cert).key_from_file(key)
             )
         )
         .name(SERVER_NAME)
@@ -189,8 +187,7 @@ async fn tms_init_data() -> Result<bool> {
 }
 
 /*
- * Perform initialization steps for a normal non-install run.
- * Currently, this simply updates enabled flag for the test client based on current configuration.
+ * Update enabled flag for the test client based on current configuration.
  */
 async fn init_test_client() -> Result<u64> {
     // Manage test client enablement by always setting flag based on current configuration.

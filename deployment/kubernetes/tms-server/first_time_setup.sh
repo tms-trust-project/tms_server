@@ -79,7 +79,7 @@ if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
  echo "---------------------------------------------------"
  echo " Re-deploying TMS portal"
  echo "---------------------------------------------------"
-  cd ${TMS_PORTAL_DEPLOY_DIR}
+  cd ${TMS_PORTAL_DEPLOY_DIR} || exit
   ./burndown
   ./burnup
 else
