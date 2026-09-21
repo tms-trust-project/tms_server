@@ -14,6 +14,7 @@
           tms-server-stack
           postgres
           docs-serve
+          config.rust.binary
         ];
       };
     };
