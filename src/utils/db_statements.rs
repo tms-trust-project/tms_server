@@ -159,11 +159,6 @@ pub const INSERT_PUBKEYS: &str = concat!(
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
 );
 
-pub const SELECT_PUBKEY: &str = concat!(
-    "SELECT public_key, remaining_uses, expires_at FROM pubkeys ",
-    "WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3",
-);
-
 pub const SEL_PUBKEY_EXISTS: &str = concat!(
 "SELECT EXISTS(SELECT 1 FROM pubkeys WHERE host_account = $1 AND host = $2)"
 );
