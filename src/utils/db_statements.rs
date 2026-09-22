@@ -159,6 +159,14 @@ pub const INSERT_PUBKEYS: &str = concat!(
     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
 );
 
+pub const INSERT_PUBKEYS_NOT_STRICT: &str = concat!(
+"INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+"public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
+"initial_ttl_minutes, expires_at, created, updated) ",
+"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ",
+"ON CONFLICT DO NOTHING"
+);
+
 pub const SELECT_PUBKEY: &str = concat!(
     "SELECT public_key, remaining_uses, expires_at FROM pubkeys ",
     "WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3",

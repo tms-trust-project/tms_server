@@ -5,6 +5,7 @@ use log::{info, error};
 use serde::Deserialize;
 use std::{env, fs::{self, Permissions}, path::Path};
 use std::collections::HashMap;
+use std::fs::File;
 use toml;
 use fs_mistrust::Mistrust;
 use std::os::unix::fs::PermissionsExt;
@@ -17,7 +18,6 @@ use clap::{Parser};
 // for a cogent explanation on dealing with futures and async programming in Rust.  More 
 // background can be found at https://rust-lang.github.io/async-book/.
 use futures::executor::block_on;
-
 // TMS Utilities
 use crate::utils::{tms_utils, db_init, errors::Errors};
 use super::db_statements::{GET_CLIENT_SECRET, GET_ADMIN_SECRET};
@@ -31,11 +31,14 @@ use super::tms_utils::get_absolute_path;
 // Directory and file locations.
 // Unless otherwise noted, all files and directories are relative to the TMS root directory.
 const DEFAULT_ROOT_DIR     : &str = "~/tms";
+const DEFAULT_LOCAL_DIR     : &str = "~/tms_local";
 const MIGRATIONS_DIR       : &str = "/migrations";
 const CONFIG_DIR           : &str = "/config";
 const LOGS_DIR             : &str = "/logs";
 const CERTS_DIR            : &str = "/certs";
 const RESOURCES_SRC_DIR    : &str = "./tms_server/resources_src";
+// Where to write initial setup info
+pub const TMS_SETUP_OUT_FILE: &str = "/../tms_local/tms-setup.out";
 
 const LOG4RS_CONFIG_FILE   : &str = "/log4rs.yml"; // relative to config dir
 const TMS_CONFIG_FILE      : &str = "/tms.toml";   // relative to config dir
@@ -46,9 +49,6 @@ const KEY_PEM_FILE         : &str = "/key.pem";    // relative to certs dir
 const DEFAULT_HTTP_ADDR    : &str = "https://localhost";
 const DEFAULT_HTTP_PORT    : u16  = 3000;
 const DEFAULT_SVR_URL      : &str = "https://localhost:3000/v1";
-
-// Where to write initial setup info
-pub const TMS_SETUP_OUT_PATH   : &str = "/home/tms/tms_local/tms-setup.out"; // TODO make this relative to tms_local dir
 
 // Test data constants.
 pub const TEST_CLIENT : &str = "testclient1";
@@ -308,6 +308,10 @@ fn init_tms_dirs() -> TmsDirs {
     println!("Checking root_dir: {}", root_dir);
     check_tms_dir(&root_dir, "root directory", &mistrust);
 
+    let local_dir = get_local_dir();
+    println!("Checking local_dir: {}", local_dir);
+    check_tms_dir(&local_dir, "tms_local directory", &mistrust);
+
     let config_dir = root_dir.clone() + CONFIG_DIR;
     dir_created = check_tms_dir(&config_dir, "config directory", &mistrust);
     if dir_created {copy_resource_files(&config_dir, CONFIG_DIR, &root_dir);}
@@ -343,6 +347,7 @@ fn check_tms_dir(dir: &String, msgname: &str, mistrust: &Mistrust) -> bool {
         panic!("The TMS {} path must be absolute: {}", msgname, dir);
     }
     if path.exists() {
+        println!("Path exists. Not creating: {}", path.to_str().unwrap());
         // Make sure the path represents a directory.
         if !path.is_dir() {
             panic!("The TMS {} path must be a directory: {}", msgname, dir);
@@ -357,6 +362,7 @@ fn check_tms_dir(dir: &String, msgname: &str, mistrust: &Mistrust) -> bool {
         // Directory not created.
         false
     } else {
+        println!("Path doest not exist. Creating: {}", path.to_str().unwrap());
         // Create the directory with the correct permissions.
         match mistrust.make_directory(path) {
             Ok(_) => (),
@@ -396,7 +402,7 @@ fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String)
     let pathbufs = match tms_utils::get_files_in_dir(source_dir.as_str()) {
         Ok(p) => p,
         Err(e) => {
-            panic!("Unable to list files in directy {}: {}", &source_dir, e);
+            panic!("Unable to list files in directory {}: {}", &source_dir, e);
         }
     };
 
@@ -567,6 +573,22 @@ fn get_root_dir() -> String {
 
     // Canonicalize the path.
     get_absolute_path(&tmp_root_dir)
+}
+
+// ---------------------------------------------------------------------------
+// get_local_dir:
+// ---------------------------------------------------------------------------
+fn get_local_dir() -> String {
+    // Canonicalize the path.
+    get_absolute_path(DEFAULT_LOCAL_DIR)
+}
+
+// ---------------------------------------------------------------------------
+// get_setup_out_file:
+// ---------------------------------------------------------------------------
+pub fn get_setup_out_path() -> String {
+    let root_dir = get_root_dir();
+    format!("{}{}",root_dir, TMS_SETUP_OUT_FILE)
 }
 
 // ***************************************************************************

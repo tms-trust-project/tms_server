@@ -10,8 +10,9 @@ use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret,
                               timestamp_utc_to_str, calc_expires_at};
 use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS,
                                   SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY,
-                                  SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE};
-use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, TMS_SETUP_OUT_PATH};
+                                  SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT};
+use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP,
+                           TEST_CLIENT_SECRET, TMS_SETUP_OUT_FILE, get_setup_out_path};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
@@ -161,7 +162,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
     info!("Creating keypair for ClientId: {} TmsId: {} RPId: {} RPAcct: {} Host: {} HostAcct: {}",
           TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
     // Create the insert statement.
-    let result = sqlx::query(INSERT_PUBKEYS)
+    let result = sqlx::query(INSERT_PUBKEYS_NOT_STRICT)
         .bind(input_record.client_id)
         .bind(input_record.tms_identity.clone())
         .bind(TEST_RP_ID)
@@ -259,7 +260,7 @@ pub async fn create_default_admin() -> Result<u64> {
 }
 
 // ---------------------------------------------------------------------------
-// print_admin_secret_message:
+// print_write_admin_info:
 // ---------------------------------------------------------------------------
 /*
  * Print one-time message to stdout that contains the admin_user and admin_secret for the
@@ -293,8 +294,10 @@ fn print_write_admin_info(dft_key_str: &String) -> Result<()> {
 
     // Write the one-time message to the terminal and to a file
     io::stdout().write_all(msg.as_bytes())?;
-    let mut setup_out_file = File::create(TMS_SETUP_OUT_PATH)?;
-    setup_out_file.write_all(msg.as_bytes())?;
+    let setup_out_path = get_setup_out_path();
+    println!("Writing to setup_out_file. Path: {}", setup_out_path);
+    let mut out_file = File::create(setup_out_path)?;
+    out_file.write_all(msg.as_bytes())?;
     Ok(())
 }
 
