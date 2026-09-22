@@ -3,7 +3,12 @@
 # It creates and initializes directories on the host and in persistent named volumes used by the server.
 # The tag of the image to be run needs to be the first and only parameter.
 PrgName=$(basename "$0")
-if [ $# -ne 1 ]; then 
+
+echo "This script is no longer needed. The --install option is not needed or supported"
+echo "Exiting ..."
+exit 1
+
+if [ $# -ne 1 ]; then
     echo "Usage: $PrgName <docker tag>"
     echo "  where <docker tag> is the image version tag"
     echo "E.g. $PrgName dev"

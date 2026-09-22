@@ -48,7 +48,7 @@ docker kill tms_server > /dev/null 2>&1
 
 # Remove containers that might have exited and not been removed
 docker rm tms_sleep > /dev/null 2>&1
-docker rm tms_server
+docker rm tms_server > /dev/null 2>&1
 
 # Delete the docker volume
 docker volume rm tms_server_vol

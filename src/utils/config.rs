@@ -47,6 +47,9 @@ const DEFAULT_HTTP_ADDR    : &str = "https://localhost";
 const DEFAULT_HTTP_PORT    : u16  = 3000;
 const DEFAULT_SVR_URL      : &str = "https://localhost:3000/v1";
 
+// Where to write initial setup info
+pub const TMS_SETUP_OUT_PATH   : &str = "/home/tms/tms_local/tms-setup.out"; // TODO make this relative to tms_local dir
+
 // Test data constants.
 pub const TEST_CLIENT : &str = "testclient1";
 pub const TEST_CLIENT_SECRET : &str = "secret1";

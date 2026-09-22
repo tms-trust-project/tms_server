@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use std::fs::File;
 use anyhow::{Result, anyhow};
 use log::{info};
 use std::io::{self, Write};
@@ -10,8 +11,7 @@ use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret,
 use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS,
                                   SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY,
                                   SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE};
-use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP,
-                           TEST_CLIENT_SECRET};
+use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, TMS_SETUP_OUT_PATH};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
@@ -251,8 +251,8 @@ pub async fn create_default_admin() -> Result<u64> {
     tx.commit().await?;
 
     // --- MOST IMPORTANT ---
-    // One time printout of the admin secret.
-    print_admin_secret_message(&dft_key_str)?;
+    // One time printout of the admin info to terminal and to a file.
+    print_write_admin_info(&dft_key_str)?;
 
     // Return the number of insertions that took place.
     Ok(dft_admin_result.rows_affected())
@@ -266,7 +266,7 @@ pub async fn create_default_admin() -> Result<u64> {
  * default admin user. This only happens when the --install option was specified and this program
  * terminates after installation with the secret information visible to user.
  */
-fn print_admin_secret_message(dft_key_str: &String) -> Result<()> {
+fn print_write_admin_info(dft_key_str: &String) -> Result<()> {
     // Compile time literal concatenation.
     let prefix = concat!(
         "\n***************************************************************************",
@@ -291,8 +291,10 @@ fn print_admin_secret_message(dft_key_str: &String) -> Result<()> {
         "\n***************************************************************************" +
         "\n***************************************************************************\n\n";
 
-    // Write the one-time message to the terminal.
-    io::stdout().write_all(msg.as_bytes())?;   
+    // Write the one-time message to the terminal and to a file
+    io::stdout().write_all(msg.as_bytes())?;
+    let mut setup_out_file = File::create(TMS_SETUP_OUT_PATH)?;
+    setup_out_file.write_all(msg.as_bytes())?;
     Ok(())
 }
 

@@ -83,13 +83,6 @@ echo "=================================="
 echo "$PSQL_CMD < $PORTAL_SEED_DATA"
 $PSQL_CMD < $PORTAL_SEED_DATA
 
-# Set up tms_server
-echo
-echo "=================================="
-echo " Setting up tms_server"
-echo "=================================="
-$RUN_PATH/docker_setup_tms.sh $DTAG
-
 # Start a long running container to allow us to see the volume
 echo
 echo "=================================="

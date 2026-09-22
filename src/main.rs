@@ -94,7 +94,7 @@ async fn main() -> Result<(), std::io::Error> {
     // NOTE: This makes a block_on call to initialize the DB pool
     info!("{}", Errors::InputParms(format!("{:#?}", *RUNTIME_CTX)));
 
-    // Initialize test data as needed.
+    // Initialize admin user and test data as needed. Test data:
     tms_init_data().await.expect("Error initializing data");
 
     // Initialize test client based on current value for enabled.

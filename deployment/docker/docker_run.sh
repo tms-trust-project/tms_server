@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script should only be called AFTER docker_setup_tms.sh has successfully run.
+# Script to start up the TMS Server.
 
 # The tag of the image to be run needs to be the first and only parameter.
 PrgName=$(basename "$0")

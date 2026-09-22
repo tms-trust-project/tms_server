@@ -2,21 +2,16 @@
 # Dockerfile for TMS Server.
 #
 # Use cargo during an initial phase to build the executable.
-# NOTE: The docker_setup_tms.sh script must be run before starting the server.
 #
 # Directory Structure
 # -------------------
 # TMS server deployment involves subdirectories under the root installation directory.
-# For containers, the root installation directory is /home/tms and its subdirectories are:
-#
-#  - tms, which has five subdirectories which are created during set up.
-#    During set up the tms/certs directory needs to be populated with the host-specific certificate
-#    chain and private key. These can be updated as needed.
-#
-#  - tms_local, which is a bind mounted host directory used by TMS running in the container to
-#    (1) write the tms-install.out file that contains administrative secrets, and
-#    (2) optional configuration files customized for the host on which TMS executes.
-#
+# When the container is first run a docker volume named tms_server_vol is created.
+# In that volumed the root installation directory is /home/tms and its subdirectories are:
+#  - tms, which has four subdirectories created during set up.
+#  - tms_local, this is where TMS will:
+#    (1) on first time startup write the tms-setup.out file that contains administrative secrets
+#    (2) read from optional configuration files customized for the host on which TMS executes.
 #  - tms_server, contains the binary executable and the resource files copied to TMS_ROOT_DIR during set up.
 #
 # PHASE 1 - Build executable using cargo
