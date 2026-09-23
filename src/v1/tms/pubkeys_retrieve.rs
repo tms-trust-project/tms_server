@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use poem::Request;
-use poem_openapi::{  OpenApi, payload::Json, Object, ApiResponse };
+use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
 use anyhow::{anyhow, Result};
 use sqlx::Row;
 

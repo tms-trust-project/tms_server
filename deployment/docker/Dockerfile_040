@@ -57,6 +57,7 @@ RUN mkdir -p /home/tms/tms_local
 RUN mkdir -p /home/tms/tms_server
 RUN chown -R tms:tms /home/tms
 RUN chmod 700 /home/tms/tms
+RUN chmod 700 /home/tms/tms_local
 
 USER tms
 

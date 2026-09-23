@@ -2,7 +2,7 @@
 
 use poem::Request;
 use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 
 use crate::utils::authz::{authorize, AuthzTypes, get_client_id_header};
@@ -150,7 +150,7 @@ impl RespNewSshKeys {
             }
     }
 
-    async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse, anyhow::Error> {
+    async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse> {
         // Log the request
         tms_utils::debug_request(http_req, req);
 
@@ -181,15 +181,15 @@ impl RespNewSshKeys {
                 client_id: req_ext.client_id.clone(),
                 rp_id: req.rp_account.clone(),
                 rp_account: req.rp_account.clone(),
-                host: req.host.clone(), 
-                host_account: req.host_account.clone(), 
+                host: req.host.clone(),
+                host_account: req.host_account.clone(),
                 tms_identity: req.tms_identity.clone()
             };
             // Insert records into the resource_provider_logins and delegations tables
             match create_pubkey_dependencies(mvp_inputs).await {
                 Ok(inserts) => info!("{} MVP dependency records inserted.", inserts),
                 Err(e) => {
-                    let msg = format!("MVP ERROR: Unable to create MVP dependencies: {}", e); 
+                    let msg = format!("MVP ERROR: Unable to create MVP dependencies: {}", e);
                     error!("{}", msg);
                     return Ok(make_http_500(msg));
                 }
@@ -239,9 +239,9 @@ impl RespNewSshKeys {
         // Generate the new key pair.
         let keyinfo = match keygen::generate_key(key_type) {
             Ok(k) => k,
-            Err(e) => { return Result::Err(anyhow!(e)); }
+            Err(e) => { return Err(anyhow!(e)); }
         };
-        
+
         // ------------------------ Update Database --------------------
         // Interpret numeric input.
         let max_uses = if req.num_uses < 0 {i32::MAX} else {req.num_uses};
@@ -261,17 +261,17 @@ impl RespNewSshKeys {
             req.tms_identity.clone(),
             req.rp_id.clone(),
             req.rp_account.clone(),
-            req.host.clone(), 
+            req.host.clone(),
             req.host_account.clone(),
-            keyinfo.public_key_fingerprint.clone(), 
-            keyinfo.public_key.clone(), 
-            keyinfo.key_type.clone(), 
-            keyinfo.key_bits, 
-            max_uses, 
-            remaining_uses, 
-            ttl_minutes, 
-            expires_at.clone(), 
-            now.clone(), 
+            keyinfo.public_key_fingerprint.clone(),
+            keyinfo.public_key.clone(),
+            keyinfo.key_type.clone(),
+            keyinfo.key_bits,
+            max_uses,
+            remaining_uses,
+            ttl_minutes,
+            expires_at.clone(),
+            now.clone(),
             now.clone(),
         );
 

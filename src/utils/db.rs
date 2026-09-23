@@ -11,8 +11,8 @@ use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret,
 use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS,
                                   SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY,
                                   SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT};
-use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, TMS_CMD_ARGS, DB_TRUE, TEST_CLIENT, TEST_APP,
-                           TEST_CLIENT_SECRET, TMS_SETUP_OUT_FILE, get_setup_out_path};
+use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP,
+                           TEST_CLIENT_SECRET, get_setup_out_path};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
@@ -20,7 +20,7 @@ use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
 use super::db_statements::{GET_DELEGATION, GET_RESERVATION_FOR_EXTEND,
                            GET_RP_LOGIN_ACTIVE, GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
-                           SELECT_PUBKEY_HOST_ACCOUNT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
+                           UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
 const DANGER_MODE_PROVIDER_TYPE: &str = "danger_mode";
 const TEST_SUPPORTS_FALSE: bool = false;
@@ -533,22 +533,22 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
                 let msg = format!("Resource provider login record is disabled. TmsId: {} RpId: {} RpAcct: {}",
                                          tms_identity, rp_id, rp_account);
                 error!("{}", msg);
-                return Result::Err(anyhow!(msg));
+                return Err(anyhow!(msg));
             }
         },
         None => {
             let msg = format!("Resource provider login record not found. TmsId: {} RpId: {} RpAcct: {}",
                                      tms_identity, rp_id, rp_account);
             error!("{}", msg);
-            return Result::Err(anyhow!(msg));
+            return Err(anyhow!(msg));
         }
     };
 
     // -------- Check delegation
     let delg_row = sqlx::query(GET_DELEGATION_ACTIVE)
         .bind(tms_identity)
-        .bind(rp_id)
         .bind(client_id)
+        .bind(rp_id)
         .bind(rp_account)
         .fetch_optional(&mut *tx)
         .await?;
@@ -560,14 +560,14 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
                 let msg = format!("Delegation record has expired. TmsId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
                                          tms_identity, client_id, rp_id, rp_account, expires_at);
                 error!("{}", msg);
-                return Result::Err(anyhow!(msg));
+                return Err(anyhow!(msg));
             }
         },
         None => {
             let msg = format!("Delegation record not found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
                                      tms_identity, client_id, rp_id, rp_account);
             error!("{}", msg);
-            return Result::Err(anyhow!(msg));
+            return Err(anyhow!(msg));
         }
     };
 
@@ -648,7 +648,7 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_id
                                           because it is already a child of reservation {}.",
                                             resid, parent_resid);
                 error!("{}", msg);
-                return Result::Err(anyhow!(msg));
+                return Err(anyhow!(msg));
             }
 
             // Check whether the reservation has expired.
@@ -656,14 +656,14 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_id
                 let msg = format!("Parent reservation {} for client {} expired at {}.",
                                             resid, client_id, expires_at);
                 error!("{}", msg);
-                return Result::Err(anyhow!(msg));
+                return Err(anyhow!(msg));
             }
         },
         None => {
             let msg = format!("NOT_FOUND: Reservation {} not found for client {}.",
                                         resid, client_id);
             error!("{}", msg);
-            return Result::Err(anyhow!(msg));
+            return Err(anyhow!(msg));
         }
     };  
 
@@ -680,7 +680,7 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_id
             let msg = format!("No RP_LOGIN entry found. TmsId: {} RpId: {} RpAcct: {}",
                                      tms_identity, rp_id, rp_account);
             error!("{}", msg);
-            return Result::Err(anyhow!(msg));
+            return Err(anyhow!(msg));
         }
     };
 
@@ -698,7 +698,7 @@ pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_id
             let msg = format!("No delegation record found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
                                      tms_identity, client_id, rp_id, rp_account);
             error!("{}", msg);
-            return Result::Err(anyhow!(msg));
+            return Err(anyhow!(msg));
         }
     };
 
