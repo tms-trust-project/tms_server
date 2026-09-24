@@ -35,20 +35,7 @@ PRG_RELPATH=$(dirname "$0")
 cd "$PRG_RELPATH"/. || exit
 PRG_PATH=$(pwd)
 
-RESULT="PASS"
-echo "**********************************************************************"
-echo "   Testing get version"
-echo "**********************************************************************"
-http --check-status GET ${TMS_URL}/v1/tms/version
-RET_CODE=$?
-echo "**********************************************************************"
-if [ $RET_CODE -ne 0 ]; then
-  echo "Result : FAIL"
-  RESULT="FAIL"
-else
-  echo "Result : PASS"
-fi
-
+FINAL_RESULT="PASS"
 echo "**********************************************************************"
 echo "   Testing get version"
 echo "**********************************************************************"
@@ -57,7 +44,7 @@ RET_CODE=$?
 echo "**********************************************************************"
 if [ $RET_CODE -ne 0 ]; then
   echo "Result : FAIL"
-  RESULT="FAIL"
+  FINAL_RESULT="FAIL"
 else
   echo "Result : PASS"
 fi
@@ -73,7 +60,7 @@ RET_CODE=$?
 echo "**********************************************************************"
 if [ $RET_CODE -ne 0 ]; then
   echo "Result : FAIL"
-  RESULT="FAIL"
+  FINAL_RESULT="FAIL"
 else
   echo "Result : PASS"
 fi
@@ -89,9 +76,13 @@ RET_CODE=$?
 echo "**********************************************************************"
 if [ $RET_CODE -ne 0 ]; then
   echo "Result : FAIL"
+  FINAL_RESULT="FAIL"
 else
   echo "Result : PASS"
 fi
 echo "======================================================================================"
-echo "Final Result: $RESULT"
+echo "Final Result: $FINAL_RESULT"
 echo "======================================================================================"
+if [ $FINAL_RESULT = "FAIL" ]; then
+  exit 1
+fi

@@ -8,13 +8,13 @@ use chrono::{DateTime, Utc};
 use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::{INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
 use crate::utils::db_types::RPLoginInput;
-use crate::utils::authz::{authorize, AuthzTypes};
-use crate::utils::tms_utils::{self, timestamp_utc, RequestDebug};
+use crate::utils::authz::{authorize, get_client_id_header, AuthzTypes};
+use crate::utils::tms_utils::{self, check_client_enabled, timestamp_utc, RequestDebug};
 use log::{error, info};
 use crate::RUNTIME_CTX;
 use crate::utils::config::DB_TRUE;
 
-// Insert fails on conflict.        
+// Insert fails on conflict.
 const STRICT:bool = true;
 
 // ***************************************************************************
@@ -138,6 +138,19 @@ impl RespCreateRPLogin {
     async fn process(http_req: &Request, req: &ReqCreateRPLogin) -> Result<TmsResponse, anyhow::Error> {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
+        // -------------------- Extract Headers ----------------------
+        // Get the header we need: client_id
+        let client_id = match get_client_id_header(http_req) {
+            Ok(h) => h,
+            Err(e) => { return Ok(make_http_400(e.to_string())); }
+        };
+
+        // Check client.
+        if !check_client_enabled(&client_id).await {
+            let msg = format!("WARNING: Client not enabled. ClientId: {}", client_id);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
 
         // ------------------------ Time Values ------------------------ 
         // The ttl can be negative, which means maximum ttl.

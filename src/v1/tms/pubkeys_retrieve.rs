@@ -13,6 +13,7 @@ use crate::utils::{tms_utils, tms_utils::RequestDebug};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db::check_rplogin_delegation;
+use crate::utils::tms_utils::check_client_enabled;
 
 // ***************************************************************************
 //                          Request/Response Definitions
@@ -75,6 +76,9 @@ enum TmsResponse {
 fn make_http_200(resp: RespPublicKey) -> TmsResponse {
     TmsResponse::Http200(Json(resp))
 }
+fn make_http_400(msg: String) -> TmsResponse {
+    TmsResponse::Http403(Json(HttpResult::new(403.to_string(), msg)))
+}
 fn make_http_403(msg: String) -> TmsResponse {
     TmsResponse::Http403(Json(HttpResult::new(403.to_string(), msg)))
 }
@@ -127,13 +131,13 @@ impl RespPublicKey {
             },
         }
 
-        // TODO/TBD Not clear if we need to check rp_login and delegation record.
-        //     As long as we always remove the pubkey record when it should no longer be used
-        //     this check is redundant.
-        //     Whenever a tms_identity unlinks their rp account or revokes a delegation we must
-        //     make sure all associated pubkey records are removed.
-        //     Also, when the rp account is unlinked we should be sure to remove all associated
-        //     delegation records.
+        // TODO NOTE: Should we check? Yes, we should check. What if the client is temporarily disabled?
+        //  And what if the mfa or delegation has expired per policy?
+        //  If we count on the pubkey always being removed in such cases then the
+        //  application (or maybe tms_server) would need to re-create the key.
+        //  TMS server would not be able to automatically re-generate a keypair,
+        //  because without an existing pubkey record we cannot lookup client_id, rp_id, rp_account.
+        //
         // TODO -------------------- Extract Headers ----------------------
         // NOTE: Get the header we need: ???
         //      Currently, KeyCmd does not set in headers. For DangerMode operation we will need
@@ -166,7 +170,14 @@ impl RespPublicKey {
         //         else { return Err(err) }
         //     }
         // };
-        // // We now have what we need to check the rp_login and delegation records.
+        // // We now have what we need to check if client is enabled and check the rp_login and
+        // // delegation records.
+        // Check client.
+        // if !check_client_enabled(&full_pubkey.req.client_id).await {
+        //     let msg = format!("WARNING: Client not enabled. ClientId: {}", full_pubkey.client_id);
+        //     error!("{}", msg);
+        //     return Ok(make_http_400(msg));
+        // }
         // match check_rplogin_delegation(&full_pubkey.tms_identity, &full_pubkey.client_id,
         //                                &full_pubkey.rp_id, &full_pubkey.rp_account).await
         // {

@@ -11,7 +11,7 @@ use crate::utils::keygen::{self, KeyType};
 use crate::utils::db_types::PubkeyInput;
 use crate::utils::db::check_rplogin_delegation;
 use crate::utils::db::insert_new_pubkey;
-use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled};
 use crate::utils::mvp::{MVPDependencyParms, create_pubkey_dependencies};
 use log::{error, info, warn};
 
@@ -74,18 +74,6 @@ impl RequestDebug for ReqNewSshKeys {
         s.push('\n');
         s
     }
-}
-
-// Extracted header values to complete request input
-#[derive(Debug)]
-struct NewSshKeysExtension
-{
-    client_id: String
-}
-
-impl NewSshKeysExtension {
-    fn new(client_id: String) -> Self
-    { Self {client_id} }
 }
 
 // ------------------- HTTP Status Codes -------------------
@@ -157,7 +145,7 @@ impl RespNewSshKeys {
         // ========================================================================================
         // -------------------- Extract Headers ----------------------
         // Get the header we need: client_id
-        let req_ext = match get_header_values(http_req) {
+        let client_id = match get_client_id_header(http_req) {
             Ok(h) => h,
             Err(e) => { return Ok(make_http_400(e.to_string())); }
         };
@@ -168,9 +156,15 @@ impl RespNewSshKeys {
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
             let msg = format!("WARNING: Not authorized to create credential for client. ClientId: {}.",
-                                     req_ext.client_id);
+                                     client_id);
             error!("{}", msg);
             return Ok(make_http_401(msg));
+        }
+        // Check client.
+        if !check_client_enabled(&client_id).await {
+            let msg = format!("WARNING: Client not enabled. ClientId: {}", client_id);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
         }
 
         // -------------------- MVP: DANGER_MODE ------------------------
@@ -178,7 +172,7 @@ impl RespNewSshKeys {
         if RUNTIME_CTX.parms.config.enable_mvp {
             // Collect values required for dependency record insertions.
             let mvp_inputs = MVPDependencyParms {
-                client_id: req_ext.client_id.clone(),
+                client_id: client_id.clone(),
                 rp_id: req.rp_account.clone(),
                 rp_account: req.rp_account.clone(),
                 host: req.host.clone(),
@@ -207,7 +201,7 @@ impl RespNewSshKeys {
         //
         // This method returns either Ok or a message indicating why a new ssh keypair is not
         //   being created for the tms_identity.
-        match check_rplogin_delegation(&req.tms_identity, &req_ext.client_id, &req.rp_id, &req.rp_account).await
+        match check_rplogin_delegation(&req.tms_identity, &client_id, &req.rp_id, &req.rp_account).await
         {
             Ok(_) => (),
             Err(err) => {
@@ -257,7 +251,7 @@ impl RespNewSshKeys {
 
         // Create the input record.
         let input_record = PubkeyInput::new(
-            req_ext.client_id.clone(),
+            client_id.clone(),
             req.tms_identity.clone(),
             req.rp_id.clone(),
             req.rp_account.clone(),
@@ -294,12 +288,3 @@ impl RespNewSshKeys {
 // ***************************************************************************
 //                          Private Functions
 // ***************************************************************************
-
-// ---------------------------------------------------------------------------
-// get_header_values:
-// ---------------------------------------------------------------------------
-fn get_header_values(http_req: &Request) -> Result<NewSshKeysExtension> {
-    // Get the required header values.
-    let hdr_client_id = get_client_id_header(http_req)?;
-    Ok(NewSshKeysExtension::new(hdr_client_id))
-}

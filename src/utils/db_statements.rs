@@ -30,6 +30,10 @@ pub const INSERT_CLIENT: &str = concat!(
     "VALUES ($1, $2, $3, $4, $5, $6)",
 );
 
+pub const IS_CLIENT_ENABLED: &str = concat!(
+    "SELECT enabled FROM clients where client_id = $1"
+);
+
 pub const GET_CLIENT: &str = concat!(
     "SELECT id, name, client_id, secret, enabled, created, updated ",
     "FROM clients WHERE client_id = $1",

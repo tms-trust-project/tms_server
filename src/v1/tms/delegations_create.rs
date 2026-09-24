@@ -8,7 +8,7 @@ use crate::utils::errors::HttpResult;
 use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_DELEGATION_NOT_STRICT};
 use crate::utils::db_types::DelegationInput;
 use crate::utils::authz::{authorize, AuthzTypes};
-use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled};
 use log::{error, info};
 
 use crate::RUNTIME_CTX;
@@ -139,8 +139,14 @@ impl RespCreateDelegations {
     async fn process(http_req: &Request, req: &ReqCreateDelegations) -> Result<TmsResponse, anyhow::Error> {
         // Conditional logging depending on log level.
         tms_utils::debug_request(http_req, req);
+        // Check client.
+        if !check_client_enabled(&req.client_id).await {
+            let msg = format!("WARNING: Client not enabled. ClientId: {}", req.client_id);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
 
-        // ------------------------ Time Values ------------------------ 
+        // ------------------------ Time Values ------------------------
         // The ttl can be negative, which means maximum ttl.
         let ttl_minutes = if req.ttl_minutes < 0 {i32::MAX} else {req.ttl_minutes};
 
