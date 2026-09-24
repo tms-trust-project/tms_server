@@ -38,7 +38,7 @@ struct RespPublicKey
 }
 
 // Implement the debug record trait for logging.
-impl RequestDebug for ReqPublicKey {   
+impl RequestDebug for ReqPublicKey {
     type Req = ReqPublicKey;
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
@@ -118,27 +118,17 @@ impl RespPublicKey {
         // Log the request
         tms_utils::debug_request(http_req, req);
 
-        let db_result = get_public_key(req).await;
-        match db_result {
-            Ok(result) => {
-                Ok(make_http_200(Self::new("0", "success", result.public_key.as_str())))
-            },
-            Err(e) => {
-                // Determine if this is a real db error or just record not found.
-                let msg = e.to_string();
-                if msg.contains("NOT_FOUND") {Ok(make_http_404(msg))} 
-                  else {Err(e)}
-            },
-        }
-
-        // TODO NOTE: Should we check? Yes, we should check. What if the client is temporarily disabled?
-        //  And what if the mfa or delegation has expired per policy?
-        //  If we count on the pubkey always being removed in such cases then the
-        //  application (or maybe tms_server) would need to re-create the key.
-        //  TMS server would not be able to automatically re-generate a keypair,
-        //  because without an existing pubkey record we cannot lookup client_id, rp_id, rp_account.
+        // NOTE:
+        // Do we need to check rp_login and delegation?
+        // Yes, we do need to check.
+        //   What if the client is temporarily disabled?
+        //   And what if the rp_login or delegation record has expired per policy?
+        //   If we count on the pubkey always being removed in such cases then the
+        //   application (or maybe tms_server) would need to re-create the key.
+        //   TMS server would not be able to automatically re-generate a keypair, because without
+        //   an existing pubkey record we cannot look up client_id, rp_id, rp_account.
         //
-        // TODO -------------------- Extract Headers ----------------------
+        // -------------------- Extract Headers ----------------------
         // NOTE: Get the header we need: ???
         //      Currently, KeyCmd does not set in headers. For DangerMode operation we will need
         //      some secure way of specifying it, so we maybe use a header?
@@ -158,42 +148,42 @@ impl RespPublicKey {
         // If we have it, then we use attributes from that record to check for valid rp_login and
         // delegation records. If not return 403
 
-        // // Look for the key in the database. If found save the result,
-        // //    else if not found return 404 else internal error return 500
-        // let full_pubkey_result = get_full_pubkey_result(req).await;
-        // let full_pubkey = match full_pubkey_result {
-        //     Ok(pubkey) => pubkey,
-        //     Err(err) => {
-        //         // Determine if this is a real error or just record not found.
-        //         let msg = err.to_string();
-        //         if msg.contains("NOT_FOUND") { return Ok(make_http_404(msg)) }
-        //         else { return Err(err) }
-        //     }
-        // };
-        // // We now have what we need to check if client is enabled and check the rp_login and
-        // // delegation records.
+        // Look for the key in the database. If found save the result,
+        //    else if not found return 404 else internal error return 500
+        let full_pubkey_result = get_full_pubkey_result(req).await;
+        let full_pubkey = match full_pubkey_result {
+            Ok(pubkey) => pubkey,
+            Err(err) => {
+                // Determine if this is a real error or just record not found.
+                let msg = err.to_string();
+                if msg.contains("NOT_FOUND") { return Ok(make_http_404(msg)) }
+                else { return Err(err) }
+            }
+        };
+        // We now have what we need to check if client is enabled and check the rp_login and
+        // delegation records.
         // Check client.
-        // if !check_client_enabled(&full_pubkey.req.client_id).await {
-        //     let msg = format!("WARNING: Client not enabled. ClientId: {}", full_pubkey.client_id);
-        //     error!("{}", msg);
-        //     return Ok(make_http_400(msg));
-        // }
-        // match check_rplogin_delegation(&full_pubkey.tms_identity, &full_pubkey.client_id,
-        //                                &full_pubkey.rp_id, &full_pubkey.rp_account).await
-        // {
-        //     Ok(_) => (),
-        //     Err(err) => {
-        //         let err_msg = err.to_string();
-        //         error!("{}", err_msg);
-        //         if err_msg.contains("INTERNAL ERROR:") { return Ok(make_http_500(err_msg)); }
-        //         let msg =
-        //             format!("Permission denied. Missing or expired login or delegation. User: {} Host: {} PubKey: {} ErrMsg: {}",
-        //                     req.user, req.host, req.public_key_fingerprint, err_msg);
-        //         return Ok(make_http_403(msg));
-        //     }
-        // };
-        // // We have valid rp_login and delegation records, we can return the public key.
-        // Ok(make_http_200(Self::new("0", "success", full_pubkey.public_key.as_str())))
+        if !check_client_enabled(&full_pubkey.client_id).await {
+            let msg = format!("WARNING: Client not enabled. ClientId: {}", full_pubkey.client_id);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
+        match check_rplogin_delegation(&full_pubkey.tms_identity, &full_pubkey.client_id,
+                                       &full_pubkey.rp_id, &full_pubkey.rp_account).await
+        {
+            Ok(_) => (),
+            Err(err) => {
+                let err_msg = err.to_string();
+                error!("{}", err_msg);
+                if err_msg.contains("INTERNAL ERROR:") { return Ok(make_http_500(err_msg)); }
+                let msg =
+                    format!("Permission denied. Missing or expired login or delegation. User: {} Host: {} PubKey: {} ErrMsg: {}",
+                            req.user, req.host, req.public_key_fingerprint, err_msg);
+                return Ok(make_http_403(msg));
+            }
+        };
+        // We have valid rp_login and delegation records, we can return the public key.
+        Ok(make_http_200(Self::new("0", "success", full_pubkey.public_key.as_str())))
     }
 }
 

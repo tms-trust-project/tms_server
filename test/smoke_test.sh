@@ -6,6 +6,8 @@
 #
 # Calls are made to three endpoints: get version, get pubkey and create keypair.
 #
+# NOTE: The test client must be enabled. It is a setting in config/tms.toml
+#
 # The following environment variables are used in testing.
 # They all have defaults that are suitable for testing against localhost:8080.
 # Note that default test data is pre-seeded at server start up.

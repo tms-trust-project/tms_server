@@ -208,7 +208,7 @@ pub const GET_PUBKEY: &str = concat!(
     "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
       "public_key_fingerprint, public_key, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated ",
-    "FROM pubkeys WHERE public_key_fingerprint = $1"
+    "FROM pubkeys WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3"
 );
 
 pub const LIST_PUBKEYS_TEMPLATE: &str = concat!(
