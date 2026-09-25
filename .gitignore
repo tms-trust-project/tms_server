@@ -1,6 +1,7 @@
 /target
 /result
 /test/data
+/tms_server
 *.log
 tms.db*
 .vscode

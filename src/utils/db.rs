@@ -8,7 +8,7 @@ use chrono::{Utc, DateTime};
 use sqlx::Row;
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR,
                               timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP,
                            TEST_CLIENT_SECRET, get_setup_out_path};
 use log::error;
@@ -432,6 +432,7 @@ pub async fn create_test_data() -> Result<u64> {
         info!("Creating TMS identity record for TMS user: {}", test_tms_identity.clone());
         sqlx::query(INSERT_TMS_IDENTITY)
             .bind(test_tms_identity.clone())
+            .bind(DB_TRUE)
             .execute(&mut *tx)
             .await?;
 
@@ -741,6 +742,24 @@ pub async fn is_client_enabled(client_id: &String) -> Result<bool>
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // Select the client's enabled flag value.
     let result = sqlx::query(IS_CLIENT_ENABLED).bind(client_id).fetch_optional(&mut *tx).await?;
+    // Commit the transaction.
+    tx.commit().await?;
+    // Return the result
+    match result {
+        Some(row) => { Ok(row.get(0)) },
+        None => { Err(anyhow!("NOT_FOUND")) }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// is_tms_id_enabled:
+// ---------------------------------------------------------------------------
+pub async fn is_tms_id_enabled(tms_id: &String) -> Result<bool>
+{
+    // Get a connection to the db and start a transaction.
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // Select the tms_identity's enabled flag value.
+    let result = sqlx::query(IS_TMS_ID_ENABLED).bind(tms_id).fetch_optional(&mut *tx).await?;
     // Commit the transaction.
     tx.commit().await?;
     // Return the result

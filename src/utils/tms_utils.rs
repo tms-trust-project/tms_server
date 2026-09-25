@@ -21,7 +21,7 @@ use log::{error, debug, LevelFilter};
 
 use crate::utils::db_statements::PLACEHOLDER;
 use crate::utils::authz::{AuthzResult, AuthzTypes};
-use crate::utils::db::is_client_enabled;
+use crate::utils::db::{is_client_enabled, is_tms_id_enabled};
 
 // ----------- Constants
 // The chrono library's MAX_UTC causes overflow during string conversions because year is more
@@ -369,6 +369,18 @@ pub async fn check_client_enabled(client_id: &String) -> bool {
     }
 }
 
+// ---------------------------------------------------------------------------
+// check_tms_id_enabled:
+// ---------------------------------------------------------------------------
+pub async fn check_tms_id_enabled(tms_id: &String) -> bool {
+    match is_tms_id_enabled(tms_id).await {
+        Ok(enabled) => enabled,
+        Err(e) => {
+            error!("Unable to determine if TMS identity is enabled. TmsId: {} Error: {}", tms_id, e);
+            false
+        }
+    }
+}
 // ***************************************************************************
 // PRIVATE FUNCTIONS
 // ***************************************************************************

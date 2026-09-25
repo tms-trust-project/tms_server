@@ -11,7 +11,7 @@ use crate::utils::keygen::{self, KeyType};
 use crate::utils::db_types::PubkeyInput;
 use crate::utils::db::check_rplogin_delegation;
 use crate::utils::db::insert_new_pubkey;
-use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled, check_tms_id_enabled};
 use crate::utils::mvp::{MVPDependencyParms, create_pubkey_dependencies};
 use log::{error, info, warn};
 
@@ -163,6 +163,13 @@ impl RespNewSshKeys {
         // Check client.
         if !check_client_enabled(&client_id).await {
             let msg = format!("WARNING: Client not enabled. ClientId: {}", client_id);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
+
+        // Check that tms_identity is enabled
+        if !check_tms_id_enabled(&req.tms_identity).await {
+            let msg = format!("WARNING: TMS Identity not enabled. TmsId: {}", req.tms_identity);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }

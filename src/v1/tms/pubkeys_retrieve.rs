@@ -13,7 +13,7 @@ use crate::utils::{tms_utils, tms_utils::RequestDebug};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db::check_rplogin_delegation;
-use crate::utils::tms_utils::check_client_enabled;
+use crate::utils::tms_utils::{check_client_enabled, check_tms_id_enabled};
 
 // ***************************************************************************
 //                          Request/Response Definitions
@@ -122,11 +122,12 @@ impl RespPublicKey {
         // Do we need to check rp_login and delegation?
         // Yes, we do need to check.
         //   What if the client is temporarily disabled?
+        //   Or maybe the tms_identity or rp_login are temporarily disabled.
         //   And what if the rp_login or delegation record has expired per policy?
-        //   If we count on the pubkey always being removed in such cases then the
-        //   application (or maybe tms_server) would need to re-create the key.
-        //   TMS server would not be able to automatically re-generate a keypair, because without
-        //   an existing pubkey record we cannot look up client_id, rp_id, rp_account.
+        //   If we count on the pubkey always being removed in such cases then the application
+        //   (or maybe tms_server) would need to re-create the key.
+        //   But, tms_server would not be able to automatically re-generate a keypair, because
+        //   without an existing pubkey record we cannot look up client_id, rp_id, rp_account.
         //
         // -------------------- Extract Headers ----------------------
         // NOTE: Get the header we need: ???
@@ -162,12 +163,19 @@ impl RespPublicKey {
         };
         // We now have what we need to check if client is enabled and check the rp_login and
         // delegation records.
-        // Check client.
+        // Check that client is enabled
         if !check_client_enabled(&full_pubkey.client_id).await {
             let msg = format!("WARNING: Client not enabled. ClientId: {}", full_pubkey.client_id);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
+        // Check that tms_identity is enabled
+        if !check_tms_id_enabled(&full_pubkey.tms_identity).await {
+            let msg = format!("WARNING: TMS Identity not enabled. TmsId: {}", full_pubkey.tms_identity);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
+
         match check_rplogin_delegation(&full_pubkey.tms_identity, &full_pubkey.client_id,
                                        &full_pubkey.rp_id, &full_pubkey.rp_account).await
         {
