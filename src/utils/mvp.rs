@@ -3,10 +3,10 @@
 use anyhow::Result;
 use crate::utils::db_types::{DelegationInput, RPLoginInput};
 use crate::utils::tms_utils::{timestamp_utc};
-use crate::v1::tms::delegations_create::insert_delegation;
-use crate::v1::tms::rp_login_create::insert_rp_login;
 use log::info;
+use crate::RUNTIME_CTX;
 use crate::utils::config::DB_TRUE;
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_DELEGATION_NOT_STRICT, INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
 use crate::utils::tms_utils;
 
 // Insert fails on conflict.
@@ -91,4 +91,55 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
               parms.tms_identity, parms.rp_id, parms.rp_account, parms.client_id);
     }
     Ok(insert_count)
+}
+
+// ***************************************************************************
+//                          Private Functions
+// ***************************************************************************
+// ---------------------------------------------------------------------------
+// insert_delegation:
+// ---------------------------------------------------------------------------
+async fn insert_delegation(rec: DelegationInput, strict: bool) -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // Choose the query based on strictness requirement.
+    let sql_query = if strict { INSERT_DELEGATION } else { INSERT_DELEGATION_NOT_STRICT };
+    // Create the insert statement.
+    let result = sqlx::query(sql_query)
+        .bind(rec.tms_identity)
+        .bind(rec.client_id)
+        .bind(rec.rp_id)
+        .bind(rec.rp_account)
+        .bind(rec.expires_at)
+        .bind(rec.created)
+        .bind(rec.updated)
+        .execute(&mut *tx)
+        .await?;
+    // Commit the transaction.
+    tx.commit().await?;
+
+    Ok(result.rows_affected())
+}
+
+// ---------------------------------------------------------------------------
+// insert_rp_login:
+// ---------------------------------------------------------------------------
+pub async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // Choose the query based on strictness requirement.
+    let sql_query = if strict { INSERT_RP_LOGIN } else { INSERT_RP_LOGIN_NOT_STRICT };
+    // Create the insert statement.
+    let result = sqlx::query(sql_query)
+        .bind(rec.tms_identity)
+        .bind(rec.rp_id)
+        .bind(rec.rp_account)
+        .bind(rec.enabled)
+        .bind(rec.created)
+        .bind(rec.updated)
+        .bind(rec.last_login)
+        .execute(&mut *tx)
+        .await?;
+    // Commit the transaction.
+    tx.commit().await?;
+
+    Ok(result.rows_affected())
 }

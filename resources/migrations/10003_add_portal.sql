@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS tms_identities
 (
     seq_id SERIAL PRIMARY KEY,
     tms_identity TEXT   NOT NULL UNIQUE,
+    enabled BOOLEAN NOT NULL DEFAULT true;
     created TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 ALTER TABLE tms_identities OWNER TO tms;
