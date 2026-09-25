@@ -16,8 +16,6 @@ use poem_extensions::api;
 use crate::v1::tms::pubkeys_create::NewSshKeysApi;
 use crate::v1::tms::pubkeys_retrieve::PublicKeyApi;
 use crate::v1::tms::pubkeys_delete::DeletePubkeysApi;
-use crate::v1::tms::pubkeys_get::GetPubkeysApi;
-use crate::v1::tms::pubkeys_update::UpdatePubkeyApi;
 use crate::v1::tms::version::VersionApi;
 
 // TMS Utilities
@@ -108,7 +106,7 @@ async fn main() -> Result<(), std::io::Error> {
     // endpoints to be defined (!).  Consult the poem_extensions documentation if generic 
     // endpoint support is needed.
     let endpoints = 
-        api!(HelloApi, NewSshKeysApi, PublicKeyApi, VersionApi, GetPubkeysApi, DeletePubkeysApi, UpdatePubkeyApi);
+        api!(HelloApi, NewSshKeysApi, PublicKeyApi, VersionApi, DeletePubkeysApi);
     let mut api_service =
         OpenApiService::new(endpoints, "TMS Server", version_str);
     let urls = &RUNTIME_CTX.parms.config.server_urls;
