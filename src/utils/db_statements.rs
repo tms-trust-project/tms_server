@@ -58,7 +58,7 @@ pub const INSERT_RP_LOGIN: &str = concat!(
 
 pub const INSERT_RP_LOGIN_NOT_STRICT: &str = concat!(
     "INSERT INTO resource_provider_logins (tms_identity, rp_id, rp_account, enabled, created, updated, last_login) ",
-    "VALUES ($1, $2, $3, $4, $5, $7) ON CONFLICT DO NOTHING",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
 );
 
 pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
@@ -78,7 +78,7 @@ pub const INSERT_DELEGATION: &str = concat!(
 
 pub const INSERT_DELEGATION_NOT_STRICT: &str = concat!(
     "INSERT INTO delegations (tms_identity, client_id, rp_id, rp_account, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
 );
 
 pub const GET_DELEGATION: &str = concat!(

@@ -15,6 +15,9 @@
 #
 # The value you will be most likely want to change at times is TMS_URL, the location of the TMS Server under test.
 # By default the test is run against localhost:8080
+
+HTTPIE_CMD="http --verify=no"
+#HTTPIE_CMD="http"
 export TMS_URL="${TMS_URL:-http://localhost:8080}"
 
 export TMS_IDENTITY="${TMS_IDENTITY:-testtmsuser101@DangerModeTestIdP}"
@@ -41,7 +44,7 @@ FINAL_RESULT="PASS"
 echo "**********************************************************************"
 echo "   Testing get version"
 echo "**********************************************************************"
-http ${TMS_URL}/v1/tms/version
+$HTTPIE_CMD ${TMS_URL}/v1/tms/version
 RET_CODE=$?
 echo "**********************************************************************"
 if [ $RET_CODE -ne 0 ]; then
@@ -55,7 +58,7 @@ echo "**********************************************************************"
 echo "**********************************************************************"
 echo "   Testing get pubkey"
 echo "**********************************************************************"
-http --check-status POST ${TMS_URL}/v1/tms/pubkeys/creds/retrieve Content-type:application/json \
+$HTTPIE_CMD --check-status POST ${TMS_URL}/v1/tms/pubkeys/creds/retrieve Content-type:application/json \
     user=testhostaccount101 user_uid:=101 host=testhost101 key_type=ed25519 \
     public_key_fingerprint='SHA256:0EddP3z8IwV4YqzewwoiJVyfKhmFj4VlsDBZqCaan24'
 RET_CODE=$?
@@ -70,7 +73,7 @@ echo "**********************************************************************"
 echo "**********************************************************************"
 echo "   Testing create keypair"
 echo "**********************************************************************"
-http --check-status POST ${TMS_URL}/v1/tms/pubkeys/creds Content-type:application/json \
+$HTTPIE_CMD --check-status POST ${TMS_URL}/v1/tms/pubkeys/creds Content-type:application/json \
      X-TMS-CLIENT-ID:${TMS_CLIENT_ID} X-TMS-CLIENT-SECRET:${TMS_CLIENT_SECRET} \
      tms_identity=${TMS_IDENTITY} rp_id=${TMS_RP_ID} rp_account=${TMS_RP_ACCOUNT} \
      host=${TMS_PUBKEY_HOST} host_account=${TMS_HOST_ACCOUNT} num_uses:=1 ttl_minutes:=1 key_type=${TMS_PUBKEY_KEYTYPE}
