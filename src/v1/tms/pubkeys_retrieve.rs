@@ -131,9 +131,9 @@ impl RespPublicKey {
         //
         // -------------------- Extract Headers ----------------------
         // NOTE: Get the header we need: ???
-        //      Currently, KeyCmd does not set in headers. For DangerMode operation we will need
+        //      Currently, KeyCmd does not set in headers. For ImplicitMode operation we will need
         //      some secure way of specifying it, so we maybe use a header?
-        // BUT, on a given host we will have some clients using DangerMode and some not, so
+        // BUT, on a given host we will have some clients using ImplicitMode and some not, so
         //   on the host side it cannot be a boolean.
         //   Maybe for now the best we can do for security is to have a special client id + secret
         //   so a host can prove itself to the TMS credential server.

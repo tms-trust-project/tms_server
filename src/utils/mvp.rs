@@ -23,7 +23,7 @@ pub struct MVPDependencyParms
 }
 
 /**
- * The Danger/Implicit Trust Mode - Minimal Viable Product (MVP) version of TMS simplifies migration to TMS in
+ * The Implicit Trust Mode - Minimal Viable Product (MVP) version of TMS simplifies migration to TMS in
  * existing environments that meet certain requirements. Specifically, MVP supports the following:
  * 
  *  - Keys never expire.
@@ -87,7 +87,7 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let count = insert_delegation(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP/DangerMode: Delegation records created. tms_identity: {} rp_id: {} rp_account {} client_id: {}",
+        info!("ImplicitTrust Mode: Delegation records created. tms_identity: {} rp_id: {} rp_account {} client_id: {}",
               parms.tms_identity, parms.rp_id, parms.rp_account, parms.client_id);
     }
     Ok(insert_count)

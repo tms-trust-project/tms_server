@@ -16,11 +16,12 @@
 # The value you will be most likely want to change at times is TMS_URL, the location of the TMS Server under test.
 # By default the test is run against localhost:8080
 
-HTTPIE_CMD="http --verify=no"
-#HTTPIE_CMD="http"
+# Use --verify=no for self-signed SSL certs
+#HTTPIE_CMD="http --verify=no"
+HTTPIE_CMD="http"
 export TMS_URL="${TMS_URL:-http://localhost:8080}"
 
-export TMS_IDENTITY="${TMS_IDENTITY:-testtmsuser101@DangerModeTestIdP}"
+export TMS_IDENTITY="${TMS_IDENTITY:-testtmsuser101@ImplicitModeTestIdP}"
 export TMS_RP_ID="${TMS_RP_ID:-test_fake_rp}"
 export TMS_RP_ACCOUNT="${TMS_RP_ACCOUNT:-testrpaccount101}"
 
