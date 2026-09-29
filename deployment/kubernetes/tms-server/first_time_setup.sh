@@ -2,6 +2,9 @@
 #
 # TMS Server first time setup and start script
 #
+# NOTE: We have the wait timeouts set fairly high because we have seen on some k8s clusters it take a very long time
+#       for pods to be created.
+#
 echo "---------------------------------------------------"
 echo " Running first time setup and start for TMS Server"
 echo "---------------------------------------------------"
@@ -21,7 +24,7 @@ kubectl delete configmap tms-first-time-init-db-configmap 2>/dev/null
 kubectl delete -f first-time-init-db.yml 2>/dev/null
 kubectl create configmap tms-first-time-init-db-configmap --from-file first-time-init-db-sh
 kubectl apply -f first-time-init-db.yml
-kubectl wait --timeout=200s --for=condition=complete job/tms-first-time-init-db
+kubectl wait --timeout=500s --for=condition=complete job/tms-first-time-init-db
 
 echo "---------------------------------------------------"
 echo " Creating PVC"
@@ -33,14 +36,14 @@ echo " Staging files in pvc"
 echo "---------------------------------------------------"
 kubectl delete -f first-time-stage.yml 2>/dev/null
 kubectl apply -f first-time-stage.yml
-kubectl wait --timeout=200s --for=condition=complete job/tms-first-time-stage
+kubectl wait --timeout=500s --for=condition=complete job/tms-first-time-stage
 
 echo "---------------------------------------------------"
 echo " Starting up server for the first time"
 echo "---------------------------------------------------"
 kubectl delete -f deploy.yml 2>/dev/null
 kubectl apply -f deploy.yml
-kubectl wait --timeout=200s --for=condition=available deploy/tms-server
+kubectl wait --timeout=500s --for=condition=available deploy/tms-server
 
 echo "---------------------------------------------------"
 echo " Setting up ingress network access"
