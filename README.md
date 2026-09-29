@@ -1,6 +1,6 @@
-# TMS Server
+# TMS Credential Server
 
-Trust Management System (TMS) credential server
+Trust Manager System (TMS) Credential Server
 
 TMS is currently deployed as a Minimal Viable Product release in three environments: DEV, STAGING and PROD.
 All deployments are native installations as opposed to docker deployments. Initially an SQLite database was

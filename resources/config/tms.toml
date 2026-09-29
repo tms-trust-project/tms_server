@@ -2,15 +2,15 @@
 title = "TMS Server"
 
 # The address and port bound by the TMS server.
-# Setting to http: allows non-tls api calls; Setting to https: uses tls 
+# Setting to http: allows non-tls api calls; Setting to https: uses tls
 # and requires a certificate. In some environments, the self-signed
-# cerficate shipped with TMS might work.  
+# cerficate shipped with TMS might work.
 http_addr = "http://localhost"
 http_port = 8080
 
 # Setting this flag causes the server to run in Minimal Viable Product (MVP)
 # mode, which affects the level of automation during key creation
-# (when the pubkeys_create endpoint executes).  MVP processing has these 
+# (when the pubkeys_create endpoint executes).  MVP processing has these
 # characteristics:
 #
 #  1. Keys are created unlimited lifetimes and number of uses.
@@ -24,24 +24,23 @@ http_port = 8080
 #  3. No new clients can be created.  This has the same effect as
 #     setting new_clients = "disallow".
 #
-# MVP is only appropriate when (1) the Identity Provider (IDP) used by 
+# MVP is only appropriate when (1) the Identity Provider (IDP) used by
 # the client to authenticate its users is the same IDP that the target
 # host uses for user login, (2) the client's user name is the same
-# as the host account name, and (3) when no new clients should be 
+# as the host account name, and (3) when no new clients should be
 # created.
 #
 # default = false
-enable_mvp = false
+enable_mvp = true
 
-# This switch can be used to allow new clients with no restrictions, 
-# lock down the current set of clients by disallowing new client creation, 
-# or only allow new client creation when the caller has a short-lived, 
+# This switch can be used to allow new clients with no restrictions,
+# lock down the current set of clients by disallowing new client creation,
+# or only allow new client creation when the caller has a short-lived,
 # one-time password created by the administrator. Valid string
 # values for this parameter are:
 #
 #   allow, disallow, on_approval
 #
-# When enable_mvp is true, then the value of this parameter is always
 # overridden and effectively set to "disallow". 
 #
 # default = "allow"
@@ -49,12 +48,12 @@ new_clients = "allow"
 
 # Enable or disable the test client
 #
-# We recommend setting this parameter to false in production 
+# We recommend setting this parameter to false in production
 # environments to avoid misuse of access granted for testing
 # purposes.
 #
 # default = false
-enable_test_client = false
+enable_test_client = true
 
 # At least one server should be specified.  The base urls listed here
 # get displayed as targets in the openapi generated livedocs.

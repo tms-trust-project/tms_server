@@ -20,7 +20,7 @@ use super::db_statements::{GET_DELEGATION, GET_RESERVATION_FOR_EXTEND,
                            GET_RP_LOGIN_ACTIVE, GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
                            UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
-const DANGER_MODE_PROVIDER_TYPE: &str = "danger_mode";
+const IMPLICIT_MODE_PROVIDER_TYPE: &str = "implicit_mode";
 const TEST_SUPPORTS_FALSE: bool = false;
 const TEST_IDP_ID: &str = "test_fake_idp";
 const TEST_IDP_NAME: &str = "Fake Test IdP";
@@ -35,7 +35,7 @@ const TEST_RP_CLIENT_SECRET: &str = "FakeTestRP4adfduG89JRazpE6DCDvkrM";
 const TEST_RP_REDIRECT_URL: &str = "https://auth.fake.test.org/v2/oauth2/authorize";
 const TEST_RP_TOKEN_URL: &str = "https://auth.fake.test.org/v2/oauth2/token";
 const TEST_TMS_USER_BASE: &str = "testtmsuser";
-const TEST_TMS_USER_DOMAIN: &str = "DangerModeTestIdP";
+const TEST_TMS_USER_DOMAIN: &str = "ImplicitModeTestIdP";
 const TEST_HOST: &str = "testhost";
 const TEST_HOST_ACCOUNT: &str = "testhostaccount";
 const TEST_RP_ACCOUNT: &str = "testrpaccount";
@@ -350,7 +350,7 @@ pub async fn create_test_idp() -> Result<u64> {
         test_idp_client_secret_hash,
         TEST_IDP_REDIRECT_URL.to_string(),
         TEST_IDP_TOKEN_URL.to_string(),
-        DANGER_MODE_PROVIDER_TYPE.to_string(),
+        IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
         TEST_SUPPORTS_FALSE,
         TEST_SUPPORTS_FALSE,
         now.clone(),
@@ -383,7 +383,7 @@ pub async fn create_test_rp() -> Result<u64> {
         test_rp_client_secret_hash,
         TEST_RP_REDIRECT_URL.to_string(),
         TEST_RP_TOKEN_URL.to_string(),
-        DANGER_MODE_PROVIDER_TYPE.to_string(),
+        IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
         TEST_SUPPORTS_FALSE,
         TEST_SUPPORTS_FALSE,
         now.clone(),

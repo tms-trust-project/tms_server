@@ -174,7 +174,7 @@ impl RespNewSshKeys {
             return Ok(make_http_400(msg));
         }
 
-        // -------------------- MVP: DANGER_MODE ------------------------
+        // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
         // If running in MVP mode then automatically create delegation records.
         if RUNTIME_CTX.parms.config.enable_mvp {
             // Collect values required for dependency record insertions.

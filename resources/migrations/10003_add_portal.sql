@@ -17,7 +17,7 @@ ALTER TABLE identity_provider_types OWNER TO tms;
 --   should always be created here for migration from TMS 0.3.
 INSERT INTO identity_provider_types (provider_type) VALUES ('globus');
 INSERT INTO identity_provider_types (provider_type) VALUES ('tacc_tapis');
-INSERT INTO identity_provider_types (provider_type) VALUES ('danger_mode');
+INSERT INTO identity_provider_types (provider_type) VALUES ('implicit_mode');
 
 -- ---------------------------------------
 -- Identity_providers table
@@ -45,32 +45,32 @@ CREATE TABLE IF NOT EXISTS identity_providers
 );
 ALTER TABLE identity_providers OWNER TO tms;
 --
--- Create an identity_provider to be used as resource provider for existing MVP legacy "danger mode" records.
+-- Create an identity_provider to be used as resource provider for existing MVP legacy "implicit trust" mode records.
 -- Only TACC is running TMS server 0.3 and the RP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
 INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
-VALUES ('danger_mode_tacc_rp', 'DangerMode TACC Resource Provider', '12345678-1234-taccrp-dangermode',
-        'DangerModeZf9afuG9RzpE6DCDvkrM', 'https://auth.danger.fake.org/v2/oauth2/authorize',
-        'https://auth.danger.fake.org/v2/oauth2/token', 'danger_mode', false, false);
+VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678-1234-taccrp-implictmode',
+        'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
+        'https://auth.implicit.fake.org/v2/oauth2/token', 'implicit_mode', false, false);
 --
--- Create an identity_provider to be used as an IdP for existing MVP legacy "danger mode" records.
+-- Create an identity_provider to be used as an IdP for existing MVP legacy "implicit mode" records.
 -- Only TACC is running TMS server 0.3 and the IdP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
 INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
-VALUES ('danger_mode_tacc_idp', 'DangerMode TACC Identity Provider', '12345678-1234-taccidp-dangermode',
-        'DangerModeZf9afuG9RzpE6DCDvkrM', 'https://auth.danger.fake.org/v2/oauth2/authorize',
-        'https://auth.danger.fake.org/v2/oauth2/token', 'danger_mode', false, false);
+VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '12345678-1234-taccidp-implicitmode',
+        'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
+        'https://auth.implicit.fake.org/v2/oauth2/token', 'implicit_mode', false, false);
 --
 -- Create an identity_provider to be used as placeholder to be used when adding columns that are NOT NULL.
 -- This should not be in place permanently, it should get replaced during an upgrade.
 INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
-VALUES ('danger_mode_unknown', 'DangerMode Unkown RP', '12345678-1234-unknown-dangermode',
-        'DangerModeUnknownZRzpE6DCDvkrM', '', '', 'danger_mode', false, false);
+VALUES ('implicit_mode_unknown', 'ImplictMode Unkown RP', '12345678-1234-unknown-implicitmode',
+        'ImplictModeUnknownZRzpE6DCDvkrM', '', '', 'implicit_mode', false, false);
 
 -- ---------------------------------------
 -- tms_identities table
@@ -89,14 +89,14 @@ CREATE TABLE IF NOT EXISTS tms_identities
 );
 ALTER TABLE tms_identities OWNER TO tms;
 
--- TODO For existing MVP legacy "danger mode" records created for TMS 0.3 and earlier, we need to
+-- TODO For existing MVP legacy "implicit trust" mode records created for TMS 0.3 and earlier, we need to
 --      add TMS identities for every record in the user_mfa, delegations tables.
 -- TODO Select all distinct client_user_id records from user_mfa and delegations and for each create a new
 --   tms_identity record in tms_identities.
 --
 
---  Create a TMS identity with a special name to act as a potential fallback for MVP legacy danger mode records.
-INSERT INTO tms_identities (tms_identity) VALUES ('dangerUserUnknown@dangerModeIdP');
+--  Create a TMS identity with a special name to act as a potential fallback for MVP legacy implicit trust mode records.
+INSERT INTO tms_identities (tms_identity) VALUES ('ImplicitUserUnknown@ImplictModeIdP');
 
 -- ---------------------------------------
 -- keys table
@@ -201,8 +201,8 @@ ALTER TABLE resource_provider_logins RENAME COLUMN tms_user_id TO tms_identity;
 -- ================================================================================================
 -- Add columns and constraints to resource_provider_logins table
 -- ================================================================================================
-ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
-ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_account TEXT NOT NULL DEFAULT 'danger_user_unknown';
+ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_unknown' REFERENCES identity_providers(id);
+ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS rp_account TEXT NOT NULL DEFAULT 'implicit_user_unknown';
 ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc');
 
 ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_id_account_key UNIQUE (tms_identity, rp_id, rp_account);
@@ -247,14 +247,14 @@ DROP TABLE IF EXISTS user_hosts;
 ALTER TABLE delegations DROP CONSTRAINT IF EXISTS delegations_client_user_id_fkey;
 --Add column tms_identity with foreign key reference to tms_identities
 -- NOTE: The hard coded string here must match the one used above for the tms_identities table.
-ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUserUnknown@dangerModeIdP'
+ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
     REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
--- TODO after above ADD COLUMN, do we need to modify the rp_account value for the existing legacy MVP danger mode records?
---      e.g., if my TACC id is jaydoe, should we update it to be 'jaydoe_dangerModeRP' or similar?
+-- TODO after above ADD COLUMN, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
+--      e.g., if my TACC id is jaydoe, should we update it to be 'jaydoe_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note below under pubkeys table
 ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
-ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
+ALTER TABLE delegations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_unknown' REFERENCES identity_providers(id);
 -- For delegations table (tms_identity, client_id, rp_id, rp_account) uniquely identify the record
 CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_cltid_rpid_rpacct_idx ON delegations (tms_identity, client_id, rp_id, rp_account);
 
@@ -268,14 +268,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_cltid_rpid_rpacct_idx ON del
 --     get pubkey - just need pubkey_fingerprint
 
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
--- TODO after above rename, do we need to modify the rp_account value for the existing legacy MVP danger mode records?
---      e.g., if my TACC id is jaydoe, should we update it to be 'jaydoe_dangerModeRP' or similar?
+-- TODO after above rename, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
+--      e.g., if my TACC id is jaydoe, should we update it to be 'jaydoe_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note above under delegations table.
-ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'dangerUserUnknown@dangerModeIdP'
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
     REFERENCES tms_identities(tms_identity);
--- For the legacy MVP records, we can use the danger mode TACC RP here.
-ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_tacc_rp' REFERENCES identity_providers(id);
+-- For the legacy MVP records, we can use the implicit mode TACC RP here.
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_tacc_rp' REFERENCES identity_providers(id);
 
 -- Fix up constraints. After alterations above there are problems
 --   After renaming we end up with pubkeys_client_user_id_fkey as FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity)
@@ -284,7 +284,7 @@ ALTER TABLE pubkeys DROP CONSTRAINT IF EXISTS pubkeys_client_user_id_fkey;
 -- reservations table
 -- ---------------------------------------
 ALTER TABLE reservations RENAME COLUMN client_user_id TO rp_account;
-ALTER TABLE reservations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'danger_mode_unknown' REFERENCES identity_providers(id);
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_unknown' REFERENCES identity_providers(id);
 
 -- ------------------------------------------------------------------------------------------------
 -- Add foreign keys for tms_identity referencing tms_identities table for tables resource_provider_logins
@@ -296,6 +296,6 @@ ALTER TABLE reservations ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'd
 ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
     FOREIGN KEY (tms_identity) REFERENCES tms_identities (tms_identity);
 
--- TODO Now that all columns are added for existing MVP legacy "danger mode" records created for TMS 0.3 and earlier,
+-- TODO Now that all columns are added for existing MVP legacy "implicit mode" records created for TMS 0.3 and earlier,
 --  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
 --    ????add TMS identities for every record in the user_mfa and delegations tables.
