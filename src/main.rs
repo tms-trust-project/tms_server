@@ -13,22 +13,14 @@ use poem::{listener::TcpListener, Route};
 use poem_openapi::{param::Query, payload::PlainText, OpenApi, OpenApiService};
 use poem_extensions::api;
 // TMS APIs
-use crate::v1::tms::client_create::CreateClientApi;
-use crate::v1::tms::client_delete::DeleteClientApi;
-use crate::v1::tms::client_get::GetClientApi;
-use crate::v1::tms::client_list::ListClientApi;
-use crate::v1::tms::client_update_secret::UpdateClientSecretApi;
-use crate::v1::tms::client_update::UpdateClientApi;
 use crate::v1::tms::pubkeys_create::NewSshKeysApi;
 use crate::v1::tms::pubkeys_retrieve::PublicKeyApi;
 use crate::v1::tms::pubkeys_delete::DeletePubkeysApi;
-use crate::v1::tms::pubkeys_get::GetPubkeysApi;
-use crate::v1::tms::pubkeys_update::UpdatePubkeyApi;
 use crate::v1::tms::version::VersionApi;
 
 // TMS Utilities
 use crate::utils::config::{TMS_CMD_ARGS, TMS_DIRS, TEST_CLIENT, init_log, init_runtime_context,
-                           set_directories_and_check_install, prohibit_root_user, RuntimeCtx};
+                           prohibit_root_user, RuntimeCtx};
 use crate::utils::errors::Errors;
 use crate::utils::{keygen, db};
 
@@ -82,14 +74,9 @@ async fn main() -> Result<(), std::io::Error> {
     keygen::init_keygen();
     println!("*** Keygen initialized ***");
 
-    // Set directories and make sure we are not trying to start without running --install first.
-    set_directories_and_check_install();
-
     // Directory setup. init_tms_dirs is triggered by lazy_static init of TMS_DIRS
-    // During the initial install this creates and populates the directories
-    // During normal startup it checks the directories and constructs the TmsDirs object
-    // After this all directories and files should be in place, including the config file tms.toml.
-    // NOTE: This is where --install is handled.
+    // Constructs this TmsDirs object
+    // This is where directories are created and populated as needed.
     println!("*** Runtime file locations *** \n{:?}\n", *TMS_DIRS);
 
     // Configure output log
@@ -105,24 +92,13 @@ async fn main() -> Result<(), std::io::Error> {
     // NOTE: This makes a block_on call to initialize the DB pool
     info!("{}", Errors::InputParms(format!("{:#?}", *RUNTIME_CTX)));
 
-    // Initialize test data. Skip if --schema-only specified.
-    if (!TMS_CMD_ARGS.schema_only) {
-        tms_init_data().await.expect("Error initializing data");
-    }
+    // Initialize admin user and test data as needed. Test data:
+    tms_init_data().await.expect("Error initializing data");
 
-    // If this was an installation run then we are done
-    if (TMS_CMD_ARGS.install) {
-        println!("Exiting: TMS root directory installed and initialized at {}", &TMS_DIRS.root_dir);
-        return Ok(());
-    }
-    // If this was a schema-only run then we are done
-    if (TMS_CMD_ARGS.schema_only) {
-        println!("Exiting: TMS DB Schema initialized.");
-        return Ok(());
-    }
+    // Initialize test client based on current value for enabled.
+    init_test_client().await.expect("Error during second stage initialization.");
 
-    // This is a non-install startup. Perform second stage initialization
-    tms_init2().await.expect("Error during second stage initialization.");
+    println!("Directories set and initialization complete.");
 
     // --------------- Main Loop Set Up ---------------
     // Create a tuple with all the endpoints, create the service and add the server urls to it.
@@ -130,10 +106,8 @@ async fn main() -> Result<(), std::io::Error> {
     // endpoints to be defined (!).  Consult the poem_extensions documentation if generic 
     // endpoint support is needed.
     let endpoints = 
-        api!(HelloApi, NewSshKeysApi, PublicKeyApi, VersionApi, 
-         CreateClientApi, GetClientApi, UpdateClientApi, DeleteClientApi, UpdateClientSecretApi, ListClientApi,
-         GetPubkeysApi, DeletePubkeysApi, UpdatePubkeyApi);
-    let mut api_service = 
+        api!(HelloApi, NewSshKeysApi, PublicKeyApi, VersionApi, DeletePubkeysApi);
+    let mut api_service =
         OpenApiService::new(endpoints, "TMS Server", version_str);
     let urls = &RUNTIME_CTX.parms.config.server_urls;
     for url in urls.iter() {
@@ -161,9 +135,7 @@ async fn main() -> Result<(), std::io::Error> {
         let cert = RUNTIME_CTX.tms_dirs.certs_dir.clone() + TMSS_CERT_FILE;
         poem::Server::new(
             TcpListener::bind(addr).openssl_tls(
-                OpensslTlsConfig::new()
-                        .cert_from_file(cert)
-                        .key_from_file(key)
+                OpensslTlsConfig::new().cert_from_file(cert).key_from_file(key)
             )
         )
         .name(SERVER_NAME)
@@ -185,17 +157,24 @@ async fn main() -> Result<(), std::io::Error> {
  * This function either experiences an error or returns true (false is never returned).
  */
 async fn tms_init_data() -> Result<bool> {
-    // Insert default records into database if they don't already exist.
-
+    // Insert default records into database if they do not already exist.
     // This call is a no-op except when the --install option is set.
     let inserts = db::create_default_admin().await.expect("Error creating default admin user.");
     info!("Number of admin user records created: {}.", inserts);
+
+    // Create test IdP if it does not already exist.
+    let inserts = db::create_test_idp().await.expect("Error creating test IdP.");
+    info!("Number of test IDPs created: {}.", inserts);
+
+    // Create test RP if it does not already exist.
+    let inserts = db::create_test_rp().await.expect("Error creating test resource provider.");
+    info!("Number of test resource providers created: {}.", inserts);
 
     // Create test client if it does not already exist.
     let inserts = db::create_test_client().await.expect("Error creating test client.");
     info!("Number of test clients created: {}.", inserts);
 
-    // Create test delegation, user_mfa and user_host records if they do not already exist.
+    // Create test tms_identities, delegation and resource_provider_logins records if they do not already exist.
     let inserts = db::create_test_data().await.expect("Error creating delegation records for test users.");
     info!("Number of test delegation related records created: {}.", inserts);
 
@@ -205,14 +184,10 @@ async fn tms_init_data() -> Result<bool> {
     Ok(true)
 }
 
-// ---------------------------------------------------------------------------
-// tms_init2:
-// ---------------------------------------------------------------------------
 /*
- * Perform initialization steps for a normal non-install run.
- * Currently, this simply updates enabled flag for the test client based on current configuration.
+ * Update enabled flag for the test client based on current configuration.
  */
-async fn tms_init2() -> Result<u64> {
+async fn init_test_client() -> Result<u64> {
     // Manage test client enablement by always setting flag based on current configuration.
     let test_client = TEST_CLIENT.to_string();
     db::set_test_enabled_internal(&test_client, RUNTIME_CTX.parms.config.enable_test_client).await

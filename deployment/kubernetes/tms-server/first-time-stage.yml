@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tms-first-time-stage
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: tms-first-time-stage
+        image: tapis/tms-server:dev
+        imagePullPolicy: Always
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          runAsNonRoot: false
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Copy from /home/tms to /data/pvc/tms"
+            cp -pr /home/tms /data/pvc
+            chown -R tms:tms /data/pvc/tms
+            ls -la /data/pvc/tms
+        volumeMounts:
+        - name: tms-server-vol
+          mountPath: /data/pvc
+      volumes:
+      - name: tms-server-vol
+        persistentVolumeClaim:
+          claimName: tms-server-vol
+  backoffLimit: 4

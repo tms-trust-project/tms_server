@@ -21,6 +21,7 @@ use log::{error, debug, LevelFilter};
 
 use crate::utils::db_statements::PLACEHOLDER;
 use crate::utils::authz::{AuthzResult, AuthzTypes};
+use crate::utils::db::{is_client_enabled, is_tms_id_enabled};
 
 // ----------- Constants
 // The chrono library's MAX_UTC causes overflow during string conversions because year is more
@@ -120,7 +121,7 @@ pub fn calc_expires_at(now : DateTime<Utc>, ttl_minutes : i32) -> DateTime<Utc> 
 
 // ---------------------------------------------------------------------------
 // get_max_tms_utc:
-//   Return a utc time far in the future, for use with mfa expiry
+//   Return a utc time far in the future, for use with rp_login expiry
 // ---------------------------------------------------------------------------
 pub fn get_max_tms_utc() -> DateTime<Utc> {
         DateTime::parse_from_rfc3339(MAX_TMS_UTC_STR).unwrap().with_timezone(&Utc)
@@ -354,6 +355,32 @@ pub fn sql_substitute_client_constraint(sql_query: &str, authz_result: &AuthzRes
     sql_query.replace(PLACEHOLDER, replacement.as_str())    
 }
 
+// ---------------------------------------------------------------------------
+// check_client_enabled:
+// ---------------------------------------------------------------------------
+/** Wrapper for the actual database call that handles errors and logging. */
+pub async fn check_client_enabled(client_id: &String) -> bool {
+    match is_client_enabled(client_id).await {
+        Ok(enabled) => enabled,
+        Err(e) => {
+            error!("Unable to determine if client is enabled. ClientId: {} Error: {}", client_id, e);
+            false
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// check_tms_id_enabled:
+// ---------------------------------------------------------------------------
+pub async fn check_tms_id_enabled(tms_id: &String) -> bool {
+    match is_tms_id_enabled(tms_id).await {
+        Ok(enabled) => enabled,
+        Err(e) => {
+            error!("Unable to determine if TMS identity is enabled. TmsId: {} Error: {}", tms_id, e);
+            false
+        }
+    }
+}
 // ***************************************************************************
 // PRIVATE FUNCTIONS
 // ***************************************************************************

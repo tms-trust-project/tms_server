@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+# TMS Server first time setup and start script
+#
+# NOTE: We have the wait timeouts set fairly high because we have seen on some k8s clusters it take a very long time
+#       for pods to be created.
+#
+echo "---------------------------------------------------"
+echo " Running first time setup and start for TMS Server"
+echo "---------------------------------------------------"
+echo
+
+PrgName=$(basename "$0")
+# Determine absolute path to location from which we are running and change to that directory.
+RUN_DIR=$(pwd)
+PRG_RELPATH=$(dirname "$0")
+cd "$PRG_RELPATH"/. || exit
+PRG_PATH=$(pwd)
+
+echo "---------------------------------------------------"
+echo " Initializing the DB"
+echo "---------------------------------------------------"
+kubectl delete configmap tms-first-time-init-db-configmap 2>/dev/null
+kubectl delete -f first-time-init-db.yml 2>/dev/null
+kubectl create configmap tms-first-time-init-db-configmap --from-file first-time-init-db-sh
+kubectl apply -f first-time-init-db.yml
+kubectl wait --timeout=500s --for=condition=complete job/tms-first-time-init-db
+
+echo "---------------------------------------------------"
+echo " Creating PVC"
+echo "---------------------------------------------------"
+kubectl apply -f pvc.yml
+
+echo "---------------------------------------------------"
+echo " Staging files in pvc"
+echo "---------------------------------------------------"
+kubectl delete -f first-time-stage.yml 2>/dev/null
+kubectl apply -f first-time-stage.yml
+kubectl wait --timeout=500s --for=condition=complete job/tms-first-time-stage
+
+echo "---------------------------------------------------"
+echo " Starting up server for the first time"
+echo "---------------------------------------------------"
+kubectl delete -f deploy.yml 2>/dev/null
+kubectl apply -f deploy.yml
+kubectl wait --timeout=500s --for=condition=available deploy/tms-server
+
+echo "---------------------------------------------------"
+echo " Setting up ingress network access"
+echo "---------------------------------------------------"
+kubectl apply -f tms-server-ingress.yml
+
+echo "---------------------------------------------------"
+echo " Seeding initial config for tms-portal if init file present"
+echo "---------------------------------------------------"
+TMS_PORTAL_SQL_FILE="$HOME/tms-portal/local/init.sql"
+if [ -r "$TMS_PORTAL_SQL_FILE" ]; then
+  # re-generate the init sql
+  $HOME/src_git/tms_portal/deploy/createConfigData.sh \
+     -v $HOME/tms-portal/deployment/tms_portal_vars.sh -o $HOME/tms-portal/local/init.sql
+  # Seed config for tms-portal from file $HOME/tms-portal/local/init.sql
+  cat "$TMS_PORTAL_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
+else
+  echo "NOTE: TMS Portal init sql file not found. Initial seeding for tms-portal will not be done"
+  echo "File: $TMS_PORTAL_SQL_FILE Portal init sql file not found."
+fi
+
+echo "---------------------------------------------------"
+echo " Seeding test allowed_redirects if init file present"
+echo "---------------------------------------------------"
+TMS_TEST_SQL_FILE="$HOME/tms-portal/local/init_test.sql"
+if [ -r "$TMS_TEST_SQL_FILE" ]; then
+  cat "$TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
+else
+  echo "NOTE: Seed file for test allowed redirects not found. Skipping."
+  echo "File: $TMS_TMS_TEST_SQL_FILE init sql file not found."
+fi
+
+# Bring down tms-portal if we have a deploy file for it
+TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
+if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
+ echo "---------------------------------------------------"
+ echo " Re-deploying TMS portal"
+ echo "---------------------------------------------------"
+  cd ${TMS_PORTAL_DEPLOY_DIR} || exit
+  ./burndown
+  ./burnup
+else
+ echo "---------------------------------------------------"
+ echo " Skipping deploy of TMS portal. Directory not found. Directory: $TMS_PORTAL_DEPLOY_DIR"
+ echo "---------------------------------------------------"
+fi

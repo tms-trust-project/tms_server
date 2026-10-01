@@ -2,18 +2,18 @@
 
 use poem::Request;
 use poem_openapi::{ OpenApi, payload::Json, Object, ApiResponse };
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 
 use crate::utils::authz::{authorize, AuthzTypes, get_client_id_header};
 use crate::utils::errors::HttpResult;
 use crate::utils::keygen::{self, KeyType};
 use crate::utils::db_types::PubkeyInput;
-use crate::utils::db::check_pubkey_dependencies;
+use crate::utils::db::check_rplogin_delegation;
 use crate::utils::db::insert_new_pubkey;
-use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled, check_tms_id_enabled};
 use crate::utils::mvp::{MVPDependencyParms, create_pubkey_dependencies};
-use log::{error, info};
+use log::{error, info, warn};
 
 use crate::RUNTIME_CTX;
 
@@ -25,12 +25,14 @@ pub struct NewSshKeysApi;
 #[derive(Object)]
 pub struct ReqNewSshKeys
 {
-    client_user_id: String,
+    tms_identity: String,
+    rp_id: String,
+    rp_account: String,
     host: String,
     host_account: String,
     num_uses: i32,     // negative means i32::MAX
     ttl_minutes: i32,  // negative means i32::MAX
-    key_type: Option<String>,  // RSA, ECDSA, ED25519, DEFAULT (=ED25519)   
+    key_type: Option<String>,  // RSA, ECDSA, ED25519, DEFAULT (=ED25519)
 }
 
 #[derive(Object, Debug)]
@@ -54,8 +56,10 @@ impl RequestDebug for ReqNewSshKeys {
     fn get_request_info(&self) -> String {
         let mut s = String::with_capacity(255);
         s.push_str("  Request body:");
-        s.push_str("\n    client_user_id: ");
-        s.push_str(&self.client_user_id);
+        s.push_str("\n    tms_identity: ");
+        s.push_str(&self.tms_identity);
+        s.push_str("\n    rp_account: ");
+        s.push_str(&self.rp_account);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
         s.push_str("\n    host_account: ");
@@ -65,26 +69,11 @@ impl RequestDebug for ReqNewSshKeys {
         s.push_str("\n    ttl_minutes: ");
         s.push_str(&self.ttl_minutes.to_string());
         s.push_str("\n    key_type: ");
-        let kt = match &self.key_type {
-            Some(k) => k,
-            None => "None",
-        };
+        let kt = match &self.key_type { Some(k) => k, None => "None" };
         s.push_str(kt);
         s.push('\n');
         s
     }
-}
-
-// Extracted header values to complete request input
-#[derive(Debug)]
-struct NewSshKeysExtension
-{
-    client_id: String
-}
-
-impl NewSshKeysExtension {
-    fn new(client_id: String) -> Self
-    { Self {client_id} }
 }
 
 // ------------------- HTTP Status Codes -------------------
@@ -99,7 +88,7 @@ enum TmsResponse {
     #[oai(status = 403)]
     Http403(Json<HttpResult>),
     #[oai(status = 500)]
-    Http500(Json<HttpResult>),
+    Http500(Json<HttpResult>)
 }
 
 fn make_http_201(resp: RespNewSshKeys) -> TmsResponse {
@@ -125,15 +114,12 @@ fn make_http_500(msg: String) -> TmsResponse {
 impl NewSshKeysApi {
     #[oai(path = "/tms/pubkeys/creds", method = "post")]
     async fn get_new_ssh_keys(&self, http_req: &Request, req: Json<ReqNewSshKeys>) -> TmsResponse {
-        match RespNewSshKeys::process(http_req, &req).await {
-            Ok(r) => r,
-            Err(e) => {
-                // Assume a server fault if a raw error came through.
-                let msg = "ERROR: ".to_owned() + e.to_string().as_str();
-                error!("{}", msg);
-                make_http_500(msg)
-            }
-        }
+        RespNewSshKeys::process(http_req, &req).await.unwrap_or_else(|e| {
+            // Assume a server fault if a raw error came through.
+            let msg = "WARNING: ".to_owned() + e.to_string().as_str();
+            warn!("{}", msg);
+            make_http_500(msg)
+        })
     }
 }
 
@@ -152,46 +138,59 @@ impl RespNewSshKeys {
             }
     }
 
-    async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse, anyhow::Error> {
-        // Conditional logging depending on log level.
+    async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse> {
+        // Log the request
         tms_utils::debug_request(http_req, req);
 
+        // ========================================================================================
         // -------------------- Extract Headers ----------------------
-        // Get the headers used in this function.
-        let req_ext = match get_header_values(http_req) {
+        // Get the header we need: client_id
+        let client_id = match get_client_id_header(http_req) {
             Ok(h) => h,
-            Err(e) => {
-                return Ok(make_http_400(e.to_string()));
-            }
+            Err(e) => { return Ok(make_http_400(e.to_string())); }
         };
 
-        // -------------------- Authorize ----------------------------
-        // Only the client and admin can query a client record.
+        // -------------------- Check Authorization ----------------------------
+        // Only the client and admin can make this call
         let allowed = [AuthzTypes::ClientOwn, AuthzTypes::TmsAdmin];
         let authz_result = authorize(http_req, &allowed).await;
         if !authz_result.is_authorized() {
-            let msg = format!("ERROR: NOT AUTHORIZED Credential mismatch for client {}.",
-                                      req_ext.client_id);
+            let msg = format!("WARNING: Not authorized to create credential for client. ClientId: {}.",
+                                     client_id);
             error!("{}", msg);
             return Ok(make_http_401(msg));
         }
+        // Check client.
+        if !check_client_enabled(&client_id).await {
+            let msg = format!("WARNING: Client not enabled. ClientId: {}", client_id);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
 
-        // -------------------- MVP Execution ------------------------
-        // Determine if we are running in minimal viable product mode.
+        // Check that tms_identity is enabled
+        if !check_tms_id_enabled(&req.tms_identity).await {
+            let msg = format!("WARNING: TMS Identity not enabled. TmsId: {}", req.tms_identity);
+            error!("{}", msg);
+            return Ok(make_http_400(msg));
+        }
+
+        // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
+        // If running in MVP mode then automatically create delegation records.
         if RUNTIME_CTX.parms.config.enable_mvp {
             // Collect values required for dependency record insertions.
             let mvp_inputs = MVPDependencyParms {
-                client_id: req_ext.client_id.clone(),
-                client_user_id: req.client_user_id.clone(), host: req.host.clone(), 
-                host_account: req.host_account.clone(), 
+                client_id: client_id.clone(),
+                rp_id: req.rp_account.clone(),
+                rp_account: req.rp_account.clone(),
+                host: req.host.clone(),
+                host_account: req.host_account.clone(),
+                tms_identity: req.tms_identity.clone()
             };
-
-            // Insert records into the user_mfa, user_hosts and delegations tables
-            // that the key pair we are about to create depends on.
+            // Insert records into the resource_provider_logins and delegations tables
             match create_pubkey_dependencies(mvp_inputs).await {
                 Ok(inserts) => info!("{} MVP dependency records inserted.", inserts),
                 Err(e) => {
-                    let msg = format!("MVP ERROR: Unable to create MVP dependencies: {}", e); 
+                    let msg = format!("MVP ERROR: Unable to create MVP dependencies: {}", e);
                     error!("{}", msg);
                     return Ok(make_http_500(msg));
                 }
@@ -199,34 +198,31 @@ impl RespNewSshKeys {
         }
 
         // --------------------- Check Expirations -----------------------
-        // The 3 tables whose expiration times need to be checked before we create this key are:
+        // The two tables that must be checked before we create this key are:
+        //   resource_provider_logins - use (tms_identity,rp_id,rp_account) as unique key.
+        //   delegations          - use (tms_identity, client_id, rp_id, rp_account) as unique key.
         //
-        //  user_mfa - use client_user_id to target unique record
-        //  delegations - use client_id and client_user_id to target unique record
-        //  user_hosts - use client_user_id, host and host_account to target unique record
+        // If rp_login record does not exist it means the tms_identity needs to log in to the RP.
+        // If delegation record does not exist or has expired it means the tms_identity needs
+        //   to re-authorize (i.e. re-delegate) their RP account.
         //
-        // Each of the above tables are queried using values that define a unique index on the
-        // target table. This guarantees that either 0 or 1 record will be returned. In the
-        // former case, the pubkey key cannot be created because one of its foreign keys doesn't
-        // exist. In the latter case, we have to check that the retrieved record has not expired.
-        //
-        // This method returns a detailed error message that indicates which table did not contain
-        // the required values and whether the error resulted from a missing or expired record.
-        match check_pubkey_dependencies(&req_ext.client_id, &req.client_user_id, &req.host,
-                                        &req.host_account).await
+        // This method returns either Ok or a message indicating why a new ssh keypair is not
+        //   being created for the tms_identity.
+        match check_rplogin_delegation(&req.tms_identity, &client_id, &req.rp_id, &req.rp_account).await
         {
             Ok(_) => (),
-            Err(e) => {
-                let msg = format!("Missing or expired dependency: {}", e);
-                error!("{}", msg);
-                if msg.contains("INTERNAL ERROR:") {return Ok(make_http_500(msg));}
-                else {return Ok(make_http_403(msg));}
-
-            } 
+            Err(err) => {
+                let err_msg = err.to_string();
+                error!("{}", err_msg);
+                if err_msg.contains("INTERNAL ERROR:") { return Ok(make_http_500(err_msg)); }
+                let msg =
+                    format!("Permission denied. Missing or expired login or delegation. ErrMsg: {}", err_msg);
+                return Ok(make_http_403(msg));
+            }
         }
 
         // ------------------------ Generate Keys ------------------------
-        // Get the caller's key type or use default.
+        // Get the provided key type or use default.
         let key_type_str = match &req.key_type {
             Some(k) => k.as_str(),
             None => "ED25519",
@@ -244,11 +240,9 @@ impl RespNewSshKeys {
         // Generate the new key pair.
         let keyinfo = match keygen::generate_key(key_type) {
             Ok(k) => k,
-            Err(e) => {
-                return Result::Err(anyhow!(e));
-            }
+            Err(e) => { return Err(anyhow!(e)); }
         };
-        
+
         // ------------------------ Update Database --------------------
         // Interpret numeric input.
         let max_uses = if req.num_uses < 0 {i32::MAX} else {req.num_uses};
@@ -264,24 +258,26 @@ impl RespNewSshKeys {
 
         // Create the input record.
         let input_record = PubkeyInput::new(
-            req_ext.client_id.clone(),
-            req.client_user_id.clone(), 
-            req.host.clone(), 
+            client_id.clone(),
+            req.tms_identity.clone(),
+            req.rp_id.clone(),
+            req.rp_account.clone(),
+            req.host.clone(),
             req.host_account.clone(),
-            keyinfo.public_key_fingerprint.clone(), 
-            keyinfo.public_key.clone(), 
-            keyinfo.key_type.clone(), 
-            keyinfo.key_bits, 
-            max_uses, 
-            remaining_uses, 
-            ttl_minutes, 
-            expires_at.clone(), 
-            now.clone(), 
+            keyinfo.public_key_fingerprint.clone(),
+            keyinfo.public_key.clone(),
+            keyinfo.key_type.clone(),
+            keyinfo.key_bits,
+            max_uses,
+            remaining_uses,
+            ttl_minutes,
+            expires_at.clone(),
+            now.clone(),
             now.clone(),
         );
 
         // Insert the new key record.
-        insert_new_pubkey(input_record).await;
+        let count = insert_new_pubkey(input_record).await;
 
         // Success! Zero key bits means a fixed key length.
         Ok(make_http_201(Self::new("0", "success",
@@ -299,12 +295,3 @@ impl RespNewSshKeys {
 // ***************************************************************************
 //                          Private Functions
 // ***************************************************************************
-
-// ---------------------------------------------------------------------------
-// get_header_values:
-// ---------------------------------------------------------------------------
-fn get_header_values(http_req: &Request) -> Result<NewSshKeysExtension> {
-    // Get the required header values.
-    let hdr_client_id = get_client_id_header(http_req)?;
-    Ok(NewSshKeysExtension::new(hdr_client_id))
-}

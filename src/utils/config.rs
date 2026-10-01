@@ -5,6 +5,7 @@ use log::{info, error};
 use serde::Deserialize;
 use std::{env, fs::{self, Permissions}, path::Path};
 use std::collections::HashMap;
+use std::fs::File;
 use toml;
 use fs_mistrust::Mistrust;
 use std::os::unix::fs::PermissionsExt;
@@ -17,7 +18,6 @@ use clap::{Parser};
 // for a cogent explanation on dealing with futures and async programming in Rust.  More 
 // background can be found at https://rust-lang.github.io/async-book/.
 use futures::executor::block_on;
-
 // TMS Utilities
 use crate::utils::{tms_utils, db_init, errors::Errors};
 use super::db_statements::{GET_CLIENT_SECRET, GET_ADMIN_SECRET};
@@ -28,14 +28,17 @@ use super::tms_utils::get_absolute_path;
 // ***************************************************************************
 //                                Constants
 // ***************************************************************************
-// Directory and file locations. Unless otherwise noted, all files and directories
-// are relative to the TMS root directory.
-const DEFAULT_ROOT_DIR     : &str = "~/.tms";
+// Directory and file locations.
+// Unless otherwise noted, all files and directories are relative to the TMS root directory.
+const DEFAULT_ROOT_DIR     : &str = "~/tms";
+const DEFAULT_LOCAL_DIR     : &str = "~/tms_local";
 const MIGRATIONS_DIR       : &str = "/migrations";
 const CONFIG_DIR           : &str = "/config";
 const LOGS_DIR             : &str = "/logs";
 const CERTS_DIR            : &str = "/certs";
-const RESOURCES_DIR        : &str = "./resources"; // relative to currnent dir
+const RESOURCES_SRC_DIR    : &str = "./tms_server/resources_src";
+// Where to write initial setup info
+pub const TMS_SETUP_OUT_FILE: &str = "/../tms_local/tms-setup.out";
 
 const LOG4RS_CONFIG_FILE   : &str = "/log4rs.yml"; // relative to config dir
 const TMS_CONFIG_FILE      : &str = "/tms.toml";   // relative to config dir
@@ -118,28 +121,14 @@ pub struct TmsDirs {
     pub certs_dir: String
 }
 
-// ---------------------------------------------------------------------------
-// TmsDbConfig:
-// ---------------------------------------------------------------------------
-#[derive(Debug, Deserialize)]
-pub struct TmsDbConfig {
-    // pub db_host: String,
-    // pub db_port: u16,
-    // pub db_user: String,
-    // pub db_password: String,
-    pub db_url: String
-}
-
 // ***************************************************************************
 //                               Config Structs
 // ***************************************************************************
 // ---------------------------------------------------------------------------
 // TMS CommandLineArgs:
 // These are combined with values from the config file to determine final settings.
-// During initial setup the config file is not used so arguments need to be set here if needed.
+// During initial set up the config file is not used so arguments need to be set here if needed.
 // Arguments:
-//  -i, --install Must be used during initial execution of tms_server. Creates directories and
-//                initializes the DB
 //  -r, --root-dir <root-dir> Installation directory.
 //  -?, --db-host Database host name. Default is localhost.
 //  -?, --db-port Database port. Default is 5432
@@ -166,15 +155,7 @@ pub struct TmsCmdArgs {
     ///
     ///   2. Otherwise, if set, the value of the environment variable TMS_ROOT_DIR,
     ///
-    ///   3. Otherwise, ~/.tms
-    #[arg(short, long)]
-    pub install: bool,
-    /// Create the DB schema, skip data initialization.
-    ///
-    /// Use when migrating DB from SQLite to Postgres
-    #[arg(short, long)]
-    pub schema_only: bool,
-    /// Display the version and exit
+    ///   3. Otherwise, ~/tms
     #[arg(short, long)]
     pub version: bool,
     /// Specify TMS root install directory.
@@ -229,7 +210,6 @@ pub struct RuntimeCtx {
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub title: String,
     pub http_addr: String,
     pub http_port: u16,
     pub enable_mvp: bool,
@@ -267,7 +247,6 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            title: "TMS Server".to_string(),
             http_addr: DEFAULT_HTTP_ADDR.to_string(),
             http_port: DEFAULT_HTTP_PORT,
             enable_mvp: false,
@@ -300,71 +279,11 @@ pub fn prohibit_root_user() {
     // Get the effective user ID.
     let uid = get_effective_uid();
     if uid == 0 {
-        let msg = 
-            format!("\n***********************************************************************\n\
-                    ERROR: This program should not execute under UID 0 (root). \n\n\
-                    Please restart as a non-privileged user.\n\
-                    ***********************************************************************\n");
-        panic!("{}", msg);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// check_prior_installation:
-// ---------------------------------------------------------------------------
-/* Panic if we are trying to run the server before an installation run. */
-pub fn set_directories_and_check_install() {
-
-    // Check that --schema_only and --install are not specified together
-    if TMS_CMD_ARGS.schema_only && TMS_CMD_ARGS.install {
-        panic!("\n***********************************************************************\n\
-                    ERROR: Option --schema-only may not be used along with --install. \n\
-                  ***********************************************************************\n");
-    }
-    // Construct root_dir path and perform checks
-    let root_dir = get_root_dir();
-    let root_path = Path::new(&root_dir);
-    if root_path.is_file() {
-        // Expected either nothing or a directory, but found a file.
-        let msg = 
-            format!("\n***********************************************************************\n\
-                    ERROR: Detected an existing file at TMS root directory.\n\
-                    ERROR: Expected a directory or nothing at path. Path: {}\n\n\
-                    Please correct the path and try again.\n\
-                    ***********************************************************************\n", root_dir);
-        panic!("{}", msg);
-    }
-    // Construct config_dir path from root_dir path and perform checks
-    let config_dir = format!("{}/config", root_dir);
-    let config_path = Path::new(&config_dir);
-
-    if config_path.is_file() {
-        // Expected either nothing or a directory, but found a file.
         let msg =
-            format!("\n***********************************************************************\n\
-                    ERROR: Detected an existing file at TMS root config directory.\n\
-                    ERROR: Expected a directory or nothing at path. Path: {}\n\n\
-                    Please correct the path and try again.\n\
-                    ***********************************************************************\n", config_dir);
-        panic!("{}", msg);
-    }
-    if !config_path.is_dir() && !TMS_CMD_ARGS.install {
-        // We are not installing and no directory found.
-        let msg = 
-            format!("\n***********************************************************************\n\
-                    ERROR: Expected the TMS root config directory to exist at path. Path: {}. \n\n\
-                    Please run 'tms_server --install' to initialize root directory at the default path \n\
-                    or consult the README file for configuring a non-default root directory location.\n\
-                    ***********************************************************************\n", config_dir);
-        panic!("{}", msg);
-    }
-    if config_path.is_dir() && TMS_CMD_ARGS.install {
-        // We are installing and root config directory already exists.
-        let msg =
-            format!("\n***********************************************************************\n\
-                    ERROR: Cannot install over existing TMS root config directory at {}. \n\n\
-                    Please correct or run tms_server without the --install option.\n\
-                    ***********************************************************************\n", config_dir);
+            "\n***********************************************************************\n\
+            ERROR: This program should not execute under UID 0 (root). \n\n\
+            Please restart as a non-privileged user.\n\
+            ***********************************************************************\n";
         panic!("{}", msg);
     }
 }
@@ -374,9 +293,7 @@ pub fn set_directories_and_check_install() {
 // ---------------------------------------------------------------------------
 /*
  * Setup for TmsDirs.
- * During the initial installation create and populate the directories.
- * During normal startup check the directories.
-
+ * Create and populate directories as needed.
  */
 fn init_tms_dirs() -> TmsDirs {
     // Initialize the mistrust object.
@@ -390,6 +307,10 @@ fn init_tms_dirs() -> TmsDirs {
     let root_dir = get_root_dir();
     println!("Checking root_dir: {}", root_dir);
     check_tms_dir(&root_dir, "root directory", &mistrust);
+
+    let local_dir = get_local_dir();
+    println!("Checking local_dir: {}", local_dir);
+    check_tms_dir(&local_dir, "tms_local directory", &mistrust);
 
     let config_dir = root_dir.clone() + CONFIG_DIR;
     dir_created = check_tms_dir(&config_dir, "config directory", &mistrust);
@@ -407,9 +328,7 @@ fn init_tms_dirs() -> TmsDirs {
     if dir_created {copy_resource_files(&migrations_dir, MIGRATIONS_DIR, &root_dir);}
 
     // Package up and return the directories.
-    TmsDirs {
-        root_dir, migrations_dir, config_dir, logs_dir, certs_dir,
-    }
+    TmsDirs { root_dir, migrations_dir, config_dir, logs_dir, certs_dir }
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +347,7 @@ fn check_tms_dir(dir: &String, msgname: &str, mistrust: &Mistrust) -> bool {
         panic!("The TMS {} path must be absolute: {}", msgname, dir);
     }
     if path.exists() {
+        println!("Path exists. Not creating: {}", path.to_str().unwrap());
         // Make sure the path represents a directory.
         if !path.is_dir() {
             panic!("The TMS {} path must be a directory: {}", msgname, dir);
@@ -442,6 +362,7 @@ fn check_tms_dir(dir: &String, msgname: &str, mistrust: &Mistrust) -> bool {
         // Directory not created.
         false
     } else {
+        println!("Path doest not exist. Creating: {}", path.to_str().unwrap());
         // Create the directory with the correct permissions.
         match mistrust.make_directory(path) {
             Ok(_) => (),
@@ -470,7 +391,7 @@ fn check_tms_dir(dir: &String, msgname: &str, mistrust: &Mistrust) -> bool {
  */
 fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String) {
     // Create the source directory pathname.
-    let source_dir = env::var(ENV_TMS_RESOURCES_DIR).unwrap_or_else(|_| RESOURCES_DIR.to_string()) + dir_suffix;
+    let source_dir = env::var(ENV_TMS_RESOURCES_DIR).unwrap_or_else(|_| RESOURCES_SRC_DIR.to_string()) + dir_suffix;
     let source_dir = get_absolute_path(&source_dir);
     println!("copy_resource_files source_dir: {}", source_dir);
     println!("copy_resource_files target_dir: {}", target_dir);
@@ -481,7 +402,7 @@ fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String)
     let pathbufs = match tms_utils::get_files_in_dir(source_dir.as_str()) {
         Ok(p) => p,
         Err(e) => {
-            panic!("Unable to list files in directy {}: {}", &source_dir, e);
+            panic!("Unable to list files in directory {}: {}", &source_dir, e);
         }
     };
 
@@ -563,7 +484,7 @@ fn copy_resource_files(target_dir: &String, dir_suffix: &str, root_dir: &String)
  * The log4rs.yml and tms.toml files have already been checked and read, so no need to do
  * that here, see init_log() and get_parms().
  * 
- * We panic if either of the pem files are not found or don't have the proper permissions.
+ * We panic if pem files not found or do not have proper permissions.
  */
 fn check_resource_files() {
     // Get the directory in which the pem files reside.
@@ -652,6 +573,22 @@ fn get_root_dir() -> String {
 
     // Canonicalize the path.
     get_absolute_path(&tmp_root_dir)
+}
+
+// ---------------------------------------------------------------------------
+// get_local_dir:
+// ---------------------------------------------------------------------------
+fn get_local_dir() -> String {
+    // Canonicalize the path.
+    get_absolute_path(DEFAULT_LOCAL_DIR)
+}
+
+// ---------------------------------------------------------------------------
+// get_setup_out_file:
+// ---------------------------------------------------------------------------
+pub fn get_setup_out_path() -> String {
+    let root_dir = get_root_dir();
+    format!("{}{}",root_dir, TMS_SETUP_OUT_FILE)
 }
 
 // ***************************************************************************
