@@ -175,6 +175,7 @@
         name = "tms-server-up";
         runtimeInputs = with pkgs; [
           mktemp
+          postgresql
         ];
         text = ''
           command -v sudo >/dev/null 2>&1 || (printf "Need \`sudo\` to run postgres"; exit 1)
