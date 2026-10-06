@@ -22,7 +22,8 @@ CREATE TABLE
         resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id),
         username TEXT NOT NULL,
         created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
-        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc')
+        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        UNIQUE (resource_id, resource_provider_login_id)
     );
 
 ALTER TABLE usernames OWNER TO tms;
