@@ -27,3 +27,7 @@ CREATE TABLE
     );
 
 ALTER TABLE usernames OWNER TO tms;
+
+-- Indicates the URL for the resources endpoint for a given RP.
+ALTER TABLE identity_providers
+ADD COLUMN IF NOT EXISTS resources_services_url TEXT;
