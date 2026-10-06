@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS identity_provider_types
 ALTER TABLE identity_provider_types OWNER TO tms;
 --
 -- Insert hard-coded types
+--
 -- TODO Might be able to create globus and tacc_tapis as part of a seeding step, but dander_mode
 --   should always be created here for migration from TMS 0.3.
 INSERT INTO identity_provider_types (provider_type) VALUES ('globus');
@@ -173,7 +174,7 @@ CREATE TABLE IF NOT EXISTS issued_tokens
 -- ---------------------------------------
 -- ================================================================================================
 -- Rename columns in clients table to better match what TMS portal code is using.
--- NOTE: No columns need to be added to table clients to accommodate TMS portal.
+-- Add column tms_mode
 -- ================================================================================================
 -- Rename column app_name in clients table to name. app_name stands for "application client" but that is not
 -- the term used in many other related documents so it could be confusing. Also, this is what TMS portal uses.
@@ -181,6 +182,8 @@ ALTER TABLE clients RENAME COLUMN app_name TO name;
 -- Rename column client_secret to secret. This is simpler and matches what the portal code is using.
 -- NOTE: Keep column client_id as is because TMS server already has a column 'id' as a SERIAL primary key
 ALTER TABLE clients RENAME COLUMN client_secret TO secret;
+-- Add column tms_mode: unsupported, explicit_trust, implicit_trust
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'unsupported';
 
 -- ---------------------------------------------------------------
 -- user_mfa table (now resource_provider_logins)
@@ -233,7 +236,7 @@ DROP TABLE IF EXISTS user_hosts;
 --    Currently (for MVP) it is essentially forever. Can always drop it later.
 --    Possibly will end up maintaining this by simply removing the delegation based on some policy
 --    rather than having an expiry.
---    
+--
 -- ALTER TABLE delegations DROP COLUMN IF EXISTS expires_at;
 
 -- Notes on the "why" for some of these changes.

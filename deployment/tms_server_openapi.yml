@@ -86,6 +86,8 @@ paths:
         *WARNING* Note that in the current MVP implementation the number of uses and TTL minutes are ignored.
         In a future release of TMS Server, these attributes will be honored.
       operationId: createSShKeypair
+      security:
+        - TmsClientAuth: []
       requestBody:
         required: true
         description: A JSON object providing information about the SSH keypair ot be generated.
@@ -150,6 +152,13 @@ paths:
 # --- Components ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
 components:
+  securitySchemes:
+    TmsClientAuth:
+      type: apiKey
+      description: |
+        Authorization for requests is handled through the use of two headers, X-TMS-CLIENT-ID and X-TMS-CLIENT-SECRET.
+      name: X-TMS-CLIENT-ID
+      in: header
   schemas:
     # -------------------------------------------------------------------------
     # --- Request objects -----------------------------------------------------
