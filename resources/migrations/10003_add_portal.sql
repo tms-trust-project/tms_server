@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS identity_providers
 (
     id                    TEXT              NOT NULL UNIQUE,
     name                  TEXT              NOT NULL,
-    client_id             TEXT              NOT NULL,
-    client_secret         TEXT              NOT NULL,
+    oauth2_client_id      TEXT              NOT NULL,
+    oauth2_client_secret  TEXT              NOT NULL,
     identity_redirect_url TEXT              NOT NULL,
     oauth2_token_url      TEXT              NOT NULL,
     oauth2_jwks_url       TEXT,
@@ -49,7 +49,7 @@ ALTER TABLE identity_providers OWNER TO tms;
 -- Only TACC is running TMS server 0.3 and the RP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
-INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678-1234-taccrp-implictmode',
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
@@ -59,7 +59,7 @@ VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678
 -- Only TACC is running TMS server 0.3 and the IdP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
-INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '12345678-1234-taccidp-implicitmode',
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
@@ -67,7 +67,7 @@ VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '1234567
 --
 -- Create an identity_provider to be used as placeholder to be used when adding columns that are NOT NULL.
 -- This should not be in place permanently, it should get replaced during an upgrade.
-INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_unknown', 'ImplictMode Unkown RP', '12345678-1234-unknown-implicitmode',
         'ImplictModeUnknownZRzpE6DCDvkrM', '', '', 'implicit_mode', false, false);
