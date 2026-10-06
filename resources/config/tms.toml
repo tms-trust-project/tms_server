@@ -41,6 +41,7 @@ enable_mvp = true
 #
 #   allow, disallow, on_approval
 #
+# When enable_mvp is true, then the value of this parameter is always
 # overridden and effectively set to "disallow". 
 #
 # default = "allow"

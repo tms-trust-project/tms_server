@@ -7,7 +7,7 @@ pub const PLACEHOLDER: &str = "${PLACEHOLDER}";
 
 pub const INSERT_IDP: &str = concat!(
 "INSERT INTO identity_providers ",
-  "(id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url, provider_type,",
+  "(id, name, oauth2_client_id, oauth2_client_secret, identity_redirect_url, oauth2_token_url, provider_type,",
   " supports_login, supports_resources, created, updated) ",
   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
 );

@@ -1,4 +1,4 @@
-# TMS Credential Server
+# Trust Manager System (TMS) Credential Server
 
 Trust Manager System (TMS) Credential Server
 

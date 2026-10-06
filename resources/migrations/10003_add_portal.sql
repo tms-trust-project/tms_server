@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS identity_provider_types
 ALTER TABLE identity_provider_types OWNER TO tms;
 --
 -- Insert hard-coded types
+--
 -- TODO Might be able to create globus and tacc_tapis as part of a seeding step, but dander_mode
 --   should always be created here for migration from TMS 0.3.
 INSERT INTO identity_provider_types (provider_type) VALUES ('globus');
@@ -29,8 +30,8 @@ CREATE TABLE IF NOT EXISTS identity_providers
 (
     id                    TEXT              NOT NULL UNIQUE,
     name                  TEXT              NOT NULL,
-    client_id             TEXT              NOT NULL,
-    client_secret         TEXT              NOT NULL,
+    oauth2_client_id      TEXT              NOT NULL,
+    oauth2_client_secret  TEXT              NOT NULL,
     identity_redirect_url TEXT              NOT NULL,
     oauth2_token_url      TEXT              NOT NULL,
     oauth2_jwks_url       TEXT,
@@ -49,7 +50,7 @@ ALTER TABLE identity_providers OWNER TO tms;
 -- Only TACC is running TMS server 0.3 and the RP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
-INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678-1234-taccrp-implictmode',
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
@@ -59,7 +60,7 @@ VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678
 -- Only TACC is running TMS server 0.3 and the IdP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
-INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '12345678-1234-taccidp-implicitmode',
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
@@ -67,7 +68,7 @@ VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '1234567
 --
 -- Create an identity_provider to be used as placeholder to be used when adding columns that are NOT NULL.
 -- This should not be in place permanently, it should get replaced during an upgrade.
-INSERT INTO identity_providers (id, name, client_id, client_secret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_unknown', 'ImplictMode Unkown RP', '12345678-1234-unknown-implicitmode',
         'ImplictModeUnknownZRzpE6DCDvkrM', '', '', 'implicit_mode', false, false);
@@ -173,7 +174,7 @@ CREATE TABLE IF NOT EXISTS issued_tokens
 -- ---------------------------------------
 -- ================================================================================================
 -- Rename columns in clients table to better match what TMS portal code is using.
--- NOTE: No columns need to be added to table clients to accommodate TMS portal.
+-- Add column tms_mode
 -- ================================================================================================
 -- Rename column app_name in clients table to name. app_name stands for "application client" but that is not
 -- the term used in many other related documents so it could be confusing. Also, this is what TMS portal uses.
@@ -181,6 +182,8 @@ ALTER TABLE clients RENAME COLUMN app_name TO name;
 -- Rename column client_secret to secret. This is simpler and matches what the portal code is using.
 -- NOTE: Keep column client_id as is because TMS server already has a column 'id' as a SERIAL primary key
 ALTER TABLE clients RENAME COLUMN client_secret TO secret;
+-- Add column tms_mode: unsupported, explicit_trust, implicit_trust
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'unsupported';
 
 -- ---------------------------------------------------------------
 -- user_mfa table (now resource_provider_logins)
@@ -233,7 +236,7 @@ DROP TABLE IF EXISTS user_hosts;
 --    Currently (for MVP) it is essentially forever. Can always drop it later.
 --    Possibly will end up maintaining this by simply removing the delegation based on some policy
 --    rather than having an expiry.
---    
+--
 -- ALTER TABLE delegations DROP COLUMN IF EXISTS expires_at;
 
 -- Notes on the "why" for some of these changes.
