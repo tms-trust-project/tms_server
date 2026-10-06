@@ -9,7 +9,7 @@ CREATE TABLE
         rp_id TEXT NOT NULL REFERENCES identity_providers (id),
         created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
         updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
-        UNIQUE (rp_id, resource_id)
+        UNIQUE (rp_id, resource_local_id)
     );
 
 ALTER TABLE resources OWNER TO tms;
