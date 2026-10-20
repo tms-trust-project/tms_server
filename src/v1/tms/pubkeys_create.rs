@@ -12,7 +12,7 @@ use crate::utils::db_types::PubkeyInput;
 use crate::utils::db::check_rplogin_delegation;
 use crate::utils::db::insert_new_pubkey;
 use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled, check_tms_id_enabled};
-use crate::utils::mvp::{MVPDependencyParms, create_pubkey_dependencies};
+use crate::utils::implicit_mode::{ImplicitModeDependencyParms, create_pubkey_dependencies};
 use log::{error, info, warn};
 
 use crate::RUNTIME_CTX;
@@ -42,6 +42,7 @@ struct RespNewSshKeys
     result_msg: String,
     private_key: String,
     public_key: String,
+    tms_login_user: String,
     public_key_fingerprint: String,
     key_type: String,
     key_bits: String,
@@ -128,12 +129,13 @@ impl NewSshKeysApi {
 // ***************************************************************************
 impl RespNewSshKeys {
     #[allow(clippy::too_many_arguments)]
-    fn new(result_code: &str, result_msg: &str, private_key: String, public_key: String, 
-           public_key_fingerprint: String, key_type: String, key_bits: String,
-           max_uses: String, remaining_uses: String, expires_at: DateTime<Utc>) -> Self {
+    fn new(result_code: &str, result_msg: &str, private_key: String, public_key: String,
+           tms_login_user: String, public_key_fingerprint: String, key_type: String,
+           key_bits: String, max_uses: String, remaining_uses: String, expires_at: DateTime<Utc>)
+        -> Self {
         Self {result_code: result_code.to_string(), 
               result_msg: result_msg.to_string(), 
-              private_key, public_key, public_key_fingerprint,
+              private_key, public_key, public_key_fingerprint, tms_login_user,
               key_type, key_bits, max_uses, remaining_uses, expires_at,
             }
     }
@@ -175,10 +177,10 @@ impl RespNewSshKeys {
         }
 
         // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
-        // If running in MVP mode then automatically create delegation records.
+        // If running in Implicit Trust mode then automatically create delegation records.
         if RUNTIME_CTX.parms.config.enable_mvp {
             // Collect values required for dependency record insertions.
-            let mvp_inputs = MVPDependencyParms {
+            let implicit_trust_inputs = ImplicitModeDependencyParms {
                 client_id: client_id.clone(),
                 rp_id: req.rp_account.clone(),
                 rp_account: req.rp_account.clone(),
@@ -187,10 +189,10 @@ impl RespNewSshKeys {
                 tms_identity: req.tms_identity.clone()
             };
             // Insert records into the resource_provider_logins and delegations tables
-            match create_pubkey_dependencies(mvp_inputs).await {
-                Ok(inserts) => info!("{} MVP dependency records inserted.", inserts),
+            match create_pubkey_dependencies(implicit_trust_inputs).await {
+                Ok(inserts) => info!("{} ImplicitTrustMode dependency records inserted.", inserts),
                 Err(e) => {
-                    let msg = format!("MVP ERROR: Unable to create MVP dependencies: {}", e);
+                    let msg = format!("ImplicitTrustMode ERROR: Unable to create login and delegation records: {}", e);
                     error!("{}", msg);
                     return Ok(make_http_500(msg));
                 }
@@ -281,14 +283,15 @@ impl RespNewSshKeys {
 
         // Success! Zero key bits means a fixed key length.
         Ok(make_http_201(Self::new("0", "success",
-                    keyinfo.private_key,
-                    keyinfo.public_key,
-                    keyinfo.public_key_fingerprint,
-                    keyinfo.key_type,
-                    keyinfo.key_bits.to_string(),
-                    max_uses.to_string(),
-                    remaining_uses.to_string(),
-                    expires_at,)))
+                keyinfo.private_key,
+                keyinfo.public_key,
+                "testuser2".to_string(), // TODO replace with real from DB
+                keyinfo.public_key_fingerprint,
+                keyinfo.key_type,
+                keyinfo.key_bits.to_string(),
+                max_uses.to_string(),
+                remaining_uses.to_string(),
+                expires_at)))
     }
 }
 

@@ -54,6 +54,9 @@ const DEFAULT_SVR_URL      : &str = "https://localhost:3000/v1";
 pub const TEST_CLIENT : &str = "testclient1";
 pub const TEST_CLIENT_SECRET : &str = "secret1";
 pub const TEST_APP: &str = "testapp1";
+pub const TEST_TAPIS_CLIENT: &str = "tapis-test";
+pub const TEST_TAPIS_CLIENT_SECRET : &str = "tapis-test-secret1";
+pub const TEST_TAPIS_APP: &str = "TapisApp";
 
 // Admin table constants.
 #[allow(dead_code)]

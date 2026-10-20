@@ -12,7 +12,7 @@ use crate::utils::tms_utils;
 // Insert fails on conflict.
 const NOT_STRICT:bool = false;
 
-pub struct MVPDependencyParms
+pub struct ImplicitModeDependencyParms
 {
     pub client_id: String,
     pub tms_identity: String,
@@ -22,15 +22,17 @@ pub struct MVPDependencyParms
     pub host_account: String,
 }
 
-/**
- * The Implicit Trust Mode - Minimal Viable Product (MVP) version of TMS simplifies migration to TMS in
- * existing environments that meet certain requirements. Specifically, MVP supports the following:
- * 
- *  - Keys never expire.
- *  - Note that to satisfy foreign key constraints, records must be created
- *    in the following order: resource_provider_logins, delegations
- *  - Key dependency records are automatically created in these tables:
-      - resource_provider_logins - non-expiring RP_LOGIN set up for user
+/*
+ * The Implicit Trust Mode, formerly known as Minimal Viable Product (MVP) mode, simplifies
+ *   migration to TMS in existing environments that meet certain requirements. Specifically,
+ *   Implicit mode supports the following:
+ *   - Keys never expire.
+ *   - All records to satisfy login and delegation checks are created (this method).
+ *    - To satisfy foreign key constraints, the records must be created in the following order:
+ *      - tms_identity, resource_provider_logins, delegations
+ *  - Records are automatically created in these tables:
+ *    - TODO tms_identities
+ *    - resource_provider_logins - non-expiring RP_LOGIN set up for user
  *    - delegations - non-expiring delegation established between tms_identity and client
  *
  * When the enable_mvp flag is turned on in the configuration file, clients can create keys without
@@ -38,7 +40,7 @@ pub struct MVPDependencyParms
  *   the input to the key create call, eliminating the possibility that missing dependency records
  *   will cause key creation to fail. If a record already exists, it is not overwritten.
  */
-pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64> {
+pub async fn create_pubkey_dependencies(parms: ImplicitModeDependencyParms) -> Result<u64> {
 
     // --------------------- Variables used throughout ---------------------
     let expires_at = tms_utils::get_max_tms_utc();
@@ -65,7 +67,7 @@ pub async fn create_pubkey_dependencies(parms: MVPDependencyParms) -> Result<u64
     let count = insert_rp_login(input_record, NOT_STRICT).await?;
     if count > 0 {
         insert_count += count;
-        info!("MVP: RP_LOGIN created for tms_identity: {} rp_id: {} rp_account: {} last_login: {}.",
+        info!("ImplicitMode: RP_LOGIN created for tms_identity: {} rp_id: {} rp_account: {} last_login: {}.",
               parms.tms_identity, parms.rp_id, parms.rp_account, now);
     }
 

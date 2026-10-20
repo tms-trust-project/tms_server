@@ -9,8 +9,7 @@ use sqlx::Row;
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR,
                               timestamp_utc_to_str, calc_expires_at};
 use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED};
-use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP,
-                           TEST_CLIENT_SECRET, get_setup_out_path};
+use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, get_setup_out_path, TEST_TAPIS_CLIENT, TEST_TAPIS_CLIENT_SECRET, TEST_TAPIS_APP};
 use log::error;
 use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
@@ -24,6 +23,8 @@ const IMPLICIT_MODE_PROVIDER_TYPE: &str = "implicit_mode";
 const TEST_SUPPORTS_FALSE: bool = false;
 const TEST_IDP_ID: &str = "test_fake_idp";
 const TEST_IDP_NAME: &str = "Fake Test IdP";
+const TEST_TAPIS_IDP_ID: &str = "test_fake_tapis_idp";
+const TEST_TAPIS_IDP_NAME: &str = "Fake Test Tapis IdP";
 const TEST_IDP_OAUTH2_CLIENT_ID: &str = "12345678-1234-1234-1234-test-idp";
 const TEST_IDP_OAUTH2_CLIENT_SECRET: &str = "FakeTestIdP94adfduG89JRazpE6DCDvkrM";
 const TEST_IDP_REDIRECT_URL: &str = "https://auth.fake.test.org/v2/oauth2/authorize";
@@ -119,11 +120,11 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
 
     // Check for existing record, create only if needed
     // Note: We check for any pubkey, not for a specific pubkey.
-    let skip_create: bool = sqlx::query_scalar(SEL_PUBKEY_EXISTS)
+    let pubkey_exists: bool = sqlx::query_scalar(SEL_PUBKEY_EXISTS)
         .bind(test_host_acct.clone())
         .bind(test_host.clone())
         .fetch_one(&mut *tx).await?;
-    if skip_create { return Ok(0) }
+    if pubkey_exists { return Ok(0) }
 
     // Generate the new key pair.
     let keyinfo = match keygen::generate_key(KEY_TYPE) {
@@ -226,10 +227,10 @@ pub async fn create_default_admin() -> Result<u64> {
     // Get a connection to the db and start a transaction.
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // If default admin already exists then we are done
-    let skip_create: bool = sqlx::query_scalar(SEL_ADMIN_EXISTS)
+    let admin_exists: bool = sqlx::query_scalar(SEL_ADMIN_EXISTS)
         .bind(DEFAULT_ADMIN_ID)
         .fetch_one(&mut *tx).await?;
-    if skip_create { return Ok(0) }
+    if admin_exists { return Ok(0) }
 
     // Get the timestamp string.
     let now = timestamp_utc();
@@ -300,97 +301,153 @@ fn print_write_admin_info(dft_key_str: &String) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// create_test_client:
+// create_test_clients:
 // ---------------------------------------------------------------------------
-/** This function either experiences an error or returns true (false is never returned). */
-pub async fn create_test_client() -> Result<u64> {
+/*
+ * Create test clients as needed. Idempotent.
+ * This function either experiences an error or returns true (false is never returned).
+ */
+pub async fn create_test_clients() -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    // If client already exists then we are done
-    let skip_create: bool = sqlx::query_scalar(SEL_CLIENT_EXISTS)
-        .bind(TEST_CLIENT)
-        .fetch_one(&mut *tx).await?;
-    if skip_create {return Ok(0)}
-
-    let test_client_secret_hash: String = hash_hex_secret(&TEST_CLIENT_SECRET.to_string());
+    let mut inserts_total = 0;
     let now = timestamp_utc();
-    // Create the client
-    // Create the input record. Note we save the hash of the hex secret, but never the secret.
-    let client_input = ClientInput::new(
-        TEST_APP.to_string(),
-        TEST_CLIENT.to_string(),
-        test_client_secret_hash,
-        DB_TRUE,
-        now.clone(),
-        now.clone(),
-    );
-    let inserts = insert_new_client(client_input).await?;
-    Ok(inserts)
+
+    // Client for basic testing
+    let client_exists: bool = sqlx::query_scalar(SEL_CLIENT_EXISTS).bind(TEST_CLIENT).fetch_one(&mut *tx).await?;
+    if !client_exists {
+        let test_client_secret_hash: String = hash_hex_secret(&TEST_CLIENT_SECRET.to_string());
+        // Create the client
+        // Create the input record. Note we save the hash of the hex secret, but never the secret.
+        let client_input = ClientInput::new(
+            TEST_APP.to_string(),
+            TEST_CLIENT.to_string(),
+            test_client_secret_hash,
+            DB_TRUE,
+            now.clone(),
+            now.clone(),
+        );
+        let inserts = insert_new_client(client_input).await?;
+        inserts_total = inserts_total + inserts;
+    }
+
+    // Client for Tapis testing
+    let client_exists: bool = sqlx::query_scalar(SEL_CLIENT_EXISTS).bind(TEST_TAPIS_CLIENT).fetch_one(&mut *tx).await?;
+    if !client_exists {
+        let test_client_secret_hash: String = hash_hex_secret(&TEST_TAPIS_CLIENT_SECRET.to_string());
+        let client_input = ClientInput::new(
+            TEST_TAPIS_APP.to_string(),
+            TEST_TAPIS_CLIENT.to_string(),
+            test_client_secret_hash,
+            DB_TRUE,
+            now.clone(),
+            now.clone(),
+        );
+        let inserts = insert_new_client(client_input).await?;
+        inserts_total = inserts_total + inserts;
+    }
+
+    Ok(inserts_total)
 }
 
 // ---------------------------------------------------------------------------
-// create_test_idp:
+// create_test_idps:
 // ---------------------------------------------------------------------------
-/** This function either experiences an error or returns true (false is never returned). */
-pub async fn create_test_idp() -> Result<u64> {
+/*
+ * Create test identity providers. Idempotent.
+ * This function either experiences an error or returns true (false is never returned).
+ */
+pub async fn create_test_idps() -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    // If client already exists then we are done
-    let skip_create: bool = sqlx::query_scalar(SEL_IDP_EXISTS)
-        .bind(TEST_IDP_ID)
-        .fetch_one(&mut *tx).await?;
-    if skip_create {return Ok(0)}
-
-    let test_idp_oauth2_client_secret_hash: String = hash_hex_secret(&TEST_IDP_OAUTH2_CLIENT_SECRET.to_string());
+    let mut inserts_total = 0;
     let now = timestamp_utc();
-    // Create the IdP
-    // Create the input record. Note we save the hash of the hex secret, but never the secret.
-    let idp_input = IdPInput::new(
-        TEST_IDP_ID.to_string(),
-        TEST_IDP_NAME.to_string(),
-        TEST_IDP_OAUTH2_CLIENT_ID.to_string(),
-        test_idp_oauth2_client_secret_hash,
-        TEST_IDP_REDIRECT_URL.to_string(),
-        TEST_IDP_TOKEN_URL.to_string(),
-        IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
-        TEST_SUPPORTS_FALSE,
-        TEST_SUPPORTS_FALSE,
-        now.clone(),
-        now.clone()
-    );
-    let inserts = insert_new_idp(idp_input).await?;
-    Ok(inserts)
+
+    // IdP for basic testing
+    let idp_exists: bool = sqlx::query_scalar(SEL_IDP_EXISTS).bind(TEST_IDP_ID).fetch_one(&mut *tx).await?;
+    if !idp_exists {
+        let test_idp_oauth2_client_secret_hash: String = hash_hex_secret(&TEST_IDP_OAUTH2_CLIENT_SECRET.to_string());
+        // Create the IdP
+        // Create the input record. Note we save the hash of the hex secret, but never the secret.
+        let idp_input = IdPInput::new(
+            TEST_IDP_ID.to_string(),
+            TEST_IDP_NAME.to_string(),
+            TEST_IDP_OAUTH2_CLIENT_ID.to_string(),
+            test_idp_oauth2_client_secret_hash,
+            TEST_IDP_REDIRECT_URL.to_string(),
+            TEST_IDP_TOKEN_URL.to_string(),
+            IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
+            TEST_SUPPORTS_FALSE,
+            TEST_SUPPORTS_FALSE,
+            now.clone(),
+            now.clone()
+        );
+        let inserts = insert_new_idp(idp_input).await?;
+        inserts_total = inserts_total + inserts;
+    }
+
+    // IdP for Tapis testing
+    let idp_exists: bool = sqlx::query_scalar(SEL_IDP_EXISTS).bind(TEST_TAPIS_IDP_ID).fetch_one(&mut *tx).await?;
+    if !idp_exists {
+        let test_idp_oauth2_client_secret_hash: String = hash_hex_secret(&TEST_IDP_OAUTH2_CLIENT_SECRET.to_string());
+        // Create the IdP
+        // Create the input record. Note we save the hash of the hex secret, but never the secret.
+        let idp_input = IdPInput::new(
+            TEST_TAPIS_IDP_ID.to_string(),
+            TEST_TAPIS_IDP_NAME.to_string(),
+            TEST_IDP_OAUTH2_CLIENT_ID.to_string(),
+            test_idp_oauth2_client_secret_hash,
+            TEST_IDP_REDIRECT_URL.to_string(),
+            TEST_IDP_TOKEN_URL.to_string(),
+            IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
+            TEST_SUPPORTS_FALSE,
+            TEST_SUPPORTS_FALSE,
+            now.clone(),
+            now.clone()
+        );
+        let inserts = insert_new_idp(idp_input).await?;
+        inserts_total = inserts_total + inserts;
+    }
+
+    Ok(inserts_total)
 }
 
 // ---------------------------------------------------------------------------
-// create_test_idp:
+// create_test_rps:
 // ---------------------------------------------------------------------------
-/** This function either experiences an error or returns true (false is never returned). */
-pub async fn create_test_rp() -> Result<u64> {
+/*
+ * Create test resource providers. Idempotent.
+ * This function either experiences an error or returns true (false is never returned).
+ */
+pub async fn create_test_rps() -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
+    let mut inserts_total = 0;
+    let now = timestamp_utc();
+
     // If client already exists then we are done
-    let skip_create: bool = sqlx::query_scalar(SEL_IDP_EXISTS)
+    let idp_exists: bool = sqlx::query_scalar(SEL_IDP_EXISTS)
         .bind(TEST_RP_ID)
         .fetch_one(&mut *tx).await?;
-    if skip_create {return Ok(0)}
+    if !idp_exists {
+        let test_rp_oauth2_client_secret_hash: String = hash_hex_secret(&TEST_RP_OAUTH2_CLIENT_SECRET.to_string());
+        // Create the RP
+        // Create the input record. Note we save the hash of the hex secret, but never the secret.
+        let idp_input = IdPInput::new(
+            TEST_RP_ID.to_string(),
+            TEST_RP_NAME.to_string(),
+            TEST_RP_OAUTH2_CLIENT_ID.to_string(),
+            test_rp_oauth2_client_secret_hash,
+            TEST_RP_REDIRECT_URL.to_string(),
+            TEST_RP_TOKEN_URL.to_string(),
+            IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
+            TEST_SUPPORTS_FALSE,
+            TEST_SUPPORTS_FALSE,
+            now.clone(),
+            now.clone()
+        );
+        let inserts = insert_new_idp(idp_input).await?;
+        inserts_total = inserts_total + inserts;
+    }
 
-    let test_rp_oauth2_client_secret_hash: String = hash_hex_secret(&TEST_RP_OAUTH2_CLIENT_SECRET.to_string());
-    let now = timestamp_utc();
-    // Create the RP
-    // Create the input record. Note we save the hash of the hex secret, but never the secret.
-    let idp_input = IdPInput::new(
-        TEST_RP_ID.to_string(),
-        TEST_RP_NAME.to_string(),
-        TEST_RP_OAUTH2_CLIENT_ID.to_string(),
-        test_rp_oauth2_client_secret_hash,
-        TEST_RP_REDIRECT_URL.to_string(),
-        TEST_RP_TOKEN_URL.to_string(),
-        IMPLICIT_MODE_PROVIDER_TYPE.to_string(),
-        TEST_SUPPORTS_FALSE,
-        TEST_SUPPORTS_FALSE,
-        now.clone(),
-        now.clone()
-    );
-    let inserts = insert_new_idp(idp_input).await?;
-    Ok(inserts)
+    Ok(inserts_total)
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -420,13 +477,13 @@ pub async fn create_test_data() -> Result<u64> {
 
         // Check for existing record. If found then continue;
         // Note: checking for a delegation record is enough since the delegation records reference the rp_login record as a foreign key.
-        let skip_create: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
+        let delegation_exists: bool = sqlx::query_scalar(SEL_DELEGATION_EXISTS)
             .bind(test_tms_identity.clone())
             .bind(TEST_CLIENT)
             .bind(TEST_RP_ID)
             .bind(test_rp_account.clone())
             .fetch_one(&mut *tx).await?;
-        if skip_create {continue};
+        if delegation_exists {continue};
 
         // First create a TMS identity in table tms_identities
         info!("Creating TMS identity record for TMS user: {}", test_tms_identity.clone());

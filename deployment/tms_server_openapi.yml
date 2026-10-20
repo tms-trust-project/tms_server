@@ -2,7 +2,8 @@ openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) server provides for management of credentials by application clients.
+    The Trust Manager System (TMS) credential server provides for management of credentials request by
+    application clients.
   version: '0.4.0'
   termsOfService: "https://tapis-project.org"
   contact:
@@ -261,6 +262,8 @@ components:
         private_key:
           type: string
         public_key:
+          type: string
+        tms_login_user:
           type: string
         public_key_fingerprint:
           type: string
