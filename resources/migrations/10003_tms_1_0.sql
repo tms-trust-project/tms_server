@@ -14,7 +14,7 @@ ALTER TABLE identity_provider_types OWNER TO tms;
 --
 -- Insert hard-coded types
 --
--- TODO Might be able to create globus and tacc_tapis as part of a seeding step, but danger_mode
+-- TODO Might be able to create globus and tacc_tapis as part of a seeding step, but implicit_mode
 --   should always be created here for migration from TMS 0.3.
 INSERT INTO identity_provider_types (provider_type) VALUES ('globus');
 INSERT INTO identity_provider_types (provider_type) VALUES ('tacc_tapis');
@@ -185,6 +185,9 @@ ALTER TABLE clients RENAME COLUMN client_secret TO secret;
 -- Add column tms_mode: explicit_trust, implicit_trust
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'explicit_trust';
 
+-- Add column for rp reference to be used for the case of implicit_mode.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS rp_id TEXT REFERENCES identity_providers(id);
+
 -- ---------------------------------------------------------------
 -- user_mfa table (now resource_provider_logins)
 -- ---------------------------------------------------------------
@@ -210,6 +213,13 @@ ALTER TABLE resource_provider_logins ADD COLUMN IF NOT EXISTS last_login TIMESTA
 
 ALTER TABLE resource_provider_logins ADD CONSTRAINT identity_id_account_key UNIQUE (tms_identity, rp_id, rp_account);
 ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_rp_id FOREIGN KEY (rp_id) REFERENCES identity_providers(id);
+-- Save the access and refresh tokens from logging in to a resource provider.
+-- They will be used for further interactions with the RP service.
+ALTER TABLE resource_provider_logins
+    ADD COLUMN IF NOT EXISTS rp_access_token TEXT;
+
+ALTER TABLE resource_provider_logins
+    ADD COLUMN IF NOT EXISTS rp_refresh_token TEXT;
 
 -- ------------------------------------------------------------------------------------------------
 -- user_hosts table
@@ -253,7 +263,7 @@ ALTER TABLE delegations DROP CONSTRAINT IF EXISTS delegations_client_user_id_fke
 ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
     REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
 -- TODO after above ADD COLUMN, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
---      e.g., if my TACC id is jaydoe, should we update it to be 'jaydoe_ImplictModeRP' or similar?
+--      e.g., if my TACC id is someuser, should we update it to be 'someuser_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note below under pubkeys table
 ALTER TABLE delegations RENAME COLUMN client_user_id TO rp_account;
@@ -272,7 +282,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_cltid_rpid_rpacct_idx ON del
 
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
 -- TODO after above rename, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
---      e.g., if my TACC id is jaydoe, should we update it to be 'jaydoe_ImplictModeRP' or similar?
+--      e.g., if my TACC id is someuser, should we update it to be 'someuser_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note above under delegations table.
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
@@ -302,3 +312,57 @@ ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
 -- TODO Now that all columns are added for existing MVP legacy "implicit mode" records created for TMS 0.3 and earlier,
 --  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
 --    ????add TMS identities for every record in the user_mfa and delegations tables.
+
+
+-- Resources available in a Resource Provider.
+CREATE TABLE
+    IF NOT EXISTS resources (
+        id SERIAL PRIMARY KEY,
+        resource_local_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        description TEXT,
+        rp_id TEXT NOT NULL REFERENCES identity_providers (id),
+        created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        UNIQUE (rp_id, resource_local_id)
+    );
+
+ALTER TABLE resources OWNER TO tms;
+
+-- ---------------------------------------
+-- resource_user_logins table
+-- ---------------------------------------
+-- This table establishes the host login user in a resource for a RP identity.
+CREATE TABLE
+    IF NOT EXISTS resource_user_logins (
+        id SERIAL PRIMARY KEY,
+        resource_id INTEGER REFERENCES resources (id),
+        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id),
+        host_login_user TEXT NOT NULL,
+        created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        UNIQUE (resource_id, resource_provider_login_id)
+    );
+
+ALTER TABLE resource_user_logins OWNER TO tms;
+
+-- ---------------------------------------
+-- client_implicit_mode_allowed_resources table
+-- ---------------------------------------
+-- This table establishes the set of resources allowed for a tms app client which uses implicit_mode
+CREATE TABLE
+    IF NOT EXISTS  (client_implicit_mode_allowed_resources)
+        id SERIAL PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES clients (id),
+        resource_id INTEGER REFERENCES resources (id),
+        created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+        UNIQUE (client_id, resource_id)
+    );
+
+ALTER TABLE client_implicit_mode_allowed_resources OWNER TO tms;
+
+-- Indicates the URL for the resources endpoint for a given RP.
+ALTER TABLE identity_providers
+ADD COLUMN IF NOT EXISTS resources_services_url TEXT;
