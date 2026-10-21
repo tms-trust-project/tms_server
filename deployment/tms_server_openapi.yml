@@ -171,7 +171,6 @@ components:
         - rp_id
         - rp_account
         - host
-        - host_account
         - num_uses
         - ttl_minutes
       properties:
@@ -187,9 +186,6 @@ components:
         host:
           type: string
           description: FQDN for the host where the user has an account.
-        host_account:
-          type: string
-          description: Username of the host account.
         num_uses:
           type: integer
           format: int32

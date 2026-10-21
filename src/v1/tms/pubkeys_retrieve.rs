@@ -252,7 +252,7 @@ async fn get_full_pubkey_result(req: &ReqPublicKey) -> Result<Pubkey> {
                            row.get(4), row.get(5), row.get(6), row.get(7),
                            row.get(8), row.get(9), row.get(10), row.get(11),
                            row.get(12), row.get(13), row.get(14), row.get(15),
-                           row.get(16), row.get(17)))
+                           row.get(16)))
         },
         None => {Err(anyhow!("NOT_FOUND"))},
     }

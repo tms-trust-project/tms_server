@@ -28,10 +28,10 @@ pub const INSERT_CLIENT: &str = concat!(
 
 pub const IS_CLIENT_ENABLED: &str = "SELECT enabled FROM clients where client_id = $1";
 
-// pub const GET_CLIENT: &str = concat!(
-//     "SELECT id, name, client_id, secret, enabled, created, updated ",
-//     "FROM clients WHERE client_id = $1",
-// );
+pub const GET_CLIENT: &str = concat!(
+    "SELECT id, name, client_id, secret, rp_id, tms_mode, enabled, created, updated ",
+    "FROM clients WHERE client_id = $1",
+);
 
 pub const SEL_CLIENT_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM clients WHERE client_id = $1)";
 
@@ -110,18 +110,13 @@ pub const INSERT_PUBKEYS_NOT_STRICT: &str = concat!(
 "ON CONFLICT DO NOTHING"
 );
 
-// pub const SELECT_PUBKEY: &str = concat!(
-//     "SELECT public_key, remaining_uses, expires_at FROM pubkeys ",
-//     "WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3",
-// );
-//
-pub const SEL_PUBKEY_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM pubkeys WHERE host_account = $1 AND host = $2)";
+pub const SEL_PUBKEY_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM pubkeys WHERE host = $1 AND host_login_user = $2)";
 
 pub const GET_PUBKEY: &str = concat!(
-    "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
-      "public_key_fingerprint, public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
+    "SELECT id, client_id, tms_identity, rp_id, rp_account, host, public_key_fingerprint, ",
+      "public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated ",
-    "FROM pubkeys WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3"
+    "FROM pubkeys WHERE host_login_user = $1 AND host = $2 AND public_key_fingerprint = $3"
 );
 
 pub const DELETE_PUBKEY: &str = concat!(
@@ -139,6 +134,10 @@ pub const INSERT_ADMIN: &str = concat!(
 // Conforms to the signature required for secret retrieval queries as defined by 
 // get_authz_secret() in authz.rs.
 pub const GET_ADMIN_SECRET: &str = "SELECT admin_secret FROM admins WHERE admin_user = $1";
+
+// ==================== resource_host_acocunts table =========================
+pub const GET_HOST_LOGIN_USER: &str =
+    "SELECT host_login_user FROM resource_host_accounts WHERE rp_id = $1 AND rp_account = $2";
 
 // // ========================= hosts table ===========================
 // pub const INSERT_HOSTS: &str = "INSERT INTO hosts (host, addr, created, updated) VALUES ($1, $2, $3, $4)";

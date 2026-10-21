@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use strum::AsRefStr;
+use strum_macros::EnumString;
 use anyhow::{Result, anyhow};
 use log::{info, error};
 use serde::Deserialize;
@@ -106,6 +108,13 @@ lazy_static! {
 lazy_static! {
     pub static ref AUTHZ_ARGS: AuthzArgs = init_authz_args();
 }
+
+// ***************************************************************************
+//                                Enums
+// ***************************************************************************
+#[derive(Debug, PartialEq, EnumString, AsRefStr)]
+#[strum(serialize_all = "PascalCase", ascii_case_insensitive)] // Make conversions case-insensitive
+pub enum TmsMode { ExplicitTrust, ImplicitTrust }
 
 // ***************************************************************************
 //                             Directory Structs

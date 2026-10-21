@@ -9,9 +9,8 @@ use crate::utils::authz::{authorize, AuthzTypes, get_client_id_header};
 use crate::utils::errors::HttpResult;
 use crate::utils::keygen::{self, KeyType};
 use crate::utils::db_types::PubkeyInput;
-use crate::utils::db::check_rplogin_delegation;
-use crate::utils::db::insert_new_pubkey;
-use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_client_enabled, check_tms_id_enabled};
+use crate::utils::db::{insert_new_pubkey, check_rplogin_delegation, get_client_result, get_host_login_user_result};
+use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_tms_id_enabled};
 use crate::utils::implicit_mode::{ImplicitModeDependencyParms, create_pubkey_dependencies};
 use log::{error, info, warn};
 
@@ -29,7 +28,6 @@ pub struct ReqNewSshKeys
     rp_id: String,
     rp_account: String,
     host: String,
-    host_account: String,
     num_uses: i32,     // negative means i32::MAX
     ttl_minutes: i32,  // negative means i32::MAX
     key_type: Option<String>,  // RSA, ECDSA, ED25519, DEFAULT (=ED25519)
@@ -63,8 +61,6 @@ impl RequestDebug for ReqNewSshKeys {
         s.push_str(&self.rp_account);
         s.push_str("\n    host: ");
         s.push_str(&self.host);
-        s.push_str("\n    host_account: ");
-        s.push_str(&self.host_account);
         s.push_str("\n    num_uses: ");
         s.push_str(&self.num_uses.to_string());
         s.push_str("\n    ttl_minutes: ");
@@ -162,31 +158,46 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_401(msg));
         }
-        // Check client.
-        if !check_client_enabled(&client_id).await {
-            let msg = format!("WARNING: Client not enabled. ClientId: {}", client_id);
+        // Get the client record. We will need the tms_mode and enabled flag
+        let client = match get_client_result(&client_id).await {
+            Ok(c) => c,
+            Err(e) => {
+                let msg = format!("Unable to fetch client. ClientId: {} TmsUserId: {} Error: {}",
+                                  client_id, req.tms_identity, e.to_string());
+                return Ok(make_http_400(msg));
+            }
+        };
+
+        // Check that client is enabled
+        if !client.enabled {
+            let msg = format!("WARNING: Client not enabled. ClientId: {} TmsUserId: {}", client_id, req.tms_identity);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
 
         // Check that tms_identity is enabled
         if !check_tms_id_enabled(&req.tms_identity).await {
-            let msg = format!("WARNING: TMS Identity not enabled. TmsId: {}", req.tms_identity);
+            let msg = format!("WARNING: TMS Identity not enabled. ClientId: {} TmsId: {}", client_id, req.tms_identity);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
 
         // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
         // If running in Implicit Trust mode then automatically create delegation records.
-        if RUNTIME_CTX.parms.config.enable_mvp {
+        // TODO catch-22 problem. We need host_login_user in order to create records, but currently
+        //       we look up host_login_user after we have checked delegation records. How to figure out host_login_user?
+        //       From tms_identity? E.g., someuser@tacc.utexas.edu becomes someuser for implicit trust mode?
+        let host_login_user = "testuser2".to_string(); // TODO
+        if RUNTIME_CTX.parms.config.enable_mvp && client.tms_mode == "implicit_trust" {
+            //
             // Collect values required for dependency record insertions.
             let implicit_trust_inputs = ImplicitModeDependencyParms {
                 client_id: client_id.clone(),
+                tms_identity: req.tms_identity.clone(),
                 rp_id: req.rp_account.clone(),
                 rp_account: req.rp_account.clone(),
                 host: req.host.clone(),
-                host_account: req.host_account.clone(),
-                tms_identity: req.tms_identity.clone()
+                host_login_user
             };
             // Insert records into the resource_provider_logins and delegations tables
             match create_pubkey_dependencies(implicit_trust_inputs).await {
@@ -246,7 +257,20 @@ impl RespNewSshKeys {
         };
 
         // TODO: Look up the host_login_user associated with the resource
-        let host_login_user = "testuser2".to_string();
+        // TODO/TBD: looks like we can just use existing host_account. Remove all recent host_login_user updates?
+        //           need to think about if this works when migrating existing records.
+        //           remove host_account from incoming request body for createKeypair endpoint? Are there any cases
+        //             where it is needed in the request body?
+//        let host_login_user = db.//"testuser2".to_string();
+        let host_login_user = match get_host_login_user_result(&req.rp_id, &req.rp_account).await {
+            Ok(hlu) => hlu,
+            Err(e) => {
+                let msg =
+                    format!("Unable to fetch host_login_user. ClientId: {} TmsUserId: {} RpId: {} RpAcct: {} Error: {}.",
+                             client_id, req.tms_identity, req.rp_id, req.rp_account, e.to_string());
+                return Ok(make_http_400(msg));
+            }
+        };
 
 
         // ------------------------ Update Database --------------------
@@ -269,7 +293,6 @@ impl RespNewSshKeys {
             req.rp_id.clone(),
             req.rp_account.clone(),
             req.host.clone(),
-            req.host_account.clone(),
             keyinfo.public_key_fingerprint.clone(),
             keyinfo.public_key.clone(),
             host_login_user.clone(),

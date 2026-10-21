@@ -19,7 +19,7 @@ pub struct ImplicitModeDependencyParms
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
-    pub host_account: String,
+    pub host_login_user: String,
 }
 
 /*

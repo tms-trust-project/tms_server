@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS issued_tokens
 -- ---------------------------------------
 -- ================================================================================================
 -- Rename columns in clients table to better match what TMS portal code is using.
--- Add column tms_mode
+-- Add columns tms_mode, rp_id
 -- ================================================================================================
 -- Rename column app_name in clients table to name. app_name stands for "application client" but that is not
 -- the term used in many other related documents so it could be confusing. Also, this is what TMS portal uses.
@@ -185,7 +185,7 @@ ALTER TABLE clients RENAME COLUMN client_secret TO secret;
 -- Add column tms_mode: explicit_trust, implicit_trust
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'explicit_trust';
 
--- Add column for rp reference to be used for the case of implicit_mode.
+-- Add column for rp reference to be used for the case of implicit_trust.
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS rp_id TEXT REFERENCES identity_providers(id);
 
 -- ---------------------------------------------------------------
@@ -274,11 +274,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_cltid_rpid_rpacct_idx ON del
 -- ---------------------------------------
 -- pubkeys table
 -- ---------------------------------------
+-- Note on authz for CRUD calls: we must already trust the TMS app client so OK to allow the client to provide these.
 -- Notes on the "why" for some of these changes.
---   What is needed to authorize CRUD calls for this table?
---     - since we must already trust the TMS client (i.e. Tapis client) we can allow the client to provide these.
---     create keypair - will need tms_identity, rp_id and rp_login so we can check the delegation record.
---     get pubkey - just need pubkey_fingerprint
+--   create keypair - will need tms_identity, rp_id and rp_login so we can check the delegation record.
+--                  - also will have host_login_user to record the host account provided by the RP
+--   get pubkey - just need pubkey_fingerprint
 
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
 -- TODO after above rename, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
@@ -289,10 +289,14 @@ ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 
     REFERENCES tms_identities(tms_identity);
 -- For the legacy MVP records, we can use the implicit mode TACC RP here.
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_tacc_rp' REFERENCES identity_providers(id);
+-- Rename column host_account to host_login_user. We are removing host_account from pubkeys create request.
+-- We will look up host_login_user (as provided by RP) at the time of key-pair creation.
+ALTER TABLE pubkeys RENAME COLUMN host_account TO host_login_user;
 
 -- Fix up constraints. After alterations above there are problems
 --   After renaming we end up with pubkeys_client_user_id_fkey as FOREIGN KEY (rp_account) REFERENCES resource_provider_logins(tms_identity)
 ALTER TABLE pubkeys DROP CONSTRAINT IF EXISTS pubkeys_client_user_id_fkey;
+
 -- ---------------------------------------
 -- reservations table
 -- ---------------------------------------
@@ -313,7 +317,6 @@ ALTER TABLE resource_provider_logins ADD CONSTRAINT fk_tms_identity
 --  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
 --    ????add TMS identities for every record in the user_mfa and delegations tables.
 
-
 -- Resources available in a Resource Provider.
 CREATE TABLE
     IF NOT EXISTS resources (
@@ -331,21 +334,27 @@ CREATE TABLE
 ALTER TABLE resources OWNER TO tms;
 
 -- ---------------------------------------
--- resource_user_logins table
+-- resource_host_accounts table
 -- ---------------------------------------
 -- This table establishes the host login user in a resource for a RP identity.
 CREATE TABLE
-    IF NOT EXISTS resource_user_logins (
+    IF NOT EXISTS resource_host_accounts (
         id SERIAL PRIMARY KEY,
-        resource_id INTEGER REFERENCES resources (id),
-        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id),
+    -- TODO/TBD: I'm thinking reference to resource_provider_logins does not make sense. What if "user" has never logged into RP?
+    --           And maybe reference to resources also does not make sense? for similar reason? Needs more thought.
+    --           or maybe by the time we are do a CREATE for this table the other two records must exist?
+    --           But de-normalizing by using rp_id and rp_account would probably help a human troubleshoot. Have both?
+    --           Plus, when we are looking up host_login_user when we are creating a key-pair (pubkeys_create.rs) what we
+    --               will have is rp_id and rp_account.
+        resource_id INTEGER REFERENCES resources (id), -- TODO rp_id
+        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id), -- TODO rp_account
         host_login_user TEXT NOT NULL,
         created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
         updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
         UNIQUE (resource_id, resource_provider_login_id)
     );
 
-ALTER TABLE resource_user_logins OWNER TO tms;
+ALTER TABLE resource_host_accounts OWNER TO tms;
 
 -- ---------------------------------------
 -- client_implicit_mode_allowed_resources table
