@@ -1,8 +1,6 @@
 // This file contains all SQL statements issued by TMS.
 #![forbid(unsafe_code)]
 
-pub const PLACEHOLDER: &str = "${PLACEHOLDER}";
-
 // ========================= identity_providers table =========================
 
 pub const INSERT_IDP: &str = concat!(
@@ -30,18 +28,18 @@ pub const INSERT_CLIENT: &str = concat!(
 
 pub const IS_CLIENT_ENABLED: &str = "SELECT enabled FROM clients where client_id = $1";
 
-pub const GET_CLIENT: &str = concat!(
-    "SELECT id, name, client_id, secret, enabled, created, updated ",
-    "FROM clients WHERE client_id = $1",
-);
+// pub const GET_CLIENT: &str = concat!(
+//     "SELECT id, name, client_id, secret, enabled, created, updated ",
+//     "FROM clients WHERE client_id = $1",
+// );
 
 pub const SEL_CLIENT_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM clients WHERE client_id = $1)";
 
-// Secret elided.
-pub const LIST_CLIENTS_TEMPLATE: &str = concat!(
-    "SELECT id, name, client_id, enabled, created, updated ",
-    "FROM clients ${PLACEHOLDER} ORDER BY client_id",
-);
+// // Secret elided.
+// pub const LIST_CLIENTS_TEMPLATE: &str = concat!(
+//     "SELECT id, name, client_id, enabled, created, updated ",
+//     "FROM clients ${PLACEHOLDER} ORDER BY client_id",
+// );
 
 // Conforms to the signature required for secret retrieval queries as defined by 
 // get_authz_secret() in authz.rs.
@@ -66,9 +64,9 @@ pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
     "FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
 
-pub const GET_RP_LOGIN_EXISTS: &str = concat!(
-    "SELECT 1 FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
-);
+// pub const GET_RP_LOGIN_EXISTS: &str = concat!(
+//     "SELECT 1 FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
+// );
 
 // ========================= user_delegations table =================
 pub const INSERT_DELEGATION: &str = concat!(
@@ -81,10 +79,10 @@ pub const INSERT_DELEGATION_NOT_STRICT: &str = concat!(
     "VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
 );
 
-pub const GET_DELEGATION: &str = concat!(
-    "SELECT id, tms_identity, client_id, rp_id, rp_account, expires_at, created, updated ",
-    "FROM delegations WHERE tms_identity = $1 AND client_id = $2 AND rp_id = $3 AND rp_account = $4"
-);
+// pub const GET_DELEGATION: &str = concat!(
+//     "SELECT id, tms_identity, client_id, rp_id, rp_account, expires_at, created, updated ",
+//     "FROM delegations WHERE tms_identity = $1 AND client_id = $2 AND rp_id = $3 AND rp_account = $4"
+// );
 
 pub const GET_DELEGATION_ACTIVE: &str = concat!(
     "SELECT expires_at ",
@@ -174,7 +172,7 @@ pub const GET_ADMIN_SECRET: &str = "SELECT admin_secret FROM admins WHERE admin_
 // );
 //
 //
-pub const GET_RESERVATION_FOR_EXTEND: &str = concat!(
-    "SELECT parent_resid, expires_at FROM reservations ",
-    "WHERE resid = $1 AND client_id = $2",
-);
+// pub const GET_RESERVATION_FOR_EXTEND: &str = concat!(
+//     "SELECT parent_resid, expires_at FROM reservations ",
+//     "WHERE resid = $1 AND client_id = $2",
+// );

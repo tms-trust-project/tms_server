@@ -204,10 +204,7 @@ impl Client {
     ) 
     -> Client {
         Client {
-            id,
-            name: name, client_id,
-            secret: secret, enabled, created, updated
-        }
+            id, name, client_id, secret, enabled, created, updated }
     }
 }
 
@@ -222,10 +219,7 @@ impl ClientInput {
             updated: DateTime<Utc>,
         ) 
         -> ClientInput {
-            ClientInput {
-                name: name, client_id,
-                secret: secret, enabled, created, updated
-            }
+            ClientInput { name, client_id, secret, enabled, created, updated }
         }
 }
 
@@ -362,13 +356,13 @@ pub struct Host {
     pub updated: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct HostInput {
-    pub host: String,
-    pub addr: String,
-    pub created: DateTime<Utc>,
-    pub updated: DateTime<Utc>,
-}
+// #[derive(Debug, Deserialize)]
+// pub struct HostInput {
+//     pub host: String,
+//     pub addr: String,
+//     pub created: DateTime<Utc>,
+//     pub updated: DateTime<Utc>,
+// }
 
 impl Host {
     #[allow(dead_code, clippy::too_many_arguments)]
@@ -386,99 +380,98 @@ impl Host {
     }
 }
 
-impl HostInput {
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new(
-        host: String,
-        addr: String,
-        created: DateTime<Utc>,
-        updated: DateTime<Utc>,
-    ) 
-    -> HostInput {
-        HostInput {
-            host, addr, created, updated
-        }
-    }
-}
+// impl HostInput {
+//     #[allow(dead_code, clippy::too_many_arguments)]
+//     pub fn new(
+//         host: String,
+//         addr: String,
+//         created: DateTime<Utc>,
+//         updated: DateTime<Utc>,
+//     )
+//     -> HostInput {
+//         HostInput {/* host, addr,*/ created, updated }
+//     }
+//}
 
-// ---------------------------------------------------------------------------
-// Reservations:
-// ---------------------------------------------------------------------------
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct Reservation {
-    pub id: i32,
-    pub resid: String,
-    pub parent_resid: String,
-    pub client_id: String,
-    pub tms_identity: String,
-    pub rp_id: String,
-    pub rp_account: String,
-    pub host: String,
-    pub public_key_fingerprint: String, 
-    pub expires_at: DateTime<Utc>,
-    pub created: DateTime<Utc>,
-    pub updated: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReservationInput {
-    pub resid: String,
-    pub parent_resid: String,
-    pub client_id: String,
-    pub tms_identity: String,
-    pub rp_id: String,
-    pub rp_account: String,
-    pub host: String,
-    pub public_key_fingerprint: String, 
-    pub expires_at: DateTime<Utc>,
-    pub created: DateTime<Utc>,
-    pub updated: DateTime<Utc>,
-}
-
-impl Reservation {
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new(
-        id: i32,
-        resid: String,
-        parent_resid: String,
-        client_id: String,
-        tms_identity: String,
-        rp_id: String,
-        rp_account: String,
-        host: String,
-        public_key_fingerprint: String, 
-        expires_at: DateTime<Utc>,
-        created: DateTime<Utc>,
-        updated: DateTime<Utc>,
-    ) 
-    -> Reservation {
-        Reservation {
-            id, resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
-            public_key_fingerprint, expires_at, created, updated
-        }
-    }
-}
-
-impl ReservationInput {
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new(
-        resid: String,
-        parent_resid: String,
-        client_id: String,
-        tms_identity: String,
-        rp_id: String,
-        rp_account: String,
-        host: String,
-        public_key_fingerprint: String, 
-        expires_at: DateTime<Utc>,
-        created: DateTime<Utc>,
-        updated: DateTime<Utc>,
-    ) 
-    -> ReservationInput {
-        ReservationInput {
-            resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
-            public_key_fingerprint, expires_at, created, updated
-        }
-    }
-}
+// TODO remove
+// // ---------------------------------------------------------------------------
+// // Reservations:
+// // ---------------------------------------------------------------------------
+// #[derive(Debug, Deserialize)]
+// #[allow(dead_code)]
+// pub struct Reservation {
+//     pub id: i32,
+//     pub resid: String,
+//     pub parent_resid: String,
+//     pub client_id: String,
+//     pub tms_identity: String,
+//     pub rp_id: String,
+//     pub rp_account: String,
+//     pub host: String,
+//     pub public_key_fingerprint: String,
+//     pub expires_at: DateTime<Utc>,
+//     pub created: DateTime<Utc>,
+//     pub updated: DateTime<Utc>,
+// }
+//
+// #[derive(Debug, Deserialize)]
+// pub struct ReservationInput {
+//     pub resid: String,
+//     pub parent_resid: String,
+//     pub client_id: String,
+//     pub tms_identity: String,
+//     pub rp_id: String,
+//     pub rp_account: String,
+//     pub host: String,
+//     pub public_key_fingerprint: String,
+//     pub expires_at: DateTime<Utc>,
+//     pub created: DateTime<Utc>,
+//     pub updated: DateTime<Utc>,
+// }
+//
+// impl Reservation {
+//     #[allow(dead_code, clippy::too_many_arguments)]
+//     pub fn new(
+//         id: i32,
+//         resid: String,
+//         parent_resid: String,
+//         client_id: String,
+//         tms_identity: String,
+//         rp_id: String,
+//         rp_account: String,
+//         host: String,
+//         public_key_fingerprint: String,
+//         expires_at: DateTime<Utc>,
+//         created: DateTime<Utc>,
+//         updated: DateTime<Utc>,
+//     )
+//     -> Reservation {
+//         Reservation {
+//             id, resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
+//             public_key_fingerprint, expires_at, created, updated
+//         }
+//     }
+// }
+//
+// impl ReservationInput {
+//     #[allow(dead_code, clippy::too_many_arguments)]
+//     pub fn new(
+//         resid: String,
+//         parent_resid: String,
+//         client_id: String,
+//         tms_identity: String,
+//         rp_id: String,
+//         rp_account: String,
+//         host: String,
+//         public_key_fingerprint: String,
+//         expires_at: DateTime<Utc>,
+//         created: DateTime<Utc>,
+//         updated: DateTime<Utc>,
+//     )
+//     -> ReservationInput {
+//         ReservationInput {
+//             resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
+//             public_key_fingerprint, expires_at, created, updated
+//         }
+//     }
+// }

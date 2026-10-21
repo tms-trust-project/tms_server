@@ -8,7 +8,6 @@ use path_absolutize::Absolutize;
 use glob::glob;
 use execute::Execute;
 use chrono::{Utc, DateTime, SecondsFormat, FixedOffset, ParseError, Duration};
-use semver::VersionReq;
 
 use poem::Request;
 
@@ -19,8 +18,6 @@ use sha2::{Sha512, Digest};
 use anyhow::{Result, anyhow};
 use log::{error, debug, LevelFilter};
 
-use crate::utils::db_statements::PLACEHOLDER;
-use crate::utils::authz::{AuthzResult, AuthzTypes};
 use crate::utils::db::{is_client_enabled, is_tms_id_enabled};
 
 // ----------- Constants
@@ -98,7 +95,7 @@ pub fn get_files_in_dir(dir: &str) -> Result<Vec<PathBuf>> {
             Err(e) => {
                 let msg = format!("Unable to access an directory entry in {}: {:?}.", &pattern, e);
                 error!("{}", msg);
-                return Result::Err(anyhow!(msg));
+                return Err(anyhow!(msg));
             },
         }
     }
@@ -201,22 +198,21 @@ pub fn run_command(mut command: Command, task: &str) -> Result<Output> {
  
     // Return an output object or error.
     // Errors are logged before returning.
-    match command.execute_output() {
+    return match command.execute_output() {
         Ok(o) => {
             // Check for success here.
-            if o.status.success() {return Result::Ok(o);}
-                else {
-                    let msg = task.to_string() + ": " + 
-                        &String::from_utf8(o.stderr)
+            if o.status.success() { Ok(o) } else {
+                let msg = task.to_string() + ": " +
+                    &String::from_utf8(o.stderr)
                         .unwrap_or(run_command_emsg(command, o.status));
-                    error!("{}", msg);
-                    return Result::Err(anyhow!(msg));
-                };
+                error!("{}", msg);
+                Err(anyhow!(msg))
+            }
         },
         Err(e) => {
             let msg = task.to_string() + ": " + &e.to_string();
             error!("{}", msg);
-            return Result::Err(anyhow!(msg));
+            Err(anyhow!(msg))
         },
     };
 }
@@ -300,59 +296,6 @@ pub fn hash_hex_secret(hex_str: &String) -> String {
     hasher.update(hex_str);
     let raw = hasher.finalize();
     hex::encode(raw)
-}
-
-// ---------------------------------------------------------------------------
-// validate_semver:
-// ---------------------------------------------------------------------------
-/** Use the semver library to enforce cargo's implementation of semantic 
- * versioning.  Either the candidate string parses and true is returned or
- * an error is returned.  
- * 
- * See https://docs.rs/semver/latest/semver/enum.Op.html for an discussion
- * on versioning operators and their meanings. 
- */
-pub fn validate_semver(semver: &str) -> Result<bool> {
-    match VersionReq::parse(semver) {
-        Ok(_) => Ok(true),
-        Err(e) => Err(anyhow!(e)),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// sql_substitute_client_constraint:
-// ---------------------------------------------------------------------------
-/** Complete the sql select statement by substituting an appropriate value for the placeholder text
- * in the query template. The substitution restricts the query to a specific client when the
- * request was authorized using X_TMS_CLIENT_ID.
- * 
- * The sql_query is the template text into which a value is substituted 
- * for the placeholder.  The authz_result is the result of a prior authorize()
- * call.
- */
-pub fn sql_substitute_client_constraint(sql_query: &str, authz_result: &AuthzResult) -> String {
-    // We can only get here if authorization succeeded, so we don't
-    // really have to worry about missing authz result data.  To be
-    // doubly safe, we return the unresolved template query which 
-    // will be rejected by the database.
-    let authz_type = match &authz_result.authz_type {
-        Some(a) => a,
-        None => return sql_query.to_string(), // poison pill
-    };
-
-    // Construct the replacement text.
-    let replacement = if *authz_type == AuthzTypes::ClientOwn {
-        // Get the client ID that was used for authorization.
-        let client_id = match &authz_result.hdr_id {
-            Some(id) => id,
-            None => return sql_query.to_string(), // another poison pill 
-        };
-        " AND client_id = '".to_string() + client_id + "'"
-    }
-    else {"".to_string()};
-
-    // Return the template after substitution.
-    sql_query.replace(PLACEHOLDER, replacement.as_str())    
 }
 
 // ---------------------------------------------------------------------------

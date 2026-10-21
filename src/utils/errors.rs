@@ -22,10 +22,7 @@ pub enum Errors {
     ReadingConfigFile(String),
 
     #[error("Unable to parse TOML file: {}", .0)]
-    TOMLParseError(String),
-
-    #[error("TMS Error: {}", .0)]
-    TMSError(String),
+    TOMLParseError(String)
 }
 
 #[derive(PartialEq, Clone, Debug, Object)]

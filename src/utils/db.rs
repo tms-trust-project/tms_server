@@ -15,9 +15,7 @@ use crate::RUNTIME_CTX;
 use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
-use super::db_statements::{GET_DELEGATION, GET_RESERVATION_FOR_EXTEND,
-                           GET_RP_LOGIN_ACTIVE, GET_RP_LOGIN_EXISTS, INSERT_ADMIN, INSERT_CLIENT,
-                           UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
+use super::db_statements::{GET_RP_LOGIN_ACTIVE, INSERT_ADMIN, INSERT_CLIENT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
 
 const IMPLICIT_MODE_PROVIDER_TYPE: &str = "implicit_mode";
 const TEST_SUPPORTS_FALSE: bool = false;
@@ -158,7 +156,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         now.clone(),
     );
 
-    info!("Creating keypair for ClientId: {} TmsId: {} RPId: {} RPAcct: {} Host: {} HostAcct: {}",
+    info!("Creating key-pair for ClientId: {} TmsId: {} RPId: {} RPAcct: {} Host: {} HostAcct: {}",
           TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS_NOT_STRICT)
@@ -182,7 +180,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("Created keypair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {}",
+    info!("Created key-pair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {}",
           TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
     info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
@@ -557,7 +555,7 @@ pub async fn create_test_keys() -> Result<u64> {
 // check_pubkey_dependencies:
 // ---------------------------------------------------------------------------
 /*
- * Before creating an ssh keypair we must first check that the tms_identity has a valid rp_login
+ * Before creating an ssh key-pair we must first check that the tms_identity has a valid rp_login
  *   record and a delegation record for the given rp_id and rp_account.
  *
  * We return as soon as we encounter an error or determine the action is not authorized.
@@ -635,135 +633,136 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// check_parent_reservation:
-// ---------------------------------------------------------------------------
-/** This function is used to validate reservation extension requests by checking
- * database state. 
- * 
- * Reservation Constraints
- * ----------------------- 
- * When extending a reservation we need to check that these conditions hold on
- * that reservation:
- * 
- *  - The designated parent reservation is not a itself a child of another reservation.
- *  - The parent reservation has not expired.
- * 
- * We identify a child reservation by the fact that its parent_resid is different
- * than its resid.  TMS limits the parent/child tree to a depth of 2. 
- * 
- * Other Constraints
- * -----------------
- * The rp_login and delegations tables must also contain records that the
- * new extended reservation will depend on.
- * 
- *  - rp_login - the user must have an rplogin record
- *  - delegations - the user must have delegated access to the reservation's client
- * 
- * Validating these constraints before actually submitting the reservation extension
- * request allows us to return meaningful messages to users on error. The final arbiter, 
- * however, are foriegn key constraints on the reservation table that take place when
- * the new reservation is created.
- * 
- * Parameters
- * ----------
- * The resid parameter designates the candidate parent reservation for a new extended reservation.
- * The client_id are used to guarantee that clients can only extend their own reservations.
- * The host specifies the where the public key represented by the public_key_fingerprint can be applied.
- * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http
- * return code.
- */
-pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_identity: &String,
-                                      rp_id: &String, rp_account: &String, host: &String,
-                                      public_key_fingerprint: &String) -> Result<DateTime<Utc>>
-{
-    // Get a connection to the db and start a transaction.
-    let mut tx = RUNTIME_CTX.db.begin().await?;
-
-    // -------- Check reservations dependency
-    let res_row = sqlx::query(GET_RESERVATION_FOR_EXTEND)
-        .bind(resid)
-        .bind(client_id)
-        .fetch_optional(&mut *tx)
-        .await?;
-
-    // Check the candidate parent reservation and save its expiration time.    
-    let expires_at: DateTime<Utc>;
-    match res_row {
-        Some(row) => {
-            // Unpack row.
-            let parent_resid: String = row.get(0);
-            expires_at = row.get(1);
-
-            // Make sure the parent reservation is not also a child of another reservation.
-            // Top-level reservations have their parent_resid set to their own resid, so if
-            // the resid used to retrieve the reservation differs from that reservation's
-            // parent, then we know the retrieved reservation is already a child. 
-            if *resid != parent_resid {
-                let msg = format!("Reservation {} cannot be designated as parent for another reservation \
-                                          because it is already a child of reservation {}.",
-                                            resid, parent_resid);
-                error!("{}", msg);
-                return Err(anyhow!(msg));
-            }
-
-            // Check whether the reservation has expired.
-            if expires_at < timestamp_utc() {
-                let msg = format!("Parent reservation {} for client {} expired at {}.",
-                                            resid, client_id, expires_at);
-                error!("{}", msg);
-                return Err(anyhow!(msg));
-            }
-        },
-        None => {
-            let msg = format!("NOT_FOUND: Reservation {} not found for client {}.",
-                                        resid, client_id);
-            error!("{}", msg);
-            return Err(anyhow!(msg));
-        }
-    };  
-
-    // -------- Check rp_login dependency
-    let rplogin_row = sqlx::query(GET_RP_LOGIN_EXISTS)
-        .bind(tms_identity)
-        .bind(rp_id)
-        .bind(rp_account)
-        .fetch_optional(&mut *tx)
-        .await?;
-    match rplogin_row {
-        Some(_) => (),
-        None => {
-            let msg = format!("No RP_LOGIN entry found. TmsId: {} RpId: {} RpAcct: {}",
-                                     tms_identity, rp_id, rp_account);
-            error!("{}", msg);
-            return Err(anyhow!(msg));
-        }
-    };
-
-    // -------- Check delegation dependency
-    let delg_row = sqlx::query(GET_DELEGATION)
-        .bind(tms_identity)
-        .bind(client_id)
-        .bind(rp_id)
-        .bind(rp_account)
-        .fetch_optional(&mut *tx)
-        .await?;
-    match delg_row {
-        Some(_) => (),
-        None => {
-            let msg = format!("No delegation record found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
-                                     tms_identity, client_id, rp_id, rp_account);
-            error!("{}", msg);
-            return Err(anyhow!(msg));
-        }
-    };
-
-    // Commit the transaction.
-    tx.commit().await?;
-
-    // All checks passed.
-    Ok(expires_at)
-}
+// TODO remove
+// // ---------------------------------------------------------------------------
+// // check_parent_reservation:
+// // ---------------------------------------------------------------------------
+// /** This function is used to validate reservation extension requests by checking
+//  * database state.
+//  *
+//  * Reservation Constraints
+//  * -----------------------
+//  * When extending a reservation we need to check that these conditions hold on
+//  * that reservation:
+//  *
+//  *  - The designated parent reservation is not a itself a child of another reservation.
+//  *  - The parent reservation has not expired.
+//  *
+//  * We identify a child reservation by the fact that its parent_resid is different
+//  * than its resid.  TMS limits the parent/child tree to a depth of 2.
+//  *
+//  * Other Constraints
+//  * -----------------
+//  * The rp_login and delegations tables must also contain records that the
+//  * new extended reservation will depend on.
+//  *
+//  *  - rp_login - the user must have an rplogin record
+//  *  - delegations - the user must have delegated access to the reservation's client
+//  *
+//  * Validating these constraints before actually submitting the reservation extension
+//  * request allows us to return meaningful messages to users on error. The final arbiter,
+//  * however, are foriegn key constraints on the reservation table that take place when
+//  * the new reservation is created.
+//  *
+//  * Parameters
+//  * ----------
+//  * The resid parameter designates the candidate parent reservation for a new extended reservation.
+//  * The client_id are used to guarantee that clients can only extend their own reservations.
+//  * The host specifies the where the public key represented by the public_key_fingerprint can be applied.
+//  * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http
+//  * return code.
+//  */
+// pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_identity: &String,
+//                                       rp_id: &String, rp_account: &String, host: &String,
+//                                       public_key_fingerprint: &String) -> Result<DateTime<Utc>>
+// {
+//     // Get a connection to the db and start a transaction.
+//     let mut tx = RUNTIME_CTX.db.begin().await?;
+//
+//     // -------- Check reservations dependency
+//     let res_row = sqlx::query(GET_RESERVATION_FOR_EXTEND)
+//         .bind(resid)
+//         .bind(client_id)
+//         .fetch_optional(&mut *tx)
+//         .await?;
+//
+//     // Check the candidate parent reservation and save its expiration time.
+//     let expires_at: DateTime<Utc>;
+//     match res_row {
+//         Some(row) => {
+//             // Unpack row.
+//             let parent_resid: String = row.get(0);
+//             expires_at = row.get(1);
+//
+//             // Make sure the parent reservation is not also a child of another reservation.
+//             // Top-level reservations have their parent_resid set to their own resid, so if
+//             // the resid used to retrieve the reservation differs from that reservation's
+//             // parent, then we know the retrieved reservation is already a child.
+//             if *resid != parent_resid {
+//                 let msg = format!("Reservation {} cannot be designated as parent for another reservation \
+//                                           because it is already a child of reservation {}.",
+//                                             resid, parent_resid);
+//                 error!("{}", msg);
+//                 return Err(anyhow!(msg));
+//             }
+//
+//             // Check whether the reservation has expired.
+//             if expires_at < timestamp_utc() {
+//                 let msg = format!("Parent reservation {} for client {} expired at {}.",
+//                                             resid, client_id, expires_at);
+//                 error!("{}", msg);
+//                 return Err(anyhow!(msg));
+//             }
+//         },
+//         None => {
+//             let msg = format!("NOT_FOUND: Reservation {} not found for client {}.",
+//                                         resid, client_id);
+//             error!("{}", msg);
+//             return Err(anyhow!(msg));
+//         }
+//     };
+//
+//     // -------- Check rp_login dependency
+//     let rplogin_row = sqlx::query(GET_RP_LOGIN_EXISTS)
+//         .bind(tms_identity)
+//         .bind(rp_id)
+//         .bind(rp_account)
+//         .fetch_optional(&mut *tx)
+//         .await?;
+//     match rplogin_row {
+//         Some(_) => (),
+//         None => {
+//             let msg = format!("No RP_LOGIN entry found. TmsId: {} RpId: {} RpAcct: {}",
+//                                      tms_identity, rp_id, rp_account);
+//             error!("{}", msg);
+//             return Err(anyhow!(msg));
+//         }
+//     };
+//
+//     // -------- Check delegation dependency
+//     let delg_row = sqlx::query(GET_DELEGATION)
+//         .bind(tms_identity)
+//         .bind(client_id)
+//         .bind(rp_id)
+//         .bind(rp_account)
+//         .fetch_optional(&mut *tx)
+//         .await?;
+//     match delg_row {
+//         Some(_) => (),
+//         None => {
+//             let msg = format!("No delegation record found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
+//                                      tms_identity, client_id, rp_id, rp_account);
+//             error!("{}", msg);
+//             return Err(anyhow!(msg));
+//         }
+//     };
+//
+//     // Commit the transaction.
+//     tx.commit().await?;
+//
+//     // All checks passed.
+//     Ok(expires_at)
+// }
 // ---------------------------------------------------------------------------
 // set_test_enabled_internal:
 // ---------------------------------------------------------------------------

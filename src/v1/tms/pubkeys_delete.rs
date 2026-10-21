@@ -57,8 +57,6 @@ impl RequestDebug for ReqDeletePubkey {
 enum TmsResponse {
     #[oai(status = 200)]
     Http200(Json<RespDeletePubkey>),
-    #[oai(status = 400)]
-    Http400(Json<HttpResult>),
     #[oai(status = 401)]
     Http401(Json<HttpResult>),
     #[oai(status = 403)]
@@ -69,9 +67,6 @@ enum TmsResponse {
 
 fn make_http_200(resp: RespDeletePubkey) -> TmsResponse {
     TmsResponse::Http200(Json(resp))
-}
-fn make_http_400(msg: String) -> TmsResponse {
-    TmsResponse::Http400(Json(HttpResult::new(400.to_string(), msg)))
 }
 fn make_http_401(msg: String) -> TmsResponse {
     TmsResponse::Http401(Json(HttpResult::new(401.to_string(), msg)))

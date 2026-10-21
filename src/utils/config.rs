@@ -5,7 +5,6 @@ use log::{info, error};
 use serde::Deserialize;
 use std::{env, fs::{self, Permissions}, path::Path};
 use std::collections::HashMap;
-use std::fs::File;
 use toml;
 use fs_mistrust::Mistrust;
 use std::os::unix::fs::PermissionsExt;
@@ -204,7 +203,6 @@ pub struct RuntimeCtx {
     pub parms: Parms,
     pub db: Pool<Postgres>,
     pub authz: &'static AuthzArgs,
-    pub tms_cmd_args: &'static TmsCmdArgs,
     pub tms_dirs: &'static TmsDirs,
 }
 
@@ -718,7 +716,7 @@ pub fn init_runtime_context() -> RuntimeCtx {
     let db :Pool<Postgres> = block_on(db_init::init_db(db_url.as_str()));
 
     // Return the runtime context.
-    RuntimeCtx {parms, db, authz: &AUTHZ_ARGS, tms_cmd_args: &TMS_CMD_ARGS, tms_dirs: &TMS_DIRS}
+    RuntimeCtx {parms, db, authz: &AUTHZ_ARGS, tms_dirs: &TMS_DIRS}
 }
 
 // ***************************************************************************

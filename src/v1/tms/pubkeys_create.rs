@@ -279,7 +279,16 @@ impl RespNewSshKeys {
         );
 
         // Insert the new key record.
-        let count = insert_new_pubkey(input_record).await;
+        match insert_new_pubkey(input_record).await
+        {
+            Ok(_) => (),
+            Err(err) => {
+                let err_msg = err.to_string();
+                error!("Unable to insert key-pair. Error: {}", err_msg);
+                return Ok(make_http_500(err_msg));
+            }
+        }
+
 
         // Success! Zero key bits means a fixed key length.
         Ok(make_http_201(Self::new("0", "success",
