@@ -19,6 +19,7 @@ pub struct Pubkey {
     pub host_account: String,
     pub public_key_fingerprint: String, 
     pub public_key: String,
+    pub host_login_user: String,
     pub key_type: String,
     pub key_bits: i32,
     pub max_uses: i32,
@@ -39,6 +40,7 @@ pub struct PubkeyInput {
     pub host_account: String,
     pub public_key_fingerprint: String, 
     pub public_key: String,
+    pub host_login_user: String,
     pub key_type: String,
     pub key_bits: i32,
     pub max_uses: i32,
@@ -69,6 +71,7 @@ impl Pubkey {
         host_account: String,
         public_key_fingerprint: String,
         public_key: String,
+        host_login_user: String,
         key_type: String,
         key_bits: i32,
         max_uses: i32,
@@ -81,7 +84,7 @@ impl Pubkey {
     -> Pubkey {
         Pubkey {
             id, client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint,
-            public_key, key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, 
+            public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes,
             expires_at, created, updated
         }
     }
@@ -98,6 +101,7 @@ impl PubkeyInput {
         host_account: String,
         public_key_fingerprint: String,
         public_key: String,
+        host_login_user: String,
         key_type: String,
         key_bits: i32,
         max_uses: i32,
@@ -109,8 +113,9 @@ impl PubkeyInput {
     ) 
     -> PubkeyInput {
         PubkeyInput {
-            client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint, public_key,
-            key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes, expires_at, created, updated
+            client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint,
+            public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses,
+            initial_ttl_minutes, expires_at, created, updated
         }
     }
 }
@@ -123,7 +128,7 @@ impl PubkeyRetrieval {
     )
     -> PubkeyRetrieval {
         PubkeyRetrieval {
-            public_key, remaining_uses, expires_at,
+            public_key, remaining_uses, expires_at
         }
     }
 }

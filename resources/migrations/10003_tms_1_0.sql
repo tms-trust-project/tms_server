@@ -241,7 +241,7 @@ DROP TABLE IF EXISTS user_hosts;
 -- ---------------------------------------
 -- TODO/TBD Also drop column expires_at as is being done for resource_provider_logins table?
 -- TODO -- Drop column expires_at. No longer needed/relevant?
--- -- ???Eventually we might have some type of policies table to support RPs specifying expiry?
+-- --TODO ???Eventually we might have some type of policies table to support RPs specifying expiry?
 --    Or keep as is for now so it is easy/quick for tms-server to check validity of delegation.
 --    Currently (for MVP) it is essentially forever. Can always drop it later.
 --    Possibly will end up maintaining this by simply removing the delegation based on some policy

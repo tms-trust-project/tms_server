@@ -42,7 +42,7 @@ struct RespNewSshKeys
     result_msg: String,
     private_key: String,
     public_key: String,
-    tms_login_user: String,
+    host_login_user: String,
     public_key_fingerprint: String,
     key_type: String,
     key_bits: String,
@@ -114,7 +114,7 @@ fn make_http_500(msg: String) -> TmsResponse {
 #[OpenApi]
 impl NewSshKeysApi {
     #[oai(path = "/tms/pubkeys/creds", method = "post")]
-    async fn get_new_ssh_keys(&self, http_req: &Request, req: Json<ReqNewSshKeys>) -> TmsResponse {
+    async fn create_new_ssh_keys(&self, http_req: &Request, req: Json<ReqNewSshKeys>) -> TmsResponse {
         RespNewSshKeys::process(http_req, &req).await.unwrap_or_else(|e| {
             // Assume a server fault if a raw error came through.
             let msg = "WARNING: ".to_owned() + e.to_string().as_str();
@@ -130,12 +130,12 @@ impl NewSshKeysApi {
 impl RespNewSshKeys {
     #[allow(clippy::too_many_arguments)]
     fn new(result_code: &str, result_msg: &str, private_key: String, public_key: String,
-           tms_login_user: String, public_key_fingerprint: String, key_type: String,
+           host_login_user: String, public_key_fingerprint: String, key_type: String,
            key_bits: String, max_uses: String, remaining_uses: String, expires_at: DateTime<Utc>)
         -> Self {
         Self {result_code: result_code.to_string(), 
               result_msg: result_msg.to_string(), 
-              private_key, public_key, public_key_fingerprint, tms_login_user,
+              private_key, public_key, public_key_fingerprint, host_login_user,
               key_type, key_bits, max_uses, remaining_uses, expires_at,
             }
     }
@@ -199,7 +199,7 @@ impl RespNewSshKeys {
             };
         }
 
-        // --------------------- Check Expirations -----------------------
+        // --------------------- Check Login and delegation records -----------------------
         // The two tables that must be checked before we create this key are:
         //   resource_provider_logins - use (tms_identity,rp_id,rp_account) as unique key.
         //   delegations          - use (tms_identity, client_id, rp_id, rp_account) as unique key.
@@ -245,6 +245,10 @@ impl RespNewSshKeys {
             Err(e) => { return Err(anyhow!(e)); }
         };
 
+        // TODO: Look up the host_login_user associated with the resource
+        let host_login_user = "testuser2".to_string();
+
+
         // ------------------------ Update Database --------------------
         // Interpret numeric input.
         let max_uses = if req.num_uses < 0 {i32::MAX} else {req.num_uses};
@@ -268,6 +272,7 @@ impl RespNewSshKeys {
             req.host_account.clone(),
             keyinfo.public_key_fingerprint.clone(),
             keyinfo.public_key.clone(),
+            host_login_user.clone(),
             keyinfo.key_type.clone(),
             keyinfo.key_bits,
             max_uses,
@@ -294,7 +299,7 @@ impl RespNewSshKeys {
         Ok(make_http_201(Self::new("0", "success",
                 keyinfo.private_key,
                 keyinfo.public_key,
-                "testuser2".to_string(), // TODO replace with real from DB
+                host_login_user,
                 keyinfo.public_key_fingerprint,
                 keyinfo.key_type,
                 keyinfo.key_bits.to_string(),

@@ -113,7 +113,8 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
  * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
 pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_acct: String,
-                                            test_host: String, test_host_acct: String) -> Result<u64> {
+                                            test_host: String, test_host_acct: String,
+                                            test_host_login_user: String) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
     // Check for existing record, create only if needed
@@ -146,6 +147,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         test_host_acct.clone(),
         pubkey_fingerprint.clone(),
         keyinfo.public_key.clone(),
+        test_host_login_user.clone(),
         keyinfo.key_type.clone(),
         keyinfo.key_bits,
         MAX_USES,
@@ -168,6 +170,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .bind(input_record.host_account)
         .bind(input_record.public_key_fingerprint.clone())
         .bind(input_record.public_key)
+        .bind(input_record.host_login_user)
         .bind(input_record.key_type.clone())
         .bind(input_record.key_bits)
         .bind(input_record.max_uses)
@@ -180,8 +183,8 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("Created key-pair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {}",
-          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
+    info!("Created key-pair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {} HostLoginUser: {}",
+          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct, test_host_login_user);
     info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
 }
@@ -200,6 +203,7 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
         .bind(rec.host_account.clone())
         .bind(rec.public_key_fingerprint.clone())
         .bind(rec.public_key.clone())
+        .bind(rec.host_login_user.clone())
         .bind(rec.key_type.clone())
         .bind(rec.key_bits)
         .bind(rec.max_uses)
@@ -541,11 +545,13 @@ pub async fn create_test_keys() -> Result<u64> {
         let test_rp_acct = format!("{}{:03}", TEST_RP_ACCOUNT, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
         let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
+        let test_host_login_user = format!("{}{:03}", TEST_HOST_ACCOUNT, n); // TODO do we need host_login_user?
+                                                                                    // TODO always same as host_account?
 
         // Create a new test pubkey for user if none exists.
         // This should return 0 if one already exists and 1 if a new one was created
         let inserts = insert_new_test_pubkey_if_none(test_tms_identity, test_rp_acct,
-                                                          test_host, test_host_acct).await?;
+                                            test_host, test_host_acct, test_host_login_user).await?;
         insert_count += inserts;
     }
     Ok(insert_count)

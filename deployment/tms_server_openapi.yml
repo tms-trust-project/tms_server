@@ -263,7 +263,7 @@ components:
           type: string
         public_key:
           type: string
-        tms_login_user:
+        host_login_user:
           type: string
         public_key_fingerprint:
           type: string
