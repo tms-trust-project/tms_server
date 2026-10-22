@@ -191,44 +191,16 @@ impl RespNewSshKeys {
         // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
         // If running in ImplicitTrust mode then automatically create delegation records.
         if RUNTIME_CTX.parms.config.enable_mvp && matches!(client.tms_mode, TmsMode::ImplicitTrust) {
-// TODO refactor this code into a method            setup_implicit_mode_records(&req);
-            // Collect values required for dependency record insertions.
-            // Extract subject from tms_identity that becomes our host_login_user, based on format someuser@some.domain
-            let host_login_user: String;
-            if let Some((host_login, _tms_id_domain)) = req.tms_identity.split_once('@') {
-                host_login_user = host_login.to_string();
-            } else {
-                let msg = format!("ImplicitTrustMode ERROR: Unable to extract host_login_user from TMS identity. ClientId: {} TmsId: {}",
-                                  client_id, req.tms_identity);
-                error!("{}", msg);
-                return Ok(make_http_400(msg));
-            }
-            // Validate host login user
-            match validate_host_login_user(&host_login_user) {
+            match setup_implicit_mode_records(&req, &*client_id).await {
                 Ok(_) => {}
                 Err(e) => {
                     let msg =
-                        format!("ImplicitTrustMode ERROR: Host login extracted from TMS identity is invalid. ClientId: {} TmsId: {} HostLoginUser: {} Error: {}",
-                                client_id, req.tms_identity, host_login_user, e.to_string());
+                        format!("ImplicitTrustMode Error setting up implicit trust records. ClientId: {} TmsId: {} Error: {}",
+                                client_id, req.tms_identity, e.to_string());
+                    error!("{}", msg);
                     return Ok(make_http_400(msg));
                 }
             }
-
-            let implicit_trust_inputs = ImplicitModeDependencyParms {
-                client_id: client_id.clone(),
-                tms_identity: req.tms_identity.clone(),
-                rp_id: req.rp_account.clone(),
-                rp_account: req.rp_account.clone()
-            };
-            // Insert records into the resource_provider_logins and delegations tables
-            match create_pubkey_dependencies(implicit_trust_inputs).await {
-                Ok(inserts) => info!("{} ImplicitTrustMode dependency records inserted.", inserts),
-                Err(e) => {
-                    let msg = format!("ImplicitTrustMode ERROR: Unable to create login and delegation records: {}", e);
-                    error!("{}", msg);
-                    return Ok(make_http_500(msg));
-                }
-            };
         }
 
         // --------------------- Check Login and delegation records -----------------------
@@ -356,13 +328,48 @@ impl RespNewSshKeys {
 //                          Private Functions
 // ***************************************************************************
 
-// /*TODO
+// /*
 //  * Create login and delegation when a new key-pair is requested for an ImplicitTrust client.
 //  */
-// fn setup_implicit_mode_records(req: &ReqNewSshKeys) -> () {
-//
-// }
-//
+async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Result<(), String>  {
+    // Collect values required for dependency record insertions.
+    // Extract subject from tms_identity that becomes our host_login_user, based on format someuser@some.domain
+    let host_login_user: String;
+    if let Some((host_login, _tms_id_domain)) = req.tms_identity.split_once('@') {
+        host_login_user = host_login.to_string();
+    } else {
+        return Err("Unable to extract host_login_user from TMS identity.".to_string());
+    }
+    // Validate host login user
+    match validate_host_login_user(&host_login_user) {
+        Ok(_) => {}
+        Err(e) => {
+            let msg =
+                format!("Host login extracted from TMS identity is invalid. HostLoginUser: {} Error: {}",
+                        host_login_user, e.to_string());
+            return Err(msg);
+        }
+    }
+
+    let implicit_trust_inputs = ImplicitModeDependencyParms {
+        client_id: client_id.parse().unwrap(),
+        tms_identity: req.tms_identity.clone(),
+        rp_id: req.rp_account.clone(),
+        rp_account: req.rp_account.clone()
+    };
+    // Insert records into the resource_provider_logins and delegations tables
+    match create_pubkey_dependencies(implicit_trust_inputs).await {
+        Ok(inserts) => {
+            info!("ImplicitTrustMode dependency records inserted. Count: {}", inserts);
+            Ok(())
+        },
+        Err(e) => {
+            let msg = format!("ImplicitTrustMode ERROR: Unable to create login and delegation records: {}", e);
+            Err(msg)
+        }
+    }
+}
+
 /*
  * Method to check that a username appears to be a valid host login user
  *  - Check not empty
