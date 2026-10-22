@@ -14,7 +14,7 @@ pub const SEL_IDP_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM identity_providers
 
 // ========================= tms_identities table ========================
 // NOTE: We just need one in this table for referencing, so OK if it already exists.
-pub const INSERT_TMS_IDENTITY: &str = concat!("INSERT INTO tms_identities (tms_identity, enabled) ",
+pub const INSERT_TMS_ID: &str = concat!("INSERT INTO tms_identities (tms_identity, enabled) ",
      " VALUES ($1, $2) ON CONFLICT DO NOTHING");
 
 pub const IS_TMS_ID_ENABLED: &str = "SELECT enabled FROM tms_identities where tms_identity = $1";

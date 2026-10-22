@@ -6,6 +6,7 @@ use crate::utils::tms_utils::{timestamp_utc};
 use log::info;
 use crate::RUNTIME_CTX;
 use crate::utils::config::DB_TRUE;
+use crate::utils::db::{insert_tms_id};
 use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_DELEGATION_NOT_STRICT, INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
 use crate::utils::tms_utils;
 
@@ -17,21 +18,23 @@ pub struct ImplicitModeDependencyParms
     pub client_id: String,
     pub tms_identity: String,
     pub rp_id: String,
-    pub rp_account: String,
-    pub host: String,
-    pub host_login_user: String,
+    pub rp_account: String
 }
 
 /*
- * The Implicit Trust Mode, formerly known as Minimal Viable Product (MVP) mode, simplifies
- *   migration to TMS in existing environments that meet certain requirements. Specifically,
+ * The Implicit Trust Mode, formerly known as Minimal Viable Product (MVP) mode, simplifies TMS
+ *   usage by allowing a TMS application client to be tied to a specific Resource Provider and
+ *   list of resources. Effectively validation of logins to the institutional IdP and the RP are
+ *   left up to the application client. Login and delegation records are created automatically.
+ *
  *   Implicit mode supports the following:
  *   - Keys never expire.
  *   - All records to satisfy login and delegation checks are created (this method).
  *    - To satisfy foreign key constraints, the records must be created in the following order:
  *      - tms_identity, resource_provider_logins, delegations
- *  - Records are automatically created in these tables:
- *    - TODO tms_identities
+ *
+ *  Records are automatically created in these tables:
+ *    - tms_identities
  *    - resource_provider_logins - non-expiring RP_LOGIN set up for user
  *    - delegations - non-expiring delegation established between tms_identity and client
  *
@@ -48,6 +51,14 @@ pub async fn create_pubkey_dependencies(parms: ImplicitModeDependencyParms) -> R
 
      // Use the same current UTC timestamp in all related time calculations.
      let now = timestamp_utc();
+
+    // --------------------- Insert tms_identity record ------------------------
+    // Required inputs: tms_identity
+    let count = insert_tms_id(&*parms.tms_identity, DB_TRUE).await?;
+    if count > 0 {
+        insert_count += count;
+        info!("ImplicitMode: TMS_IDENTITY created. TmsId: {}.", parms.tms_identity);
+    }
 
     // --------------------- Insert rp_login record ------------------------
     // Required inputs: tms_identity, rp_id, rp_account, enabled
@@ -125,7 +136,7 @@ async fn insert_delegation(rec: DelegationInput, strict: bool) -> Result<u64> {
 // ---------------------------------------------------------------------------
 // insert_rp_login:
 // ---------------------------------------------------------------------------
-pub async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
+async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
     // Choose the query based on strictness requirement.
     let sql_query = if strict { INSERT_RP_LOGIN } else { INSERT_RP_LOGIN_NOT_STRICT };

@@ -182,10 +182,10 @@ ALTER TABLE clients RENAME COLUMN app_name TO name;
 -- Rename column client_secret to secret. This is simpler and matches what the portal code is using.
 -- NOTE: Keep column client_id as is because TMS server already has a column 'id' as a SERIAL primary key
 ALTER TABLE clients RENAME COLUMN client_secret TO secret;
--- Add column tms_mode: explicit_trust, implicit_trust
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'explicit_trust';
+-- Add column tms_mode: ExplicitTrust, ImplicitTrust
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'ExplicitTrust';
 
--- Add column for rp reference to be used for the case of implicit_trust.
+-- Add column for rp reference to be used for the case of ImplicitTrust.
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS rp_id TEXT REFERENCES identity_providers(id);
 
 -- ---------------------------------------------------------------

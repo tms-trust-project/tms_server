@@ -114,6 +114,9 @@ impl RespPublicKey {
               public_key: key.to_string()}
     }
 
+    // ========================================================================================
+    //   Main endpoint processing method for getPubKey: POST /tms/pubkeys/creds/retrieve
+    // ========================================================================================
     async fn process(http_req: &Request, req: &ReqPublicKey) -> Result<TmsResponse> {
         // Log the request
         tms_utils::debug_request(http_req, req);

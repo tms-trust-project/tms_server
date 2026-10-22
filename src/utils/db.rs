@@ -5,10 +5,10 @@ use anyhow::{Result, anyhow};
 use log::{info};
 use std::io::{self, Write};
 use chrono::{Utc, DateTime};
-use sqlx::Row;
+use sqlx::{Row};
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR,
                               timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED, GET_CLIENT, GET_HOST_LOGIN_USER};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_ID, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED, GET_CLIENT, GET_HOST_LOGIN_USER};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, get_setup_out_path, TEST_TAPIS_CLIENT, TEST_TAPIS_CLIENT_SECRET, TEST_TAPIS_APP, TmsMode};
 use log::error;
 use crate::RUNTIME_CTX;
@@ -60,6 +60,21 @@ const KEY_TYPE: KeyType = KeyType::Ed25519;
 */
 
 /*
+ * Insert a Tms identity record. Idempotent. ON CONFLICT DO NOTHING
+ */
+pub async fn insert_tms_id(tms_id: &str, enabled: bool) -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    let result = sqlx::query(INSERT_TMS_ID)
+        .bind(tms_id)
+        .bind(enabled)
+        .execute(&mut *tx)
+        .await?;
+    // Commit the transaction.
+    tx.commit().await?;
+    Ok(result.rows_affected())
+}
+
+/*
  * Insert a IdP record
  */
 pub async fn insert_new_idp(rec: IdPInput) -> Result<u64> {
@@ -96,7 +111,7 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
         .bind(rec.client_id.clone())
         .bind(rec.secret)
         .bind(rec.rp_id.clone())
-        .bind(rec.tms_mode.clone())
+        .bind(rec.tms_mode.to_string())
         .bind(rec.enabled)
         .bind(rec.created)
         .bind(rec.updated)
@@ -323,7 +338,7 @@ pub async fn create_test_clients() -> Result<u64> {
             TEST_CLIENT.to_string(),
             test_client_secret_hash,
             TEST_RP_ID.to_string(),
-            TEST_TMS_MODE.as_ref().to_string(),
+            TEST_TMS_MODE,
             DB_TRUE,
             now.clone(),
             now.clone(),
@@ -342,7 +357,7 @@ pub async fn create_test_clients() -> Result<u64> {
             TEST_TAPIS_CLIENT.to_string(),
             test_client_secret_hash,
             TEST_RP_ID.to_string(),
-            TEST_TMS_MODE.as_ref().to_string(),
+            TEST_TMS_MODE,
             DB_TRUE,
             now.clone(),
             now.clone(),
@@ -491,13 +506,9 @@ pub async fn create_test_data() -> Result<u64> {
 
         // First create a TMS identity in table tms_identities
         info!("Creating TMS identity record for TMS user: {}", test_tms_identity.clone());
-        sqlx::query(INSERT_TMS_IDENTITY)
-            .bind(test_tms_identity.clone())
-            .bind(DB_TRUE)
-            .execute(&mut *tx)
-            .await?;
+        insert_tms_id(&*test_tms_identity, DB_TRUE).await?;
 
-        info!("Creating test records for tms identity: {} rp_id: {} rp_account {} host: {}",
+        info!("Creating test records for tms identity. TmsId: {} rp_id: {} rp_account {} host: {}",
               test_tms_identity, TEST_RP_ID, test_rp_account, test_host);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)

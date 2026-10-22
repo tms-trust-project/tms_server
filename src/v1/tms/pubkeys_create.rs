@@ -13,8 +13,12 @@ use crate::utils::db::{insert_new_pubkey, check_rplogin_delegation, get_client_r
 use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_tms_id_enabled};
 use crate::utils::implicit_mode::{ImplicitModeDependencyParms, create_pubkey_dependencies};
 use log::{error, info, warn};
-
+use regex::regex;
 use crate::RUNTIME_CTX;
+use crate::utils::config::TmsMode;
+
+// NOTE: This const string appears in the code twice because the regex macro regex! requires a literal.
+const HOST_LOGIN_REGEX: &str = "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$";
 
 // ***************************************************************************
 //                          Request/Response Definitions
@@ -136,11 +140,13 @@ impl RespNewSshKeys {
             }
     }
 
+    // ========================================================================================
+    //   Main endpoint processing method for createKeypair: POST /tms/pubkeys/creds
+    // ========================================================================================
     async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse> {
         // Log the request
         tms_utils::debug_request(http_req, req);
 
-        // ========================================================================================
         // -------------------- Extract Headers ----------------------
         // Get the header we need: client_id
         let client_id = match get_client_id_header(http_req) {
@@ -183,21 +189,36 @@ impl RespNewSshKeys {
         }
 
         // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
-        // If running in Implicit Trust mode then automatically create delegation records.
-        // TODO catch-22 problem. We need host_login_user in order to create records, but currently
-        //       we look up host_login_user after we have checked delegation records. How to figure out host_login_user?
-        //       From tms_identity? E.g., someuser@tacc.utexas.edu becomes someuser for implicit trust mode?
-        let host_login_user = "testuser2".to_string(); // TODO
-        if RUNTIME_CTX.parms.config.enable_mvp && client.tms_mode == "implicit_trust" {
-            //
+        // If running in ImplicitTrust mode then automatically create delegation records.
+        if RUNTIME_CTX.parms.config.enable_mvp && matches!(client.tms_mode, TmsMode::ImplicitTrust) {
+// TODO refactor this code into a method            setup_implicit_mode_records(&req);
             // Collect values required for dependency record insertions.
+            // Extract subject from tms_identity that becomes our host_login_user, based on format someuser@some.domain
+            let host_login_user: String;
+            if let Some((host_login, _tms_id_domain)) = req.tms_identity.split_once('@') {
+                host_login_user = host_login.to_string();
+            } else {
+                let msg = format!("ImplicitTrustMode ERROR: Unable to extract host_login_user from TMS identity. ClientId: {} TmsId: {}",
+                                  client_id, req.tms_identity);
+                error!("{}", msg);
+                return Ok(make_http_400(msg));
+            }
+            // Validate host login user
+            match validate_host_login_user(&host_login_user) {
+                Ok(_) => {}
+                Err(e) => {
+                    let msg =
+                        format!("ImplicitTrustMode ERROR: Host login extracted from TMS identity is invalid. ClientId: {} TmsId: {} HostLoginUser: {} Error: {}",
+                                client_id, req.tms_identity, host_login_user, e.to_string());
+                    return Ok(make_http_400(msg));
+                }
+            }
+
             let implicit_trust_inputs = ImplicitModeDependencyParms {
                 client_id: client_id.clone(),
                 tms_identity: req.tms_identity.clone(),
                 rp_id: req.rp_account.clone(),
-                rp_account: req.rp_account.clone(),
-                host: req.host.clone(),
-                host_login_user
+                rp_account: req.rp_account.clone()
             };
             // Insert records into the resource_provider_logins and delegations tables
             match create_pubkey_dependencies(implicit_trust_inputs).await {
@@ -261,7 +282,6 @@ impl RespNewSshKeys {
         //           need to think about if this works when migrating existing records.
         //           remove host_account from incoming request body for createKeypair endpoint? Are there any cases
         //             where it is needed in the request body?
-//        let host_login_user = db.//"testuser2".to_string();
         let host_login_user = match get_host_login_user_result(&req.rp_id, &req.rp_account).await {
             Ok(hlu) => hlu,
             Err(e) => {
@@ -335,3 +355,27 @@ impl RespNewSshKeys {
 // ***************************************************************************
 //                          Private Functions
 // ***************************************************************************
+
+// /*TODO
+//  * Create login and delegation when a new key-pair is requested for an ImplicitTrust client.
+//  */
+// fn setup_implicit_mode_records(req: &ReqNewSshKeys) -> () {
+//
+// }
+//
+/*
+ * Method to check that a username appears to be a valid host login user
+ *  - Check not empty
+ *  - Check length. By RFC 5321, usernames for an email address or limited to 64 characters
+ *  - Check against regex: r"^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$"
+ */
+fn validate_host_login_user(host_login: &str) -> Result<(), String> {
+    if host_login.is_empty() { return Err("HostLogin cannot be empty".to_string()); }
+    if host_login.len() > 64 { return Err("HostLogin too long, max 64 characters.".to_string()); }
+    // Check regex
+    // HOST_LOGIN_REGEX appears as hard-coded string because regex macro regex! requires a literal.
+    if ! regex!("^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$").is_match(host_login) {
+        return Err(format!("HostLogin does not match regex: {}", HOST_LOGIN_REGEX));
+    }
+    Ok(())
+}

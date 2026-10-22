@@ -3,6 +3,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use crate::utils::config::TmsMode;
 
 // ---------------------------------------------------------------------------
 // pubkeys:
@@ -178,7 +179,7 @@ pub struct Client {
     pub client_id: String,
     pub secret: String,
     pub rp_id: String,
-    pub tms_mode: String,
+    pub tms_mode: TmsMode,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -190,7 +191,7 @@ pub struct ClientInput {
     pub client_id: String,
     pub secret: String,
     pub rp_id: String,
-    pub tms_mode: String,
+    pub tms_mode: TmsMode,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -204,7 +205,7 @@ impl Client {
         client_id: String,
         secret: String,
         rp_id: String,
-        tms_mode: String,
+        tms_mode: TmsMode,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
@@ -222,7 +223,7 @@ impl ClientInput {
             client_id: String,
             secret: String,
             rp_id: String,
-            tms_mode: String,
+            tms_mode: TmsMode,
             enabled: bool,
             created: DateTime<Utc>,
             updated: DateTime<Utc>,

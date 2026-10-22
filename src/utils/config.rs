@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
-use strum::AsRefStr;
-use strum_macros::EnumString;
+use strum_macros::{AsRefStr, Display, EnumString};
 use anyhow::{Result, anyhow};
 use log::{info, error};
 use serde::Deserialize;
@@ -112,7 +111,7 @@ lazy_static! {
 // ***************************************************************************
 //                                Enums
 // ***************************************************************************
-#[derive(Debug, PartialEq, EnumString, AsRefStr)]
+#[derive(Debug, PartialEq, Eq, AsRefStr, EnumString, Deserialize, Display, sqlx::Type)]
 #[strum(serialize_all = "PascalCase", ascii_case_insensitive)] // Make conversions case-insensitive
 pub enum TmsMode { ExplicitTrust, ImplicitTrust }
 
