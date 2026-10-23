@@ -175,9 +175,6 @@ CREATE TABLE IF NOT EXISTS issued_tokens
     updated       TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
-
-
-
 -- TODO Now that all columns are added for existing MVP legacy "implicit mode" records created for TMS 0.3 and earlier,
 --  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
 --    and tms_identity for every record in the old user_mfa table and delegations table.
@@ -198,29 +195,32 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 ALTER TABLE resources OWNER TO tms;
 
--- -- ---------------------------------------
--- -- resource_host_accounts table
--- -- ---------------------------------------
--- -- This table establishes the host login user in a resource for a Resource Provider identity.
--- CREATE TABLE IF NOT EXISTS resource_host_accounts
--- (
---    id SERIAL PRIMARY KEY,
---     -- TODO/TBD: I'm thinking reference to resource_provider_logins does not make sense. What if "user" has never logged into RP?
---     --           And maybe reference to resources also does not make sense? for similar reason? Needs more thought.
---     --           or maybe by the time we are do a CREATE for this table the other two records must exist?
---     --           But de-normalizing by using rp_id and rp_account would probably help a human troubleshoot. Have both?
---     --           Plus, when we are looking up host_login_user when we are creating a key-pair (pubkeys_create.rs) what we
---     --               will have is rp_id and rp_account.
--- -- TODO        resource_id INTEGER REFERENCES resources (id),   -- TODO Is this what we are calling rp_id in the above?
---    rp_id TEXT NOT NULL REFERENCES identity_providers (id) -- TODO Use this to replace above line?
--- -- TODO        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id), -- TODO rp_account
---    host_login_user TEXT NOT NULL,
---    created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
---    updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
--- -- TODO???        UNIQUE (rp_id, host_login_user)
--- --TODO        UNIQUE (resource_id, resource_provider_login_id)
--- );
--- ALTER TABLE resource_host_accounts OWNER TO tms;
+-- ---------------------------------------
+-- resource_host_accounts table
+-- ---------------------------------------
+-- This table establishes the host login user in a resource for a Resource Provider identity.
+CREATE TABLE IF NOT EXISTS resource_host_accounts
+(
+   id SERIAL PRIMARY KEY,
+-- TODO/TBD: I'm thinking reference to resource_provider_logins does not make sense. What if "user" has never logged into RP?
+--           And maybe reference to resources also does not make sense? for similar reason? Needs more thought.
+--           or maybe by the time we do an INSERT for this table the other two records must exist?
+--           But de-normalizing by using rp_id and rp_account would probably help a human troubleshoot. Have both?
+--           Plus, when we are looking up host_login_user when we are creating a key-pair (pubkeys_create.rs) what we
+--               will have is rp_id and rp_account.
+-- TODO        resource_id INTEGER REFERENCES resources (id),   -- TODO Is this what we are calling rp_id in the above?
+   rp_id TEXT NOT NULL REFERENCES identity_providers (id), -- TODO Use this to replace above line?
+   rp_account TEXT NOT NULL,  -- REFERENCES ???? (id),
+-- TODO NOTE: for rp_account there is no table to reference. Would it make sense for this record to be what other tables reference?
+--        rp_account is in tables resource_provider_logins, delegations, pubkeys, reservations
+-- TODO        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id), -- TODO rp_account instead?
+   host_login_user TEXT NOT NULL,
+   created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+   updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc')
+-- TODO???        UNIQUE (rp_id, host_login_user)
+--TODO        UNIQUE (resource_id, resource_provider_login_id)
+);
+ALTER TABLE resource_host_accounts OWNER TO tms;
 
 -- ----------------------------------------------------------------------
 -- client_implicit_mode_allowed_resources table
@@ -360,7 +360,7 @@ ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
 --      e.g., if my TACC id is someuser, should we update it to be 'someuser_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note above under delegations table.
-ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknownImplictModeIdP'
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
     REFERENCES tms_identities(tms_identity);
 -- For the legacy MVP records, we can use the implicit mode TACC RP here.
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_tacc_rp'
