@@ -22,8 +22,8 @@ pub const IS_TMS_ID_ENABLED: &str = "SELECT enabled FROM tms_identities where tm
 
 // ========================= clients table =========================
 pub const INSERT_CLIENT: &str = concat!(
-    "INSERT INTO clients (name, client_id, secret, enabled, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6)",
+    "INSERT INTO clients (name, client_id, secret, rp_id, tms_mode, enabled, created, updated) ",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 );
 
 pub const IS_CLIENT_ENABLED: &str = "SELECT enabled FROM clients where client_id = $1";
@@ -96,17 +96,17 @@ pub const SEL_DELEGATION_EXISTS: &str = concat!(
 
 // ========================= pubkeys table =========================
 pub const INSERT_PUBKEYS: &str = concat!(
-    "INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+    "INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, ",
       "public_key_fingerprint, public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
 );
 
 pub const INSERT_PUBKEYS_NOT_STRICT: &str = concat!(
-"INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+"INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, ",
 "public_key_fingerprint, public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
 "initial_ttl_minutes, expires_at, created, updated) ",
-"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) ",
+"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ",
 "ON CONFLICT DO NOTHING"
 );
 

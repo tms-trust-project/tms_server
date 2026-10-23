@@ -56,7 +56,7 @@ ALTER TABLE identity_providers OWNER TO tms;
 -- Only TACC is running TMS server 0.3 and the RP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
-INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_client_id, oauth2_client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678-1234-taccrp-implictmode',
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
@@ -66,7 +66,7 @@ VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678
 -- Only TACC is running TMS server 0.3 and the IdP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
-INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_client_id, oauth2_client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '12345678-1234-taccidp-implicitmode',
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
@@ -74,7 +74,7 @@ VALUES ('implicit_mode_tacc_idp', 'ImplictMode TACC Identity Provider', '1234567
 --
 -- Create an identity_provider to be used as placeholder to be used when adding columns that are NOT NULL.
 -- This should not be in place permanently, it should get replaced during an upgrade.
-INSERT INTO identity_providers (id, name, oauth2_clientid, oauth2_clientsecret, identity_redirect_url, oauth2_token_url,
+INSERT INTO identity_providers (id, name, oauth2_client_id, oauth2_client_secret, identity_redirect_url, oauth2_token_url,
                                 provider_type, supports_login, supports_resources)
 VALUES ('implicit_mode_unknown', 'ImplictMode Unkown RP', '12345678-1234-unknown-implicitmode',
         'ImplictModeUnknownZRzpE6DCDvkrM', '', '', 'implicit_mode', false, false);
@@ -185,57 +185,57 @@ CREATE TABLE IF NOT EXISTS issued_tokens
 -- ----------------------------------------------------------------------
 -- Resources available in a Resource Provider.
 -- ----------------------------------------------------------------------
-CREATE TABLE
-    IF NOT EXISTS resources (
-        id SERIAL PRIMARY KEY,
-        resource_local_id TEXT NOT NULL, -- TODO what is resource_local_id?
-        name TEXT NOT NULL,
-        url TEXT NOT NULL,
-        description TEXT,
-        rp_id TEXT NOT NULL REFERENCES identity_providers (id),
-        created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
-        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
-        UNIQUE (rp_id, resource_local_id)
-    );
+CREATE TABLE IF NOT EXISTS resources (
+    id SERIAL PRIMARY KEY,
+    resource_local_id TEXT NOT NULL, -- TODO what is resource_local_id?
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    description TEXT,
+    rp_id TEXT NOT NULL REFERENCES identity_providers (id),
+    created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+    updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+    UNIQUE (rp_id, resource_local_id)
+);
 ALTER TABLE resources OWNER TO tms;
 
--- ---------------------------------------
--- resource_host_accounts table
--- ---------------------------------------
--- This table establishes the host login user in a resource for a Resource Provider identity.
-CREATE TABLE
-    IF NOT EXISTS resource_host_accounts (
-        id SERIAL PRIMARY KEY,
-    -- TODO/TBD: I'm thinking reference to resource_provider_logins does not make sense. What if "user" has never logged into RP?
-    --           And maybe reference to resources also does not make sense? for similar reason? Needs more thought.
-    --           or maybe by the time we are do a CREATE for this table the other two records must exist?
-    --           But de-normalizing by using rp_id and rp_account would probably help a human troubleshoot. Have both?
-    --           Plus, when we are looking up host_login_user when we are creating a key-pair (pubkeys_create.rs) what we
-    --               will have is rp_id and rp_account.
-        resource_id INTEGER REFERENCES resources (id),   -- TODO Is this what we are calling rp_id in the above?
-        rp_id TEXT NOT NULL REFERENCES identity_providers (id) -- TODO Use this to replace above line?
-        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id), -- TODO rp_account
-        host_login_user TEXT NOT NULL,
-        created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
-        updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
-        UNIQUE (resource_id, resource_provider_login_id)
-    );
-ALTER TABLE resource_host_accounts OWNER TO tms;
+-- -- ---------------------------------------
+-- -- resource_host_accounts table
+-- -- ---------------------------------------
+-- -- This table establishes the host login user in a resource for a Resource Provider identity.
+-- CREATE TABLE IF NOT EXISTS resource_host_accounts
+-- (
+--    id SERIAL PRIMARY KEY,
+--     -- TODO/TBD: I'm thinking reference to resource_provider_logins does not make sense. What if "user" has never logged into RP?
+--     --           And maybe reference to resources also does not make sense? for similar reason? Needs more thought.
+--     --           or maybe by the time we are do a CREATE for this table the other two records must exist?
+--     --           But de-normalizing by using rp_id and rp_account would probably help a human troubleshoot. Have both?
+--     --           Plus, when we are looking up host_login_user when we are creating a key-pair (pubkeys_create.rs) what we
+--     --               will have is rp_id and rp_account.
+-- -- TODO        resource_id INTEGER REFERENCES resources (id),   -- TODO Is this what we are calling rp_id in the above?
+--    rp_id TEXT NOT NULL REFERENCES identity_providers (id) -- TODO Use this to replace above line?
+-- -- TODO        resource_provider_login_id INTEGER REFERENCES resource_provider_logins (id), -- TODO rp_account
+--    host_login_user TEXT NOT NULL,
+--    created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+--    updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
+-- -- TODO???        UNIQUE (rp_id, host_login_user)
+-- --TODO        UNIQUE (resource_id, resource_provider_login_id)
+-- );
+-- ALTER TABLE resource_host_accounts OWNER TO tms;
 
 -- ----------------------------------------------------------------------
 -- client_implicit_mode_allowed_resources table
 -- ----------------------------------------------------------------------
 -- This table establishes the set of resources allowed for a tms app client which uses implicit_mode
-CREATE TABLE
-    IF NOT EXISTS  (client_implicit_mode_allowed_resources)
+CREATE TABLE IF NOT EXISTS client_allowed_resources
+(
     id SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients (id),
     resource_id INTEGER REFERENCES resources (id),
     created TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
     updated TIMESTAMPTZ NOT NULL DEFAULT (NOW () AT TIME ZONE 'utc'),
     UNIQUE (client_id, resource_id)
-    );
-ALTER TABLE client_implicit_mode_allowed_resources OWNER TO tms;
+);
+ALTER TABLE client_allowed_resources OWNER TO tms;
 
 
 -- ********************************************************************
@@ -360,7 +360,7 @@ ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
 --      e.g., if my TACC id is someuser, should we update it to be 'someuser_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note above under delegations table.
-ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
+ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknownImplictModeIdP'
     REFERENCES tms_identities(tms_identity);
 -- For the legacy MVP records, we can use the implicit mode TACC RP here.
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_tacc_rp'
