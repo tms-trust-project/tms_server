@@ -174,7 +174,7 @@ impl RespPublicKey {
         }
         // Check that tms_identity is enabled
         if !check_tms_id_enabled(&full_pubkey.tms_identity).await {
-            let msg = format!("WARNING: TMS Identity not enabled. TmsId: {}", full_pubkey.tms_identity);
+            let msg = format!("WARNING: TMS Identity not enabled. TmsUserId: {}", full_pubkey.tms_identity);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }

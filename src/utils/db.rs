@@ -174,7 +174,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         now.clone(),
     );
 
-    info!("Creating key-pair for ClientId: {} TmsId: {} RPId: {} RPAcct: {} Host: {} HostLoginUser: {}",
+    info!("Creating key-pair for ClientId: {} TmsUserId: {} RPId: {} RPAcct: {} Host: {} HostLoginUser: {}",
           TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_login_user);
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS_NOT_STRICT)
@@ -198,7 +198,7 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("Created key-pair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostLoginUser: {}",
+    info!("Created key-pair for ClientId: {} TmsUserId: {} RpId: {} RpAcct: {} Host: {} HostLoginUser: {}",
           TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_login_user);
     info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
@@ -230,7 +230,7 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("pubkey record created. ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostLoginUser: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
+    info!("pubkey record created. ClientId: {} TmsUserId: {} RpId: {} RpAcct: {} Host: {} HostLoginUser: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
            rec.client_id, rec.tms_identity, rec.rp_id, rec.rp_account, rec.host, rec.host_login_user, rec.expires_at, rec.remaining_uses, rec.key_type);
     Ok(result.rows_affected())
 }
@@ -508,7 +508,7 @@ pub async fn create_test_data() -> Result<u64> {
         info!("Creating TMS identity record for TMS user: {}", test_tms_identity.clone());
         insert_tms_id(&*test_tms_identity, DB_TRUE).await?;
 
-        info!("Creating test records for tms identity. TmsId: {} rp_id: {} rp_account {} host: {}",
+        info!("Creating test records for tms identity. TmsUserId: {} rp_id: {} rp_account {} host: {}",
               test_tms_identity, TEST_RP_ID, test_rp_account, test_host);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)
@@ -601,14 +601,14 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
             let enabled: bool = row.get(0);
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
-                let msg = format!("Resource provider login record is disabled. TmsId: {} RpId: {} RpAcct: {}",
+                let msg = format!("Resource provider login record is disabled. TmsUserId: {} RpId: {} RpAcct: {}",
                                          tms_identity, rp_id, rp_account);
                 error!("{}", msg);
                 return Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Resource provider login record not found. TmsId: {} RpId: {} RpAcct: {}",
+            let msg = format!("Resource provider login record not found. TmsUserId: {} RpId: {} RpAcct: {}",
                                      tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Err(anyhow!(msg));
@@ -628,14 +628,14 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
             // Check expiry
             let expires_at: DateTime<Utc> = row.get(0);
             if expires_at < timestamp_utc() {
-                let msg = format!("Delegation record has expired. TmsId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
+                let msg = format!("Delegation record has expired. TmsUserId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
                                          tms_identity, client_id, rp_id, rp_account, expires_at);
                 error!("{}", msg);
                 return Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Delegation record not found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
+            let msg = format!("Delegation record not found. TmsUserId: {} ClientId: {} RpId: {} RpAcct: {}",
                                      tms_identity, client_id, rp_id, rp_account);
             error!("{}", msg);
             return Err(anyhow!(msg));
@@ -740,7 +740,6 @@ pub async fn get_client_result(client_id: &String) -> Result<Client> {
 // ---------------------------------------------------------------------------
 pub async fn get_host_login_user_result(rp_id: &String, rp_account: &String) -> Result<String> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
-
     let result = sqlx::query_scalar(GET_HOST_LOGIN_USER)
         .bind(rp_id.clone()).bind(rp_account.clone())
         .fetch_optional(&mut *tx).await?;

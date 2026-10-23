@@ -183,7 +183,7 @@ impl RespNewSshKeys {
 
         // Check that tms_identity is enabled
         if !check_tms_id_enabled(&req.tms_identity).await {
-            let msg = format!("WARNING: TMS Identity not enabled. ClientId: {} TmsId: {}", client_id, req.tms_identity);
+            let msg = format!("WARNING: TMS Identity not enabled. ClientId: {} TmsUserId: {}", client_id, req.tms_identity);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
@@ -195,7 +195,7 @@ impl RespNewSshKeys {
                 Ok(_) => {}
                 Err(e) => {
                     let msg =
-                        format!("ImplicitTrustMode Error setting up implicit trust records. ClientId: {} TmsId: {} Error: {}",
+                        format!("ImplicitTrustMode Error setting up implicit trust records. ClientId: {} TmsUserId: {} Error: {}",
                                 client_id, req.tms_identity, e.to_string());
                     error!("{}", msg);
                     return Ok(make_http_400(msg));
@@ -249,11 +249,7 @@ impl RespNewSshKeys {
             Err(e) => { return Err(anyhow!(e)); }
         };
 
-        // TODO: Look up the host_login_user associated with the resource
-        // TODO/TBD: looks like we can just use existing host_account. Remove all recent host_login_user updates?
-        //           need to think about if this works when migrating existing records.
-        //           remove host_account from incoming request body for createKeypair endpoint? Are there any cases
-        //             where it is needed in the request body?
+        // Look up the host_login_user associated with the resource
         let host_login_user = match get_host_login_user_result(&req.rp_id, &req.rp_account).await {
             Ok(hlu) => hlu,
             Err(e) => {
@@ -263,7 +259,6 @@ impl RespNewSshKeys {
                 return Ok(make_http_400(msg));
             }
         };
-
 
         // ------------------------ Update Database --------------------
         // Interpret numeric input.

@@ -57,7 +57,7 @@ pub async fn create_pubkey_dependencies(parms: ImplicitModeDependencyParms) -> R
     let count = insert_tms_id(&*parms.tms_identity, DB_TRUE).await?;
     if count > 0 {
         insert_count += count;
-        info!("ImplicitMode: TMS_IDENTITY created. TmsId: {}.", parms.tms_identity);
+        info!("ImplicitMode: TMS_IDENTITY created. TmsUserId: {}.", parms.tms_identity);
     }
 
     // --------------------- Insert rp_login record ------------------------
