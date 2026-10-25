@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use strum_macros::{AsRefStr, Display, EnumString};
+use strum_macros::{Display, EnumString};
 use anyhow::{Result, anyhow};
 use log::{info, error};
 use serde::Deserialize;
@@ -111,7 +111,8 @@ lazy_static! {
 // ***************************************************************************
 //                                Enums
 // ***************************************************************************
-#[derive(Debug, PartialEq, Eq, AsRefStr, EnumString, Deserialize, Display, sqlx::Type)]
+#[derive(Debug, PartialEq, Eq, EnumString, Display, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "TEXT")]
 #[strum(serialize_all = "PascalCase", ascii_case_insensitive)] // Make conversions case-insensitive
 pub enum TmsMode { ExplicitTrust, ImplicitTrust }
 
@@ -221,7 +222,7 @@ pub struct RuntimeCtx {
 pub struct Config {
     pub http_addr: String,
     pub http_port: u16,
-    pub enable_mvp: bool,
+    pub enable_implicit: bool,
     pub enable_test_client: bool,
     pub new_clients: String,
     pub server_urls: Vec<String>
@@ -258,7 +259,7 @@ impl Default for Config {
         Self {
             http_addr: DEFAULT_HTTP_ADDR.to_string(),
             http_port: DEFAULT_HTTP_PORT,
-            enable_mvp: false,
+            enable_implicit: false,
             enable_test_client: false,
             new_clients: DEFAULT_NEW_CLIENTS.to_string(),
             server_urls: vec![DEFAULT_SVR_URL.to_string()]

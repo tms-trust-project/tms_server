@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS identity_providers
 );
 ALTER TABLE identity_providers OWNER TO tms;
 --
--- Create an identity_provider to be used as resource provider for existing MVP legacy "implicit trust" mode records.
+-- Create an identity_provider to be used as resource provider for existing "implicit trust" mode records, i.e.
+--    existing MVP legacy records.
 -- Only TACC is running TMS server 0.3 and the RP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
@@ -62,7 +63,7 @@ VALUES ('implicit_mode_tacc_rp', 'ImplictMode TACC Resource Provider', '12345678
         'ImplictModeZf9afuG9RzpE6DCDvkrM', 'https://auth.implicit.fake.org/v2/oauth2/authorize',
         'https://auth.implicit.fake.org/v2/oauth2/token', 'implicit_mode', false, false);
 --
--- Create an identity_provider to be used as an IdP for existing MVP legacy "implicit mode" records.
+-- Create an identity_provider to be used as an IdP for existing MVP legacy "implicit trust" records.
 -- Only TACC is running TMS server 0.3 and the IdP is always strictly just TACC.
 -- The TMS host module tms_keycmd is only running on TACC resources and the use of TMS is restricted to Tapis
 --   tenants which use TACC ldap for authentication.
@@ -102,7 +103,9 @@ ALTER TABLE tms_identities OWNER TO tms;
 --   tms_identity record in tms_identities.
 --
 
---  Create a TMS identity with a special name to act as a potential fallback for MVP legacy implicit trust mode records.
+--  Create a TMS identity with a special name to act as a potential fallback for implicit trust mode records.
+--   TODO: Needed for migration of existing MVP legacy records? Or not needed? Probably not, since we should create a
+--         TMS identity for each user associated with legacy records?
 INSERT INTO tms_identities (tms_identity) VALUES ('ImplicitUserUnknown@ImplictModeIdP');
 
 -- ---------------------------------------
@@ -175,7 +178,7 @@ CREATE TABLE IF NOT EXISTS issued_tokens
     updated       TIMESTAMPTZ       NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 
--- TODO Now that all columns are added for existing MVP legacy "implicit mode" records created for TMS 0.3 and earlier,
+-- TODO Now that all columns are added for existing MVP legacy "implicit trust" records created for TMS 0.3 and earlier,
 --  we probably need to fill in some attributes for various tables, attributes: tms_identity, rp_id, rp_account
 --    and tms_identity for every record in the old user_mfa table and delegations table.
 
@@ -256,7 +259,8 @@ ALTER TABLE clients RENAME COLUMN app_name TO name;
 -- NOTE: Keep column client_id as is because TMS server already has a column 'id' as a SERIAL primary key
 ALTER TABLE clients RENAME COLUMN client_secret TO secret;
 -- Add column tms_mode: ExplicitTrust, ImplicitTrust
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'ExplicitTrust';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS tms_mode TEXT NOT NULL DEFAULT 'ExplicitTrust'
+    CHECK (tms_mode IN ('ExplicitTrust', 'ImplicitTrust'));
 -- Add column for rp to be used for the case of ImplicitTrust.
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS rp_id TEXT REFERENCES identity_providers(id);
 
@@ -337,7 +341,7 @@ ALTER TABLE delegations DROP CONSTRAINT IF EXISTS delegations_client_user_id_fke
 -- NOTE: The hard coded string here must match the one used above for the tms_identities table.
 ALTER TABLE delegations ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
     REFERENCES tms_identities(tms_identity) ON UPDATE CASCADE ON DELETE CASCADE;
--- TODO after above ADD COLUMN, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
+-- TODO after above ADD COLUMN, do we need to modify the rp_account value for the existing legacy MVP implicit trust records?
 --      e.g., if my TACC id is someuser, should we update it to be 'someuser_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note below under pubkeys table
@@ -356,13 +360,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS delegations_tmsid_cltid_rpid_rpacct_idx ON del
 --                  - also will have host_login_user to record the host account provided by the RP
 --   get pubkey - just need pubkey_fingerprint
 ALTER TABLE pubkeys RENAME COLUMN client_user_id TO rp_account;
--- TODO after above rename, do we need to modify the rp_account value for the existing legacy MVP implicit mode records?
+-- TODO after above rename, do we need to modify the rp_account value for the existing legacy MVP implicit trust records?
 --      e.g., if my TACC id is someuser, should we update it to be 'someuser_ImplictModeRP' or similar?
 --      NOTE: Must create tms_identity also
 --      See similar note above under delegations table.
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS tms_identity TEXT NOT NULL DEFAULT 'ImplicitUserUnknown@ImplictModeIdP'
     REFERENCES tms_identities(tms_identity);
--- For the legacy MVP records, we can use the implicit mode TACC RP here.
+-- For the legacy MVP records, we can use the implicit trust TACC RP here.
 ALTER TABLE pubkeys ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT 'implicit_mode_tacc_rp'
     REFERENCES identity_providers(id);
 -- Rename column host_account to host_login_user. We are removing host_account from pubkeys create request.

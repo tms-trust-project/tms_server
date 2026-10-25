@@ -38,7 +38,7 @@ pub struct ImplicitModeDependencyParms
  *    - resource_provider_logins - non-expiring RP_LOGIN set up for user
  *    - delegations - non-expiring delegation established between tms_identity and client
  *
- * When the enable_mvp flag is turned on in the configuration file, clients can create keys without
+ * When the enable_implicit flag is turned on in the configuration file, clients can create keys without
  *   prior configuration in the above tables. TMS will automatically create those records based on
  *   the input to the key create call, eliminating the possibility that missing dependency records
  *   will cause key creation to fail. If a record already exists, it is not overwritten.

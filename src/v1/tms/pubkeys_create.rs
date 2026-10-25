@@ -145,6 +145,7 @@ impl RespNewSshKeys {
     // ========================================================================================
     async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse> {
         // Log the request
+        info!("DEBUG createkey process");
         tms_utils::debug_request(http_req, req);
 
         // -------------------- Extract Headers ----------------------
@@ -153,6 +154,7 @@ impl RespNewSshKeys {
             Ok(h) => h,
             Err(e) => { return Ok(make_http_400(e.to_string())); }
         };
+        info!("DEBUG createkey got client_id {}", client_id);
 
         // -------------------- Check Authorization ----------------------------
         // Only the client and admin can make this call
@@ -164,6 +166,7 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_401(msg));
         }
+        info!("DEBUG createkey passed auth check");
         // Get the client record. We will need the tms_mode and enabled flag
         let client = match get_client_result(&client_id).await {
             Ok(c) => c,
@@ -173,6 +176,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_400(msg));
             }
         };
+        info!("DEBUG createkey got client");
 
         // Check that client is enabled
         if !client.enabled {
@@ -180,6 +184,7 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
+        info!("DEBUG createkey client is enabled");
 
         // Check that tms_identity is enabled
         if !check_tms_id_enabled(&req.tms_identity).await {
@@ -187,10 +192,13 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
+        info!("DEBUG createkey tms_id is enabled");
 
         // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
         // If running in ImplicitTrust mode then automatically create delegation records.
-        if RUNTIME_CTX.parms.config.enable_mvp && matches!(client.tms_mode, TmsMode::ImplicitTrust) {
+        if RUNTIME_CTX.parms.config.enable_implicit && matches!(client.tms_mode, TmsMode::ImplicitTrust) {
+            info!("DEBUG createkey implicit");
+            info!("DEBUG createkey creating implicit_mode records");
             match setup_implicit_mode_records(&req, &*client_id).await {
                 Ok(_) => {}
                 Err(e) => {
@@ -201,6 +209,7 @@ impl RespNewSshKeys {
                     return Ok(make_http_400(msg));
                 }
             }
+            info!("DEBUG createkey created implicit records");
         }
 
         // --------------------- Check Login and delegation records -----------------------
@@ -226,6 +235,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_403(msg));
             }
         }
+        info!("DEBUG createkey record check complete");
 
         // ------------------------ Generate Keys ------------------------
         // Get the provided key type or use default.
@@ -249,6 +259,7 @@ impl RespNewSshKeys {
             Err(e) => { return Err(anyhow!(e)); }
         };
 
+        info!("DEBUG createkey generated keypair");
         // Look up the host_login_user associated with the resource
         let host_login_user = match get_host_login_user_result(&req.rp_id, &req.rp_account).await {
             Ok(hlu) => hlu,
@@ -259,6 +270,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_400(msg));
             }
         };
+        info!("DEBUG createkey got host_login_user");
 
         // ------------------------ Update Database --------------------
         // Interpret numeric input.
@@ -304,6 +316,7 @@ impl RespNewSshKeys {
             }
         }
 
+        info!("DEBUG createkey DONE, DB updated");
 
         // Success! Zero key bits means a fixed key length.
         Ok(make_http_201(Self::new("0", "success",
@@ -336,7 +349,7 @@ async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Re
         return Err("Unable to extract host_login_user from TMS identity.".to_string());
     }
     // Validate host login user
-    match validate_host_login_user(&host_login_user) {
+    match validate_host_login_user(&host_login_user).await {
         Ok(_) => {}
         Err(e) => {
             let msg =
@@ -371,7 +384,7 @@ async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Re
  *  - Check length. By RFC 5321, usernames for an email address or limited to 64 characters
  *  - Check against regex: r"^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$"
  */
-fn validate_host_login_user(host_login: &str) -> Result<(), String> {
+async fn validate_host_login_user(host_login: &str) -> Result<(), String> {
     if host_login.is_empty() { return Err("HostLogin cannot be empty".to_string()); }
     if host_login.len() > 64 { return Err("HostLogin too long, max 64 characters.".to_string()); }
     // Check regex
