@@ -14,7 +14,7 @@ pub const SEL_IDP_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM identity_providers
 
 // ========================= tms_identities table ========================
 // NOTE: We just need one in this table for referencing, so OK if it already exists.
-pub const INSERT_TMS_ID: &str = concat!("INSERT INTO tms_identities (tms_identity, enabled) ",
+pub const INSERT_TMS_ID_NOT_STRICT: &str = concat!("INSERT INTO tms_identities (tms_identity, enabled) ",
      " VALUES ($1, $2) ON CONFLICT DO NOTHING");
 
 pub const IS_TMS_ID_ENABLED: &str = "SELECT enabled FROM tms_identities where tms_identity = $1";
@@ -63,10 +63,6 @@ pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
     "SELECT enabled ",
     "FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
-
-// pub const GET_RP_LOGIN_EXISTS: &str = concat!(
-//     "SELECT 1 FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
-// );
 
 // ========================= user_delegations table =================
 pub const INSERT_DELEGATION: &str = concat!(
@@ -135,7 +131,12 @@ pub const INSERT_ADMIN: &str = concat!(
 // get_authz_secret() in authz.rs.
 pub const GET_ADMIN_SECRET: &str = "SELECT admin_secret FROM admins WHERE admin_user = $1";
 
-// ==================== resource_host_acocunts table =========================
+// ==================== resource_host_accounts table =========================
+pub const INSERT_HOST_ACCT_NOT_STRICT: &str = concat!(
+    "INSERT INTO resource_host_accounts (rp_id, rp_account, host_login_user, created) ",
+    "VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+);
+
 pub const GET_HOST_LOGIN_USER: &str =
     "SELECT host_login_user FROM resource_host_accounts WHERE rp_id = $1 AND rp_account = $2";
 

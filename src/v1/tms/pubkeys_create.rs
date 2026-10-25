@@ -267,6 +267,7 @@ impl RespNewSshKeys {
                 let msg =
                     format!("Unable to fetch host_login_user. ClientId: {} TmsUserId: {} RpId: {} RpAcct: {} Error: {}.",
                              client_id, req.tms_identity, req.rp_id, req.rp_account, e.to_string());
+                error!("{}", msg);
                 return Ok(make_http_400(msg));
             }
         };
@@ -345,6 +346,7 @@ async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Re
     let host_login_user: String;
     if let Some((host_login, _tms_id_domain)) = req.tms_identity.split_once('@') {
         host_login_user = host_login.to_string();
+        info!{"Found host login user: {}", host_login_user};
     } else {
         return Err("Unable to extract host_login_user from TMS identity.".to_string());
     }
@@ -362,8 +364,9 @@ async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Re
     let implicit_trust_inputs = ImplicitModeDependencyParms {
         client_id: client_id.parse().unwrap(),
         tms_identity: req.tms_identity.clone(),
-        rp_id: req.rp_account.clone(),
-        rp_account: req.rp_account.clone()
+        rp_id: req.rp_id.clone(),
+        rp_account: req.rp_account.clone(),
+        host_login_user
     };
     // Insert records into the resource_provider_logins and delegations tables
     match create_pubkey_dependencies(implicit_trust_inputs).await {

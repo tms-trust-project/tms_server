@@ -1,13 +1,13 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use crate::utils::db_types::{DelegationInput, RPLoginInput};
+use crate::utils::db_types::{DelegationInput, RHostAccountInput, RPLoginInput};
 use crate::utils::tms_utils::{timestamp_utc};
 use log::info;
 use crate::RUNTIME_CTX;
 use crate::utils::config::DB_TRUE;
 use crate::utils::db::{insert_tms_id};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_DELEGATION_NOT_STRICT, INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_DELEGATION_NOT_STRICT, INSERT_HOST_ACCT_NOT_STRICT, INSERT_RP_LOGIN, INSERT_RP_LOGIN_NOT_STRICT};
 use crate::utils::tms_utils;
 
 // Insert fails on conflict.
@@ -18,7 +18,8 @@ pub struct ImplicitModeDependencyParms
     pub client_id: String,
     pub tms_identity: String,
     pub rp_id: String,
-    pub rp_account: String
+    pub rp_account: String,
+    pub host_login_user: String
 }
 
 /*
@@ -37,6 +38,7 @@ pub struct ImplicitModeDependencyParms
  *    - tms_identities
  *    - resource_provider_logins - non-expiring RP_LOGIN set up for user
  *    - delegations - non-expiring delegation established between tms_identity and client
+ *    - resource_host_accounts - host login user
  *
  * When the enable_implicit flag is turned on in the configuration file, clients can create keys without
  *   prior configuration in the above tables. TMS will automatically create those records based on
@@ -103,6 +105,24 @@ pub async fn create_pubkey_dependencies(parms: ImplicitModeDependencyParms) -> R
         info!("ImplicitTrust Mode: Delegation records created. tms_identity: {} rp_id: {} rp_account {} client_id: {}",
               parms.tms_identity, parms.rp_id, parms.rp_account, parms.client_id);
     }
+    // --------------------- Insert resource_host_account record ------------------------
+    // Required inputs: rp_id, rp_account, host_login_user
+    //
+    // Create the input record.
+    let input_record = RHostAccountInput::new(
+        parms.rp_id.clone(),
+        parms.rp_account.clone(),
+        parms.host_login_user.clone(),
+        now.clone(),
+        now.clone()
+    );
+    // Insert not already present.
+    let count = insert_acct_host_login(input_record).await?;
+    if count > 0 {
+        insert_count += count;
+        info!("ImplicitMode: Resource Host Account created for tms_identity: {} rp_id: {} rp_account: {} host_login_user: {}.",
+              parms.tms_identity, parms.rp_id, parms.rp_account, parms.host_login_user);
+    }
     Ok(insert_count)
 }
 
@@ -149,6 +169,27 @@ async fn insert_rp_login(rec: RPLoginInput, strict: bool) -> Result<u64> {
         .bind(rec.created)
         .bind(rec.updated)
         .bind(rec.last_login)
+        .execute(&mut *tx)
+        .await?;
+    // Commit the transaction.
+    tx.commit().await?;
+
+    Ok(result.rows_affected())
+}
+
+// ---------------------------------------------------------------------------
+// insert_res_acct_login:
+// ---------------------------------------------------------------------------
+async fn insert_acct_host_login(rec: RHostAccountInput) -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    // Choose the query based on strictness requirement.
+    // Create the insert statement.
+    let result = sqlx::query(INSERT_HOST_ACCT_NOT_STRICT)
+        .bind(rec.rp_id)
+        .bind(rec.rp_account)
+        .bind(rec.host_login_user)
+        .bind(rec.created)
+        .bind(rec.updated)
         .execute(&mut *tx)
         .await?;
     // Commit the transaction.

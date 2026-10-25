@@ -8,7 +8,7 @@ use chrono::{Utc, DateTime};
 use sqlx::{Row};
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR,
                               timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_ID, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED, GET_CLIENT, GET_HOST_LOGIN_USER};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_ID_NOT_STRICT, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED, GET_CLIENT, GET_HOST_LOGIN_USER};
 use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, get_setup_out_path, TEST_TAPIS_CLIENT, TEST_TAPIS_CLIENT_SECRET, TEST_TAPIS_APP, TmsMode};
 use log::error;
 use crate::RUNTIME_CTX;
@@ -64,7 +64,7 @@ const KEY_TYPE: KeyType = KeyType::Ed25519;
  */
 pub async fn insert_tms_id(tms_id: &str, enabled: bool) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
-    let result = sqlx::query(INSERT_TMS_ID)
+    let result = sqlx::query(INSERT_TMS_ID_NOT_STRICT)
         .bind(tms_id)
         .bind(enabled)
         .execute(&mut *tx)

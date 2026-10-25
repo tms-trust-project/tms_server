@@ -239,6 +239,15 @@ pub struct RPLoginInput {
     pub last_login: DateTime<Utc>
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RHostAccountInput {
+    pub rp_id: String,
+    pub rp_account: String,
+    pub host_login_user: String,
+    pub created: DateTime<Utc>,
+    pub updated: DateTime<Utc>
+}
+
 impl RPLogin {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
@@ -269,6 +278,19 @@ impl RPLoginInput {
     )
     -> RPLoginInput {
         RPLoginInput { tms_identity, rp_id, rp_account, enabled, created, updated, last_login }
+    }
+}
+
+impl RHostAccountInput {
+    pub fn new(
+        rp_id: String,
+        rp_account: String,
+        host_login_user: String,
+        created: DateTime<Utc>,
+        updated: DateTime<Utc>
+    )
+        -> RHostAccountInput {
+        RHostAccountInput { rp_id, rp_account, host_login_user, created, updated }
     }
 }
 
