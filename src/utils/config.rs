@@ -30,8 +30,8 @@ use super::tms_utils::get_absolute_path;
 // ***************************************************************************
 // Directory and file locations.
 // Unless otherwise noted, all files and directories are relative to the TMS root directory.
-const DEFAULT_ROOT_DIR     : &str = "~/tms";
-const DEFAULT_LOCAL_DIR     : &str = "~/tms_local";
+const DEFAULT_ROOT_DIR     : &str = "$HOME/tms";
+const LOCAL_DIR            : &str = "$HOME/tms_local";
 const MIGRATIONS_DIR       : &str = "/migrations";
 const CONFIG_DIR           : &str = "/config";
 const LOGS_DIR             : &str = "/logs";
@@ -166,7 +166,7 @@ pub struct TmsCmdArgs {
     ///
     ///   2. Otherwise, if set, the value of the environment variable TMS_ROOT_DIR,
     ///
-    ///   3. Otherwise, ~/tms
+    ///   3. Otherwise, $HOME/tms
     #[arg(short, long)]
     pub version: bool,
     /// Specify TMS root install directory.
@@ -590,7 +590,7 @@ fn get_root_dir() -> String {
 // ---------------------------------------------------------------------------
 fn get_local_dir() -> String {
     // Canonicalize the path.
-    get_absolute_path(DEFAULT_LOCAL_DIR)
+    get_absolute_path(LOCAL_DIR)
 }
 
 // ---------------------------------------------------------------------------
