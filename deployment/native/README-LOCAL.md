@@ -65,7 +65,6 @@ The installation script will:
 - Create the directories `$HOME/tms`, `$HOME/tms_server` and `$HOME/tms_local`.
 - Install the server under `$HOME/tms` and `$HOME/tms_server`
 - Copy the SSL certificate files into place at `$HOME/tms/certs`.
-# TODO - Copy any custom `tms.toml` and `log4rs.yml` files from `$HOME/tms_local` to `$HOME/tms/config`.
 
 ## Running TMSCS
 Note that the installation script will not start the service after installing. The server may be started up in the
@@ -79,17 +78,20 @@ cd $HOME/src/tms_server
 cargo run
 ```
 
-The server should now be available on the localhost at port `8080` or whatever port was configured in a custom
-`tms.toml` file that was located under `$HOME/tms_local`.
+The server should now be available on the localhost at port `8080`
 For example, to fetch the current TMS Server version:
 ```
-curl -k https://localhost:3000/v1/tms/version
+curl -k https://localhost:8080/v1/tms/version
 ```
+
+To change the port please edit the file `$HOME/tms/config/tms.toml` and re-start the server.
 
 ## Logging
 The log configuration and formatting for `tms_server` is specified in the configuration file
 `$HOME/tms/config/log4rs.yml`. By default, the log level is set to `INFO` and log messages are written to the file
 `$HOME/tms/logs/tms_roller.log`.
+
+To change the log configuration please edit the file `$HOME/tms/config/log4rs.yml` and re-start the server.
 
 ## TMSCS Directories and Files
 
@@ -119,8 +121,8 @@ Under `$HOME/tms_server`
 3. File *tms.version* - 
 
 Under `$HOME/tms_local`
-1. File *tms.toml* - (Optional) Local customizations of TMSCS configuration settings.
-2. File *log4rs.toml* - (Optional) Local customizations of TMSCS log settings.
+1. File *tms.toml* - (Optional) Local customizations of TMSCS configuration settings. NOTE: Not automatically applied.
+2. File *log4rs.toml* - (Optional) Local customizations of TMSCS log settings. NOTE: Not automatically applied.
 3.File *tms-setup.out* - Output generated during first-time server startup, including administrator credentials.
     * **WARNING This is only place where these credentials are displayed. Losing them will likely make reinstallation necessary.**
 

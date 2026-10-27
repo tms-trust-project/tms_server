@@ -9,8 +9,8 @@
 #   as well as custom tms.toml and log4rs.yml files.
 # The DB is initialized
 #
-# TODO: Support custom tms.toml, log4rs.yml during install? Since directories and files are initialized during
-#       first-time startup it seems we would have to add back support for the --install option for tms_server.
+# NOTE: Still could support custom tms.toml, log4rs.yml during install, but since directories and files are initialized
+#       during first-time startup it seems we would have to add back support for the --install option for tms_server.
 #
 # Assumptions:
 #  - We are running from a checkout of tms_server github repo.
@@ -72,6 +72,8 @@ SERVER_DIR="$HOME/tms_server"
 LOCAL_DIR="$HOME/tms_local"
 # Set backup directory
 BAK_DIR="$HOME/tms_backups"
+DB_ENV_FILE="tms-db-env"
+DB_ENV_PATH="$ROOT_DIR/${DB_ENV_FILE}"
 
 # Make sure rust and psql are installed.
 rustc --version
@@ -175,16 +177,10 @@ $SRC_DIR/deployment/postgres/tms_init_db.sh
 #  Create directories that might not exist yet.
 #  NOTE: We could get fancy and put these in a list, process in a loop and check exit code
 # ============================================================================================
-#mkdir -p $ROOT_DIR
-#mkdir -p $ROOT_DIR/config
 mkdir -p $SERVER_DIR
-#mkdir -p $LOCAL_DIR
 mkdir -p $BAK_DIR/scripts
-#chmod 700 $ROOT_DIR
-#chmod 700 $ROOT_DIR/config
 # Copy initial resources directory to server directory. This is used during initial server startup.
 cp -pr $SRC_DIR/resources $SERVER_DIR/resources_src
-#chmod 700 $ROOT_DIR
 
 # Construct script to be used by install user to build new executable
 echo
@@ -262,9 +258,6 @@ chmod +x "$BAK_FILE_PATH"
 # =====================================================================================
 #  BEGIN install
 # =====================================================================================
-# TODO
-#DB_ENV_FILE="tms-db-env"
-#DB_ENV_PATH="$ROOT_DIR/${DB_ENV_FILE}"
 
 #####################################################
 ################## INSTALL ##########################
@@ -272,53 +265,20 @@ chmod +x "$BAK_FILE_PATH"
 # --------------------------------------
 # Clean install specific steps
 # --------------------------------------
-## TODO Create environment file for backup script
-#DB_ENV_FILE="$DB_ENV_PATH"
-#echo
-#echo "===== Creating environment file for backup script. File path: $DB_ENV_FILE"
-#echo "========================================================================================="
-## Construct env file
-#cat >> $DB_ENV_FILE << EOB
-#PG_DEPLOYMENT="tms-postgres"
-#PG_USER="tms"
-#PG_DBNAME="tmsdb"
-#PG_HOST="$TMS_DB_HOST"
-#PG_PORT="$TMS_DB_PORT"
-#PG_PASSWORD="$TMS_DB_USER_PASSWORD"
-#EOB
-#chmod 400 "$DB_ENV_FILE"
-
-#TODO
-## First Time Install Processing. Save output of initial --install run to ROOT_DIR
-## Copy the SSL cert files into place
-#mkdir -p $ROOT_DIR/certs
-#chmod 700 $ROOT_DIR/certs
-#cp -p $TMS_SSL_CERT_PATH $ROOT_DIR/certs/cert.pem
-#cp -p $TMS_SSL_KEY_PATH $ROOT_DIR/certs/key.pem
-#chmod 600 $ROOT_DIR/certs/*.pem
-
-# TODO
-## If there are custom tms or log4s config then copy into place
-#if [ -f $LOCAL_DIR/tms.toml ]; then
-#  cp -p $LOCAL_DIR/tms.toml $ROOT_DIR/config
-#  RET_CODE=$?
-#  if [ $RET_CODE -ne 0 ]; then
-#    echo "ERROR: Unable to copy: $LOCAL_DIR/tms.toml to $ROOT_DIR/config"
-#    echo "Exiting ..."
-#    exit $RET_CODE
-#  fi
-#  chmod 600 $ROOT_DIR/config/tms.toml
-#fi
-#if [ -f $LOCAL_DIR/log4rs.yml ]; then
-#  cp -p $LOCAL_DIR/log4rs.yml $ROOT_DIR/config/log4rs.yml
-#  RET_CODE=$?
-#  if [ $RET_CODE -ne 0 ]; then
-#    echo "ERROR: Unable to copy file: $LOCAL_DIR/log4rs.yml to $ROOT_DIR/config/log4rs.yml"
-#    echo "Exiting ..."
-#    exit $RET_CODE
-#  fi
-#  chmod 600 $ROOT_DIR/config/log4rs.yml
-#fi
+# Create environment file for backup script
+echo
+echo "===== Creating environment file for backup script. File path: $DB_ENV_PATH"
+echo "========================================================================================="
+# Construct env file
+cat >> $DB_ENV_PATH << EOB
+PG_DEPLOYMENT="tms-postgres"
+PG_USER="tms"
+PG_DBNAME="tmsdb"
+PG_HOST="$TMS_DB_HOST"
+PG_PORT="$TMS_DB_PORT"
+PG_PASSWORD="$TMS_DB_USER_PASSWORD"
+EOB
+chmod 400 "$DB_ENV_PATH"
 
 # If no example cert related files exist then copy example cert and key path files into local directory.
 if [ ! -f $LOCAL_DIR/cert.path ]; then

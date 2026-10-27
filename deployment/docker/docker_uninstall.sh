@@ -52,6 +52,3 @@ docker rm tms_server > /dev/null 2>&1
 
 # Delete the docker volume
 docker volume rm tms_server_vol
-
-# Remove the tms-root directory
-rm -fr "$HOME"/tms-docker/tms_local
