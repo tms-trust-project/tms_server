@@ -319,7 +319,7 @@ pub async fn check_tms_id_enabled(tms_id: &String) -> bool {
     match is_tms_id_enabled(tms_id).await {
         Ok(enabled) => enabled,
         Err(e) => {
-            error!("Unable to determine if TMS identity is enabled. TmsId: {} Error: {}", tms_id, e);
+            error!("Unable to determine if TMS identity is enabled. TmsUserId: {} Error: {}", tms_id, e);
             false
         }
     }

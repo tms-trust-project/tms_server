@@ -18,21 +18,20 @@
 
 # Use --verify=no for self-signed SSL certs
 #HTTPIE_CMD="http --verify=no"
-HTTPIE_CMD="http"
+HTTPIE_CMD="${HTTPIE_CMD:-http}"
 export TMS_URL="${TMS_URL:-http://localhost:8080}"
-
-export TMS_IDENTITY="${TMS_IDENTITY:-testtmsuser101@ImplicitModeTestIdP}"
-export TMS_RP_ID="${TMS_RP_ID:-test_fake_rp}"
-export TMS_RP_ACCOUNT="${TMS_RP_ACCOUNT:-testrpaccount101}"
 
 export TMS_CLIENT_ID="${TMS_CLIENT_ID:-testclient1}"
 export TMS_CLIENT_SECRET="${TMS_CLIENT_SECRET:-secret1}"
+export TMS_IDENTITY="${TMS_IDENTITY:-testtmsuser101@ImplicitModeTestIdP}"
+export TMS_RP_ID="${TMS_RP_ID:-test_fake_rp}"
+export TMS_RP_ACCOUNT="${TMS_RP_ACCOUNT:-testrpaccount101}"
+export TMS_HOST_ACCOUNT="${TMS_HOST_ACCOUNT:-testhostloginuser101}"
+
 export TMS_PUBKEY_FINGERPRINT="${TMS_PUBKEY_FINGERPRINT:-SHA256:0EddP3z8IwV4YqzewwoiJVyfKhmFj4VlsDBZqCaan24}"
+export TMS_PUBKEY_USERID="${TMS_PUBKEY_USERID:-101}"
 export TMS_PUBKEY_HOST="${TMS_PUBKEY_HOST:-testhost101}"
 export TMS_PUBKEY_KEYTYPE="${TMS_PUBKEY_KEYTYPE:-ed25519}"
-export TMS_PUBKEY_USER="${TMS_PUBKEY_USER:-testhostaccount101}"
-export TMS_PUBKEY_USERID="${TMS_PUBKEY_USERID:-101}"
-export TMS_HOST_ACCOUNT="${TMS_HOST_ACCOUNT:-testhostaccount101}"
 
 #
 # Determine absolute path to location from which we are running and change to that directory.
@@ -60,8 +59,8 @@ echo "**********************************************************************"
 echo "   Testing get pubkey"
 echo "**********************************************************************"
 $HTTPIE_CMD --check-status POST ${TMS_URL}/v1/tms/pubkeys/creds/retrieve Content-type:application/json \
-    user=testhostaccount101 user_uid:=101 host=testhost101 key_type=ed25519 \
-    public_key_fingerprint='SHA256:0EddP3z8IwV4YqzewwoiJVyfKhmFj4VlsDBZqCaan24'
+    user=${TMS_HOST_ACCOUNT} user_uid:=${TMS_PUBKEY_USERID} host=${TMS_PUBKEY_HOST} key_type=${TMS_PUBKEY_KEYTYPE} \
+    public_key_fingerprint="${TMS_PUBKEY_FINGERPRINT}"
 RET_CODE=$?
 echo "**********************************************************************"
 if [ $RET_CODE -ne 0 ]; then

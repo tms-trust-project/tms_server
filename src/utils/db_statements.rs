@@ -14,7 +14,7 @@ pub const SEL_IDP_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM identity_providers
 
 // ========================= tms_identities table ========================
 // NOTE: We just need one in this table for referencing, so OK if it already exists.
-pub const INSERT_TMS_IDENTITY: &str = concat!("INSERT INTO tms_identities (tms_identity, enabled) ",
+pub const INSERT_TMS_ID_NOT_STRICT: &str = concat!("INSERT INTO tms_identities (tms_identity, enabled) ",
      " VALUES ($1, $2) ON CONFLICT DO NOTHING");
 
 pub const IS_TMS_ID_ENABLED: &str = "SELECT enabled FROM tms_identities where tms_identity = $1";
@@ -22,16 +22,16 @@ pub const IS_TMS_ID_ENABLED: &str = "SELECT enabled FROM tms_identities where tm
 
 // ========================= clients table =========================
 pub const INSERT_CLIENT: &str = concat!(
-    "INSERT INTO clients (name, client_id, secret, enabled, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6)",
+    "INSERT INTO clients (name, client_id, secret, rp_id, tms_mode, enabled, created, updated) ",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 );
 
 pub const IS_CLIENT_ENABLED: &str = "SELECT enabled FROM clients where client_id = $1";
 
-// pub const GET_CLIENT: &str = concat!(
-//     "SELECT id, name, client_id, secret, enabled, created, updated ",
-//     "FROM clients WHERE client_id = $1",
-// );
+pub const GET_CLIENT: &str = concat!(
+    "SELECT id, name, client_id, secret, rp_id, tms_mode, enabled, created, updated ",
+    "FROM clients WHERE client_id = $1",
+);
 
 pub const SEL_CLIENT_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM clients WHERE client_id = $1)";
 
@@ -64,10 +64,6 @@ pub const GET_RP_LOGIN_ACTIVE: &str = concat!(
     "FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
 );
 
-// pub const GET_RP_LOGIN_EXISTS: &str = concat!(
-//     "SELECT 1 FROM resource_provider_logins WHERE tms_identity = $1 AND rp_id = $2 AND rp_account = $3"
-// );
-
 // ========================= user_delegations table =================
 pub const INSERT_DELEGATION: &str = concat!(
     "INSERT INTO delegations (tms_identity, client_id, rp_id, rp_account, expires_at, created, updated) ",
@@ -96,32 +92,27 @@ pub const SEL_DELEGATION_EXISTS: &str = concat!(
 
 // ========================= pubkeys table =========================
 pub const INSERT_PUBKEYS: &str = concat!(
-    "INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+    "INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, ",
       "public_key_fingerprint, public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated) ",
-    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
 );
 
 pub const INSERT_PUBKEYS_NOT_STRICT: &str = concat!(
-"INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, host_account, ",
+"INSERT INTO pubkeys (client_id, tms_identity, rp_id, rp_account, host, ",
 "public_key_fingerprint, public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
 "initial_ttl_minutes, expires_at, created, updated) ",
-"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) ",
+"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ",
 "ON CONFLICT DO NOTHING"
 );
 
-// pub const SELECT_PUBKEY: &str = concat!(
-//     "SELECT public_key, remaining_uses, expires_at FROM pubkeys ",
-//     "WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3",
-// );
-//
-pub const SEL_PUBKEY_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM pubkeys WHERE host_account = $1 AND host = $2)";
+pub const SEL_PUBKEY_EXISTS: &str = "SELECT EXISTS(SELECT 1 FROM pubkeys WHERE host = $1 AND host_login_user = $2)";
 
 pub const GET_PUBKEY: &str = concat!(
-    "SELECT id, client_id, tms_identity, rp_id, rp_account, host, host_account, ",
-      "public_key_fingerprint, public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
+    "SELECT id, client_id, tms_identity, rp_id, rp_account, host, public_key_fingerprint, ",
+      "public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, ",
       "initial_ttl_minutes, expires_at, created, updated ",
-    "FROM pubkeys WHERE host_account = $1 AND host = $2 AND public_key_fingerprint = $3"
+    "FROM pubkeys WHERE host_login_user = $1 AND host = $2 AND public_key_fingerprint = $3"
 );
 
 pub const DELETE_PUBKEY: &str = concat!(
@@ -139,6 +130,15 @@ pub const INSERT_ADMIN: &str = concat!(
 // Conforms to the signature required for secret retrieval queries as defined by 
 // get_authz_secret() in authz.rs.
 pub const GET_ADMIN_SECRET: &str = "SELECT admin_secret FROM admins WHERE admin_user = $1";
+
+// ==================== resource_host_accounts table =========================
+pub const INSERT_HOST_ACCT_NOT_STRICT: &str = concat!(
+    "INSERT INTO resource_host_accounts (rp_id, rp_account, host_login_user, created) ",
+    "VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+);
+
+pub const GET_HOST_LOGIN_USER: &str =
+    "SELECT host_login_user FROM resource_host_accounts WHERE rp_id = $1 AND rp_account = $2";
 
 // // ========================= hosts table ===========================
 // pub const INSERT_HOSTS: &str = "INSERT INTO hosts (host, addr, created, updated) VALUES ($1, $2, $3, $4)";

@@ -114,6 +114,9 @@ impl RespPublicKey {
               public_key: key.to_string()}
     }
 
+    // ========================================================================================
+    //   Main endpoint processing method for getPubKey: POST /tms/pubkeys/creds/retrieve
+    // ========================================================================================
     async fn process(http_req: &Request, req: &ReqPublicKey) -> Result<TmsResponse> {
         // Log the request
         tms_utils::debug_request(http_req, req);
@@ -171,7 +174,7 @@ impl RespPublicKey {
         }
         // Check that tms_identity is enabled
         if !check_tms_id_enabled(&full_pubkey.tms_identity).await {
-            let msg = format!("WARNING: TMS Identity not enabled. TmsId: {}", full_pubkey.tms_identity);
+            let msg = format!("WARNING: TMS Identity not enabled. TmsUserId: {}", full_pubkey.tms_identity);
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
@@ -252,7 +255,7 @@ async fn get_full_pubkey_result(req: &ReqPublicKey) -> Result<Pubkey> {
                            row.get(4), row.get(5), row.get(6), row.get(7),
                            row.get(8), row.get(9), row.get(10), row.get(11),
                            row.get(12), row.get(13), row.get(14), row.get(15),
-                           row.get(16), row.get(17)))
+                           row.get(16)))
         },
         None => {Err(anyhow!("NOT_FOUND"))},
     }

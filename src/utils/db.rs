@@ -5,14 +5,14 @@ use anyhow::{Result, anyhow};
 use log::{info};
 use std::io::{self, Write};
 use chrono::{Utc, DateTime};
-use sqlx::Row;
+use sqlx::{Row};
 use crate::utils::tms_utils::{timestamp_utc, create_hex_secret, hash_hex_secret, MAX_TMS_UTC_STR,
                               timestamp_utc_to_str, calc_expires_at};
-use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_IDENTITY, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED};
-use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, get_setup_out_path, TEST_TAPIS_CLIENT, TEST_TAPIS_CLIENT_SECRET, TEST_TAPIS_APP};
+use crate::utils::db_statements::{INSERT_DELEGATION, INSERT_PUBKEYS, INSERT_RP_LOGIN, SEL_CLIENT_EXISTS, SEL_PUBKEY_EXISTS, SEL_IDP_EXISTS, INSERT_IDP, INSERT_TMS_ID_NOT_STRICT, SEL_ADMIN_EXISTS, GET_DELEGATION_ACTIVE, INSERT_PUBKEYS_NOT_STRICT, IS_CLIENT_ENABLED, IS_TMS_ID_ENABLED, GET_CLIENT, GET_HOST_LOGIN_USER};
+use crate::utils::config::{DEFAULT_ADMIN_ID, PERM_ADMIN, DB_TRUE, TEST_CLIENT, TEST_APP, TEST_CLIENT_SECRET, get_setup_out_path, TEST_TAPIS_CLIENT, TEST_TAPIS_CLIENT_SECRET, TEST_TAPIS_APP, TmsMode};
 use log::error;
 use crate::RUNTIME_CTX;
-use crate::utils::db_types::{ClientInput, IdPInput, PubkeyInput};
+use crate::utils::db_types::{Client, ClientInput, IdPInput, PubkeyInput};
 use crate::utils::keygen;
 use crate::utils::keygen::KeyType;
 use super::db_statements::{GET_RP_LOGIN_ACTIVE, INSERT_ADMIN, INSERT_CLIENT, UPDATE_CLIENT_ENABLED, SEL_DELEGATION_EXISTS};
@@ -27,6 +27,7 @@ const TEST_IDP_OAUTH2_CLIENT_ID: &str = "12345678-1234-1234-1234-test-idp";
 const TEST_IDP_OAUTH2_CLIENT_SECRET: &str = "FakeTestIdP94adfduG89JRazpE6DCDvkrM";
 const TEST_IDP_REDIRECT_URL: &str = "https://auth.fake.test.org/v2/oauth2/authorize";
 const TEST_IDP_TOKEN_URL: &str = "https://auth.fake.test.org/v2/oauth2/token";
+const TEST_TMS_MODE: TmsMode = TmsMode::ImplicitTrust;
 const TEST_RP_ID: &str = "test_fake_rp";
 const TEST_RP_NAME: &str = "Fake Test RP";
 const TEST_RP_OAUTH2_CLIENT_ID: &str = "12345678-1234-1234-1234-test-rp";
@@ -36,7 +37,7 @@ const TEST_RP_TOKEN_URL: &str = "https://auth.fake.test.org/v2/oauth2/token";
 const TEST_TMS_USER_BASE: &str = "testtmsuser";
 const TEST_TMS_USER_DOMAIN: &str = "ImplicitModeTestIdP";
 const TEST_HOST: &str = "testhost";
-const TEST_HOST_ACCOUNT: &str = "testhostaccount";
+const TEST_HOST_LOGIN_USER: &str = "testhostloginuser";
 const TEST_RP_ACCOUNT: &str = "testrpaccount";
 const TEST_FIXED_RP_ACCT: &str  = "testrpaccount101";
 const TEST_FIXED_FINGERPRINT: &str= "SHA256:0EddP3z8IwV4YqzewwoiJVyfKhmFj4VlsDBZqCaan24";
@@ -57,6 +58,21 @@ const KEY_TYPE: KeyType = KeyType::Ed25519;
  * sure there are no other transactions that issue multiple SQL calls on different 
  * tables in a different order, which could lead to conflicts and deadlocks.
 */
+
+/*
+ * Insert a Tms identity record. Idempotent. ON CONFLICT DO NOTHING
+ */
+pub async fn insert_tms_id(tms_id: &str, enabled: bool) -> Result<u64> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    let result = sqlx::query(INSERT_TMS_ID_NOT_STRICT)
+        .bind(tms_id)
+        .bind(enabled)
+        .execute(&mut *tx)
+        .await?;
+    // Commit the transaction.
+    tx.commit().await?;
+    Ok(result.rows_affected())
+}
 
 /*
  * Insert a IdP record
@@ -94,34 +110,35 @@ pub async fn insert_new_client(rec: ClientInput) -> Result<u64> {
         .bind(rec.name.clone())
         .bind(rec.client_id.clone())
         .bind(rec.secret)
+        .bind(rec.rp_id.clone())
+        .bind(rec.tms_mode.to_string())
         .bind(rec.enabled)
         .bind(rec.created)
         .bind(rec.updated)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    info!("New client created. ClientId: {} App: '{}' enabled: {} created: {} updated: {}",
-          rec.client_id, rec.name, rec.enabled, rec.created, rec.updated);
+    info!("New client created. ClientId: {} App: '{}' enabled: {} RpId: {} TmsMode: {} created: {} updated: {}",
+          rec.client_id, rec.name, rec.enabled, rec.rp_id, rec.tms_mode, rec.created, rec.updated);
     Ok(result.rows_affected())
 }
 
 /*
- * Insert a new pubkey record if there is not at least one already associated with host+host_account
+ * Insert a new pubkey record if there is not at least one already associated with host+host_login_user
  * For testing purposes as long as there is at least one we should be good.
  *
  * If asked to generate for 'testuser001' use a fixed pubkey fingerprint.
  * Fingerprint will not be correct but having at lease one fixed value is convenient for testing.
  */
 pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_acct: String,
-                                            test_host: String, test_host_acct: String,
-                                            test_host_login_user: String) -> Result<u64> {
+                                            test_host: String, test_host_login_user: String) -> Result<u64> {
     let mut tx = RUNTIME_CTX.db.begin().await?;
 
     // Check for existing record, create only if needed
     // Note: We check for any pubkey, not for a specific pubkey.
     let pubkey_exists: bool = sqlx::query_scalar(SEL_PUBKEY_EXISTS)
-        .bind(test_host_acct.clone())
         .bind(test_host.clone())
+        .bind(test_host_login_user.clone())
         .fetch_one(&mut *tx).await?;
     if pubkey_exists { return Ok(0) }
 
@@ -144,7 +161,6 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         TEST_RP_ID.to_string(),
         test_rp_acct.clone(),
         test_host.clone(),
-        test_host_acct.clone(),
         pubkey_fingerprint.clone(),
         keyinfo.public_key.clone(),
         test_host_login_user.clone(),
@@ -158,8 +174,8 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         now.clone(),
     );
 
-    info!("Creating key-pair for ClientId: {} TmsId: {} RPId: {} RPAcct: {} Host: {} HostAcct: {}",
-          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct);
+    info!("Creating key-pair for ClientId: {} TmsUserId: {} RPId: {} RPAcct: {} Host: {} HostLoginUser: {}",
+          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_login_user);
     // Create the insert statement.
     let result = sqlx::query(INSERT_PUBKEYS_NOT_STRICT)
         .bind(input_record.client_id)
@@ -167,10 +183,9 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .bind(TEST_RP_ID)
         .bind(input_record.rp_account.clone())
         .bind(input_record.host.clone())
-        .bind(input_record.host_account)
         .bind(input_record.public_key_fingerprint.clone())
         .bind(input_record.public_key)
-        .bind(input_record.host_login_user)
+        .bind(test_host_login_user.clone())
         .bind(input_record.key_type.clone())
         .bind(input_record.key_bits)
         .bind(input_record.max_uses)
@@ -183,8 +198,8 @@ pub async fn insert_new_test_pubkey_if_none(test_tms_identity: String, test_rp_a
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("Created key-pair for ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {} HostLoginUser: {}",
-          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_acct, test_host_login_user);
+    info!("Created key-pair for ClientId: {} TmsUserId: {} RpId: {} RpAcct: {} Host: {} HostLoginUser: {}",
+          TEST_CLIENT, test_tms_identity, TEST_RP_ID, test_rp_acct, test_host, test_host_login_user);
     info!("Pubkey fingerprint: {}", input_record.public_key_fingerprint);
     Ok(result.rows_affected())
 }
@@ -200,7 +215,6 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
         .bind(rec.rp_id.clone())
         .bind(rec.rp_account.clone())
         .bind(rec.host.clone())
-        .bind(rec.host_account.clone())
         .bind(rec.public_key_fingerprint.clone())
         .bind(rec.public_key.clone())
         .bind(rec.host_login_user.clone())
@@ -216,9 +230,8 @@ pub async fn insert_new_pubkey(rec: PubkeyInput) -> Result<u64> {
         .await?;
     // Commit the transaction.
     tx.commit().await?;
-    info!("pubkey record created. ClientId: {} TmsId: {} RpId: {} RpAcct: {} Host: {} HostAcct: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
-           rec.client_id, rec.tms_identity, rec.rp_id, rec.rp_account, rec.host, rec.host_account,
-           rec.expires_at, rec.remaining_uses, rec.key_type);
+    info!("pubkey record created. ClientId: {} TmsUserId: {} RpId: {} RpAcct: {} Host: {} HostLoginUser: {} ExpiresAt: {} RemainingUses: {} KeyType: {}.",
+           rec.client_id, rec.tms_identity, rec.rp_id, rec.rp_account, rec.host, rec.host_login_user, rec.expires_at, rec.remaining_uses, rec.key_type);
     Ok(result.rows_affected())
 }
 
@@ -324,10 +337,13 @@ pub async fn create_test_clients() -> Result<u64> {
             TEST_APP.to_string(),
             TEST_CLIENT.to_string(),
             test_client_secret_hash,
+            TEST_RP_ID.to_string(),
+            TEST_TMS_MODE,
             DB_TRUE,
             now.clone(),
             now.clone(),
         );
+
         let inserts = insert_new_client(client_input).await?;
         inserts_total = inserts_total + inserts;
     }
@@ -340,6 +356,8 @@ pub async fn create_test_clients() -> Result<u64> {
             TEST_TAPIS_APP.to_string(),
             TEST_TAPIS_CLIENT.to_string(),
             test_client_secret_hash,
+            TEST_RP_ID.to_string(),
+            TEST_TMS_MODE,
             DB_TRUE,
             now.clone(),
             now.clone(),
@@ -473,7 +491,6 @@ pub async fn create_test_data() -> Result<u64> {
     for n in 1..=TEST_RECORD_CNT {
         let test_tms_identity = format!("{}{:03}@{}", TEST_TMS_USER_BASE, n, TEST_TMS_USER_DOMAIN);
         let test_host = format!("{}{:03}", TEST_HOST, n);
-        let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
         let test_rp_account = format!("{}{:03}", TEST_RP_ACCOUNT, n);
         let mut tx = RUNTIME_CTX.db.begin().await?;
 
@@ -489,14 +506,10 @@ pub async fn create_test_data() -> Result<u64> {
 
         // First create a TMS identity in table tms_identities
         info!("Creating TMS identity record for TMS user: {}", test_tms_identity.clone());
-        sqlx::query(INSERT_TMS_IDENTITY)
-            .bind(test_tms_identity.clone())
-            .bind(DB_TRUE)
-            .execute(&mut *tx)
-            .await?;
+        insert_tms_id(&*test_tms_identity, DB_TRUE).await?;
 
-        info!("Creating test records for tms identity: {} rp_id: {} rp_account {} host: {} host_acct {}",
-              test_tms_identity, TEST_RP_ID, test_rp_account, test_host, test_host_acct);
+        info!("Creating test records for tms identity. TmsUserId: {} rp_id: {} rp_account {} host: {}",
+              test_tms_identity, TEST_RP_ID, test_rp_account, test_host);
         // -------- Populate rp_login
         sqlx::query(INSERT_RP_LOGIN)
             .bind(test_tms_identity.clone())
@@ -523,8 +536,8 @@ pub async fn create_test_data() -> Result<u64> {
         insert_count += 1;
         // Commit the transaction.
         tx.commit().await?;
-        info!("Created delegation records for tms identity: {} host: {} host_acct {}",
-              test_tms_identity, test_host, test_host_acct);
+        info!("Created delegation records for tms identity: {} host: {}",
+              test_tms_identity, test_host);
     }
 
     Ok(insert_count)
@@ -544,14 +557,12 @@ pub async fn create_test_keys() -> Result<u64> {
         let test_tms_identity = format!("{}{:03}@{}", TEST_TMS_USER_BASE, n, TEST_TMS_USER_DOMAIN);
         let test_rp_acct = format!("{}{:03}", TEST_RP_ACCOUNT, n);
         let test_host = format!("{}{:03}", TEST_HOST, n);
-        let test_host_acct = format!("{}{:03}", TEST_HOST_ACCOUNT, n);
-        let test_host_login_user = format!("{}{:03}", TEST_HOST_ACCOUNT, n); // TODO do we need host_login_user?
-                                                                                    // TODO always same as host_account?
+        let test_host_login_user = format!("{}{:03}", TEST_HOST_LOGIN_USER, n);
 
         // Create a new test pubkey for user if none exists.
         // This should return 0 if one already exists and 1 if a new one was created
         let inserts = insert_new_test_pubkey_if_none(test_tms_identity, test_rp_acct,
-                                            test_host, test_host_acct, test_host_login_user).await?;
+                                            test_host, test_host_login_user).await?;
         insert_count += inserts;
     }
     Ok(insert_count)
@@ -590,14 +601,14 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
             let enabled: bool = row.get(0);
             // Check whether the user's rplogin is enabled.
             if enabled != DB_TRUE {
-                let msg = format!("Resource provider login record is disabled. TmsId: {} RpId: {} RpAcct: {}",
+                let msg = format!("Resource provider login record is disabled. TmsUserId: {} RpId: {} RpAcct: {}",
                                          tms_identity, rp_id, rp_account);
                 error!("{}", msg);
                 return Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Resource provider login record not found. TmsId: {} RpId: {} RpAcct: {}",
+            let msg = format!("Resource provider login record not found. TmsUserId: {} RpId: {} RpAcct: {}",
                                      tms_identity, rp_id, rp_account);
             error!("{}", msg);
             return Err(anyhow!(msg));
@@ -617,14 +628,14 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
             // Check expiry
             let expires_at: DateTime<Utc> = row.get(0);
             if expires_at < timestamp_utc() {
-                let msg = format!("Delegation record has expired. TmsId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
+                let msg = format!("Delegation record has expired. TmsUserId: {} ClientId: {} RpId: {} RpAcct: {} Expiry: {}.",
                                          tms_identity, client_id, rp_id, rp_account, expires_at);
                 error!("{}", msg);
                 return Err(anyhow!(msg));
             }
         },
         None => {
-            let msg = format!("Delegation record not found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
+            let msg = format!("Delegation record not found. TmsUserId: {} ClientId: {} RpId: {} RpAcct: {}",
                                      tms_identity, client_id, rp_id, rp_account);
             error!("{}", msg);
             return Err(anyhow!(msg));
@@ -639,136 +650,6 @@ pub async fn check_rplogin_delegation(tms_identity: &String, client_id: &String,
     Ok(())
 }
 
-// TODO remove
-// // ---------------------------------------------------------------------------
-// // check_parent_reservation:
-// // ---------------------------------------------------------------------------
-// /** This function is used to validate reservation extension requests by checking
-//  * database state.
-//  *
-//  * Reservation Constraints
-//  * -----------------------
-//  * When extending a reservation we need to check that these conditions hold on
-//  * that reservation:
-//  *
-//  *  - The designated parent reservation is not a itself a child of another reservation.
-//  *  - The parent reservation has not expired.
-//  *
-//  * We identify a child reservation by the fact that its parent_resid is different
-//  * than its resid.  TMS limits the parent/child tree to a depth of 2.
-//  *
-//  * Other Constraints
-//  * -----------------
-//  * The rp_login and delegations tables must also contain records that the
-//  * new extended reservation will depend on.
-//  *
-//  *  - rp_login - the user must have an rplogin record
-//  *  - delegations - the user must have delegated access to the reservation's client
-//  *
-//  * Validating these constraints before actually submitting the reservation extension
-//  * request allows us to return meaningful messages to users on error. The final arbiter,
-//  * however, are foriegn key constraints on the reservation table that take place when
-//  * the new reservation is created.
-//  *
-//  * Parameters
-//  * ----------
-//  * The resid parameter designates the candidate parent reservation for a new extended reservation.
-//  * The client_id are used to guarantee that clients can only extend their own reservations.
-//  * The host specifies the where the public key represented by the public_key_fingerprint can be applied.
-//  * Note that message that contains "INTERNAL ERROR:" should trigger a 500 http
-//  * return code.
-//  */
-// pub async fn check_parent_reservation(resid: &String, client_id: &String, tms_identity: &String,
-//                                       rp_id: &String, rp_account: &String, host: &String,
-//                                       public_key_fingerprint: &String) -> Result<DateTime<Utc>>
-// {
-//     // Get a connection to the db and start a transaction.
-//     let mut tx = RUNTIME_CTX.db.begin().await?;
-//
-//     // -------- Check reservations dependency
-//     let res_row = sqlx::query(GET_RESERVATION_FOR_EXTEND)
-//         .bind(resid)
-//         .bind(client_id)
-//         .fetch_optional(&mut *tx)
-//         .await?;
-//
-//     // Check the candidate parent reservation and save its expiration time.
-//     let expires_at: DateTime<Utc>;
-//     match res_row {
-//         Some(row) => {
-//             // Unpack row.
-//             let parent_resid: String = row.get(0);
-//             expires_at = row.get(1);
-//
-//             // Make sure the parent reservation is not also a child of another reservation.
-//             // Top-level reservations have their parent_resid set to their own resid, so if
-//             // the resid used to retrieve the reservation differs from that reservation's
-//             // parent, then we know the retrieved reservation is already a child.
-//             if *resid != parent_resid {
-//                 let msg = format!("Reservation {} cannot be designated as parent for another reservation \
-//                                           because it is already a child of reservation {}.",
-//                                             resid, parent_resid);
-//                 error!("{}", msg);
-//                 return Err(anyhow!(msg));
-//             }
-//
-//             // Check whether the reservation has expired.
-//             if expires_at < timestamp_utc() {
-//                 let msg = format!("Parent reservation {} for client {} expired at {}.",
-//                                             resid, client_id, expires_at);
-//                 error!("{}", msg);
-//                 return Err(anyhow!(msg));
-//             }
-//         },
-//         None => {
-//             let msg = format!("NOT_FOUND: Reservation {} not found for client {}.",
-//                                         resid, client_id);
-//             error!("{}", msg);
-//             return Err(anyhow!(msg));
-//         }
-//     };
-//
-//     // -------- Check rp_login dependency
-//     let rplogin_row = sqlx::query(GET_RP_LOGIN_EXISTS)
-//         .bind(tms_identity)
-//         .bind(rp_id)
-//         .bind(rp_account)
-//         .fetch_optional(&mut *tx)
-//         .await?;
-//     match rplogin_row {
-//         Some(_) => (),
-//         None => {
-//             let msg = format!("No RP_LOGIN entry found. TmsId: {} RpId: {} RpAcct: {}",
-//                                      tms_identity, rp_id, rp_account);
-//             error!("{}", msg);
-//             return Err(anyhow!(msg));
-//         }
-//     };
-//
-//     // -------- Check delegation dependency
-//     let delg_row = sqlx::query(GET_DELEGATION)
-//         .bind(tms_identity)
-//         .bind(client_id)
-//         .bind(rp_id)
-//         .bind(rp_account)
-//         .fetch_optional(&mut *tx)
-//         .await?;
-//     match delg_row {
-//         Some(_) => (),
-//         None => {
-//             let msg = format!("No delegation record found. TmsId: {} ClientId: {} RpId: {} RpAcct: {}",
-//                                      tms_identity, client_id, rp_id, rp_account);
-//             error!("{}", msg);
-//             return Err(anyhow!(msg));
-//         }
-//     };
-//
-//     // Commit the transaction.
-//     tx.commit().await?;
-//
-//     // All checks passed.
-//     Ok(expires_at)
-// }
 // ---------------------------------------------------------------------------
 // set_test_enabled_internal:
 // ---------------------------------------------------------------------------
@@ -830,6 +711,45 @@ pub async fn is_tms_id_enabled(tms_id: &String) -> Result<bool>
         None => { Err(anyhow!("NOT_FOUND")) }
     }
 }
+
+// ---------------------------------------------------------------------------
+// get_client_result:
+// ---------------------------------------------------------------------------
+pub async fn get_client_result(client_id: &String) -> Result<Client> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+
+    // Create the select statement.
+    let result = sqlx::query(GET_CLIENT)
+        .bind(client_id.clone())
+        .fetch_optional(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    // We may have found the client.
+    match result {
+        Some(row) => {
+            Ok(Client::new(row.get(0), row.get(1), row.get(2), row.get(3), row.get(4),
+                           row.get(5), row.get(6), row.get(7), row.get(8)))
+        },
+        None => { Err(anyhow!("NOT_FOUND")) }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// get_host_login_user_result:
+// ---------------------------------------------------------------------------
+pub async fn get_host_login_user_result(rp_id: &String, rp_account: &String) -> Result<String> {
+    let mut tx = RUNTIME_CTX.db.begin().await?;
+    let result = sqlx::query_scalar(GET_HOST_LOGIN_USER)
+        .bind(rp_id.clone()).bind(rp_account.clone())
+        .fetch_optional(&mut *tx).await?;
+    tx.commit().await?;
+    match result {
+        Some(hlu) => Ok(hlu),
+        None => { Err(anyhow!("NOT_FOUND")) }
+   }
+}
+
 
 // ***************************************************************************
 //                          Private Functions

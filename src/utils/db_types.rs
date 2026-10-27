@@ -3,6 +3,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use crate::utils::config::TmsMode;
 
 // ---------------------------------------------------------------------------
 // pubkeys:
@@ -16,8 +17,7 @@ pub struct Pubkey {
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
-    pub host_account: String,
-    pub public_key_fingerprint: String, 
+    pub public_key_fingerprint: String,
     pub public_key: String,
     pub host_login_user: String,
     pub key_type: String,
@@ -37,8 +37,7 @@ pub struct PubkeyInput {
     pub rp_id: String,
     pub rp_account: String,
     pub host: String,
-    pub host_account: String,
-    pub public_key_fingerprint: String, 
+    pub public_key_fingerprint: String,
     pub public_key: String,
     pub host_login_user: String,
     pub key_type: String,
@@ -51,14 +50,6 @@ pub struct PubkeyInput {
     pub updated: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct PubkeyRetrieval {
-    pub public_key: String,
-    pub remaining_uses: i32,
-    pub expires_at: DateTime<Utc>,
-}
-
 impl Pubkey {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
@@ -68,7 +59,6 @@ impl Pubkey {
         rp_id: String,
         rp_account: String,
         host: String,
-        host_account: String,
         public_key_fingerprint: String,
         public_key: String,
         host_login_user: String,
@@ -83,7 +73,7 @@ impl Pubkey {
     ) 
     -> Pubkey {
         Pubkey {
-            id, client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint,
+            id, client_id, tms_identity, rp_id, rp_account, host, public_key_fingerprint,
             public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses, initial_ttl_minutes,
             expires_at, created, updated
         }
@@ -98,7 +88,6 @@ impl PubkeyInput {
         rp_id: String,
         rp_account: String,
         host: String,
-        host_account: String,
         public_key_fingerprint: String,
         public_key: String,
         host_login_user: String,
@@ -113,22 +102,9 @@ impl PubkeyInput {
     ) 
     -> PubkeyInput {
         PubkeyInput {
-            client_id, tms_identity, rp_id, rp_account, host, host_account, public_key_fingerprint,
+            client_id, tms_identity, rp_id, rp_account, host, public_key_fingerprint,
             public_key, host_login_user, key_type, key_bits, max_uses, remaining_uses,
             initial_ttl_minutes, expires_at, created, updated
-        }
-    }
-}
-
-impl PubkeyRetrieval {
-    pub fn new(
-        public_key: String,
-        remaining_uses: i32,
-        expires_at: DateTime<Utc>,
-    )
-    -> PubkeyRetrieval {
-        PubkeyRetrieval {
-            public_key, remaining_uses, expires_at
         }
     }
 }
@@ -181,6 +157,8 @@ pub struct Client {
     pub name: String,
     pub client_id: String,
     pub secret: String,
+    pub rp_id: String,
+    pub tms_mode: TmsMode,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -191,6 +169,8 @@ pub struct ClientInput {
     pub name: String,
     pub client_id: String,
     pub secret: String,
+    pub rp_id: String,
+    pub tms_mode: TmsMode,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -203,13 +183,15 @@ impl Client {
         name: String,
         client_id: String,
         secret: String,
+        rp_id: String,
+        tms_mode: TmsMode,
         enabled: bool,
         created: DateTime<Utc>,
         updated: DateTime<Utc>,
     ) 
     -> Client {
         Client {
-            id, name, client_id, secret, enabled, created, updated }
+            id, name, client_id, secret, rp_id, tms_mode, enabled, created, updated }
     }
 }
 
@@ -219,12 +201,14 @@ impl ClientInput {
             name: String,
             client_id: String,
             secret: String,
+            rp_id: String,
+            tms_mode: TmsMode,
             enabled: bool,
             created: DateTime<Utc>,
             updated: DateTime<Utc>,
         ) 
         -> ClientInput {
-            ClientInput { name, client_id, secret, enabled, created, updated }
+            ClientInput { name, client_id, secret, rp_id, tms_mode, enabled, created, updated }
         }
 }
 
@@ -253,6 +237,15 @@ pub struct RPLoginInput {
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
     pub last_login: DateTime<Utc>
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RHostAccountInput {
+    pub rp_id: String,
+    pub rp_account: String,
+    pub host_login_user: String,
+    pub created: DateTime<Utc>,
+    pub updated: DateTime<Utc>
 }
 
 impl RPLogin {
@@ -285,6 +278,19 @@ impl RPLoginInput {
     )
     -> RPLoginInput {
         RPLoginInput { tms_identity, rp_id, rp_account, enabled, created, updated, last_login }
+    }
+}
+
+impl RHostAccountInput {
+    pub fn new(
+        rp_id: String,
+        rp_account: String,
+        host_login_user: String,
+        created: DateTime<Utc>,
+        updated: DateTime<Utc>
+    )
+        -> RHostAccountInput {
+        RHostAccountInput { rp_id, rp_account, host_login_user, created, updated }
     }
 }
 
@@ -361,14 +367,6 @@ pub struct Host {
     pub updated: DateTime<Utc>,
 }
 
-// #[derive(Debug, Deserialize)]
-// pub struct HostInput {
-//     pub host: String,
-//     pub addr: String,
-//     pub created: DateTime<Utc>,
-//     pub updated: DateTime<Utc>,
-// }
-
 impl Host {
     #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
@@ -379,104 +377,6 @@ impl Host {
         updated: DateTime<Utc>,
     ) 
     -> Host {
-        Host {
-            id, host, addr, created, updated
-        }
+        Host { id, host, addr, created, updated }
     }
 }
-
-// impl HostInput {
-//     #[allow(dead_code, clippy::too_many_arguments)]
-//     pub fn new(
-//         host: String,
-//         addr: String,
-//         created: DateTime<Utc>,
-//         updated: DateTime<Utc>,
-//     )
-//     -> HostInput {
-//         HostInput {/* host, addr,*/ created, updated }
-//     }
-//}
-
-// TODO remove
-// // ---------------------------------------------------------------------------
-// // Reservations:
-// // ---------------------------------------------------------------------------
-// #[derive(Debug, Deserialize)]
-// #[allow(dead_code)]
-// pub struct Reservation {
-//     pub id: i32,
-//     pub resid: String,
-//     pub parent_resid: String,
-//     pub client_id: String,
-//     pub tms_identity: String,
-//     pub rp_id: String,
-//     pub rp_account: String,
-//     pub host: String,
-//     pub public_key_fingerprint: String,
-//     pub expires_at: DateTime<Utc>,
-//     pub created: DateTime<Utc>,
-//     pub updated: DateTime<Utc>,
-// }
-//
-// #[derive(Debug, Deserialize)]
-// pub struct ReservationInput {
-//     pub resid: String,
-//     pub parent_resid: String,
-//     pub client_id: String,
-//     pub tms_identity: String,
-//     pub rp_id: String,
-//     pub rp_account: String,
-//     pub host: String,
-//     pub public_key_fingerprint: String,
-//     pub expires_at: DateTime<Utc>,
-//     pub created: DateTime<Utc>,
-//     pub updated: DateTime<Utc>,
-// }
-//
-// impl Reservation {
-//     #[allow(dead_code, clippy::too_many_arguments)]
-//     pub fn new(
-//         id: i32,
-//         resid: String,
-//         parent_resid: String,
-//         client_id: String,
-//         tms_identity: String,
-//         rp_id: String,
-//         rp_account: String,
-//         host: String,
-//         public_key_fingerprint: String,
-//         expires_at: DateTime<Utc>,
-//         created: DateTime<Utc>,
-//         updated: DateTime<Utc>,
-//     )
-//     -> Reservation {
-//         Reservation {
-//             id, resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
-//             public_key_fingerprint, expires_at, created, updated
-//         }
-//     }
-// }
-//
-// impl ReservationInput {
-//     #[allow(dead_code, clippy::too_many_arguments)]
-//     pub fn new(
-//         resid: String,
-//         parent_resid: String,
-//         client_id: String,
-//         tms_identity: String,
-//         rp_id: String,
-//         rp_account: String,
-//         host: String,
-//         public_key_fingerprint: String,
-//         expires_at: DateTime<Utc>,
-//         created: DateTime<Utc>,
-//         updated: DateTime<Utc>,
-//     )
-//     -> ReservationInput {
-//         ReservationInput {
-//             resid, parent_resid, client_id, tms_identity, rp_id, rp_account, host,
-//             public_key_fingerprint, expires_at, created, updated
-//         }
-//     }
-// }

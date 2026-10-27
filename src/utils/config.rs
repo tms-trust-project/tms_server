@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use strum_macros::{Display, EnumString};
 use anyhow::{Result, anyhow};
 use log::{info, error};
 use serde::Deserialize;
@@ -29,8 +30,8 @@ use super::tms_utils::get_absolute_path;
 // ***************************************************************************
 // Directory and file locations.
 // Unless otherwise noted, all files and directories are relative to the TMS root directory.
-const DEFAULT_ROOT_DIR     : &str = "~/tms";
-const DEFAULT_LOCAL_DIR     : &str = "~/tms_local";
+const DEFAULT_ROOT_DIR     : &str = "$HOME/tms";
+const LOCAL_DIR            : &str = "$HOME/tms_local";
 const MIGRATIONS_DIR       : &str = "/migrations";
 const CONFIG_DIR           : &str = "/config";
 const LOGS_DIR             : &str = "/logs";
@@ -108,6 +109,14 @@ lazy_static! {
 }
 
 // ***************************************************************************
+//                                Enums
+// ***************************************************************************
+#[derive(Debug, PartialEq, Eq, EnumString, Display, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "TEXT")]
+#[strum(serialize_all = "PascalCase", ascii_case_insensitive)] // Make conversions case-insensitive
+pub enum TmsMode { ExplicitTrust, ImplicitTrust }
+
+// ***************************************************************************
 //                             Directory Structs
 // ***************************************************************************
 // ---------------------------------------------------------------------------
@@ -157,7 +166,7 @@ pub struct TmsCmdArgs {
     ///
     ///   2. Otherwise, if set, the value of the environment variable TMS_ROOT_DIR,
     ///
-    ///   3. Otherwise, ~/tms
+    ///   3. Otherwise, $HOME/tms
     #[arg(short, long)]
     pub version: bool,
     /// Specify TMS root install directory.
@@ -213,7 +222,7 @@ pub struct RuntimeCtx {
 pub struct Config {
     pub http_addr: String,
     pub http_port: u16,
-    pub enable_mvp: bool,
+    pub enable_implicit: bool,
     pub enable_test_client: bool,
     pub new_clients: String,
     pub server_urls: Vec<String>
@@ -250,7 +259,7 @@ impl Default for Config {
         Self {
             http_addr: DEFAULT_HTTP_ADDR.to_string(),
             http_port: DEFAULT_HTTP_PORT,
-            enable_mvp: false,
+            enable_implicit: false,
             enable_test_client: false,
             new_clients: DEFAULT_NEW_CLIENTS.to_string(),
             server_urls: vec![DEFAULT_SVR_URL.to_string()]
@@ -581,7 +590,7 @@ fn get_root_dir() -> String {
 // ---------------------------------------------------------------------------
 fn get_local_dir() -> String {
     // Canonicalize the path.
-    get_absolute_path(DEFAULT_LOCAL_DIR)
+    get_absolute_path(LOCAL_DIR)
 }
 
 // ---------------------------------------------------------------------------
