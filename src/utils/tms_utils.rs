@@ -2,18 +2,13 @@
 
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
-use std::os::unix::fs::MetadataExt;
 use path_absolutize::Absolutize;
 use glob::glob;
-use chrono::{Utc, DateTime, SecondsFormat, FixedOffset, ParseError, Duration};
-
+use chrono::{Utc, DateTime, SecondsFormat, Duration};
 use poem::Request;
-
 use rand_core::{RngCore, OsRng};
 use hex;
 use sha2::{Sha512, Digest};
-
 use anyhow::{Result, anyhow};
 use log::{error, debug, LevelFilter};
 
@@ -49,7 +44,6 @@ pub const MAX_TMS_UTC_STR: &str = "9999-12-31T23:59:59Z";
  * I went with the former on a hunch that it's the most appropriate, happy
  * to change if my guess is wrong.
  */
-#[allow(dead_code)]
 pub fn get_absolute_path(path: &str) -> String {
     // Replace ~ and environment variable values if possible.
     // On error, return the string version of the original path.
@@ -132,59 +126,13 @@ pub fn timestamp_utc() -> DateTime<Utc> {
 }
 
 // ---------------------------------------------------------------------------
-// timestamp_str:
-// ---------------------------------------------------------------------------
-/** Get the current UTC timestamp as a string in rfc3339 format, which looks
- * like this:  2022-09-13T14:14:42.719849Z
- */
-#[allow(dead_code)]
-pub fn timestamp_str() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true)
-}
-
-// ---------------------------------------------------------------------------
 // timestamp_utc_to_str:
 // ---------------------------------------------------------------------------
 /** Convert a UTC datetime to rfc3339 format with microsecond precision, which 
  * looks like this:  2022-09-13T14:14:42.719849Z
  */
-#[allow(dead_code)]
 pub fn timestamp_utc_to_str(ts: DateTime<Utc>) -> String {
     ts.to_rfc3339_opts(SecondsFormat::Micros, true)
-}
-
-// ---------------------------------------------------------------------------
-// timestamp_utc_secs_to_str:
-// ---------------------------------------------------------------------------
-/** Convert a UTC datetime to rfc3339 format with second precision, which looks 
- * like this:  2022-09-13T14:14:42Z
- */
-#[allow(dead_code)]
-pub fn timestamp_utc_secs_to_str(ts: DateTime<Utc>) -> String {
-    ts.to_rfc3339_opts(SecondsFormat::Secs, true)
-}
-
-// ---------------------------------------------------------------------------
-// timestamp_str_to_datetime:
-// ---------------------------------------------------------------------------
-/** Convert a timestamp string in rfc3339 format (ex: 2022-09-13T14:14:42.719849912+00:00)
- * to a DateTime object.  The result will contain a parse error if the string
- * does not conform to rfc3339.
- */
-#[allow(dead_code)]
-pub fn timestamp_str_to_datetime(ts: &str) -> Result<DateTime<FixedOffset>, ParseError> {
-    DateTime::parse_from_rfc3339(ts)
-}
-
-// ---------------------------------------------------------------------------
-// is_executable:
-// ---------------------------------------------------------------------------
-// Determine whether a path--typically a file--is executable.
-#[allow(dead_code)]
-pub fn is_executable(path: &Path) -> bool {
-    let meta = path.metadata()
-        .unwrap_or_else(|_| panic!("Unable to retrieve metadata for {:?}", path));
-    meta.mode() & 0o111 != 0
 }
 
 // ***************************************************************************
@@ -282,19 +230,6 @@ pub async fn check_tms_id_enabled(tms_id: &String) -> bool {
             false
         }
     }
-}
-// ***************************************************************************
-// PRIVATE FUNCTIONS
-// ***************************************************************************
-// ---------------------------------------------------------------------------
-// run_command_emsg:
-// ---------------------------------------------------------------------------
-/** Return a message for commands that return non-zero exit codes. */
-#[allow(dead_code)]
-fn run_command_emsg(command: Command, status: ExitStatus) -> String {
-    "Unknown error condition returned by command: ".to_owned() + 
-    command.get_program().to_str().unwrap_or("unknown") +
-    " with exit status: " + &status.to_string()
 }
 
 

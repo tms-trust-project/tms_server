@@ -18,12 +18,11 @@ pub const X_TMS_ADMIN_SECRET:  &str = "X-TMS-ADMIN-SECRET";
 pub const X_TMS_CLIENT_ID:     &str = "X-TMS-CLIENT-ID";
 pub const X_TMS_CLIENT_SECRET: &str = "X-TMS-CLIENT-SECRET";
 
-// The different types of authorizations that can be checked.  Each implemented
-// authz type is configured with a AuthzSpec that is stored in the static
-// AuthzArgs component of RUNTIME_CTX (see config.rs for details).
+// The different types of authorizations that can be checked. Each implemented authz type is
+// configured with a AuthzSpec that is stored in the static AuthzArgs component of RUNTIME_CTX
+// (see config.rs for details).
 #[derive(Debug, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
-pub enum AuthzTypes {ClientOwn, TmsAdmin, TmsctlHost, UserOwn}
+pub enum AuthzTypes {ClientOwn, TmsAdmin}
 
 // ***************************************************************************
 //                            Result Struct
@@ -113,28 +112,6 @@ pub fn get_client_id_header(http_req: &Request) -> Result<String> {
 }
 
 // ---------------------------------------------------------------------------
-// get_client_id_header_string:
-// ---------------------------------------------------------------------------
-/** Get the value of the X_TMS_CLIENT_ID as a string.  Return the empty string
- * if the value is not set or cannot be converted to a string.
- */
-#[allow(dead_code)]
-pub fn get_client_id_header_string(http_req: &Request) -> String {
-    match http_req.headers().get(X_TMS_CLIENT_ID) {
-        Some(v) => {
-            match v.to_str() {
-                Ok(s) => s.to_string(),
-                Err(e) => {
-                    error!("Invalid string assigned to header {}: {}", X_TMS_CLIENT_ID, e);
-                    "".to_string()
-                }
-            }
-        },
-        None => "".to_string(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // authorize:
 // ---------------------------------------------------------------------------
 pub async fn authorize(http_req: &Request, allowed: &[AuthzTypes]) -> AuthzResult {
@@ -142,9 +119,7 @@ pub async fn authorize(http_req: &Request, allowed: &[AuthzTypes]) -> AuthzResul
     for authz_type in allowed {
         let result = match authz_type {
             AuthzTypes::ClientOwn => authorize_by_type(http_req, AuthzTypes::ClientOwn).await,
-            AuthzTypes::TmsAdmin => authorize_by_type(http_req, AuthzTypes::TmsAdmin).await,
-            AuthzTypes::TmsctlHost => authorize_by_type(http_req, AuthzTypes::TmsctlHost).await,
-            AuthzTypes::UserOwn => authorize_by_type(http_req, AuthzTypes::UserOwn).await,
+            AuthzTypes::TmsAdmin => authorize_by_type(http_req, AuthzTypes::TmsAdmin).await
         };
 
         // The first successful authorization terminates checking.

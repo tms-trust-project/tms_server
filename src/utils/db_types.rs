@@ -9,7 +9,7 @@ use crate::utils::config::TmsMode;
 // pubkeys:
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Allow dead code for debug output?
 pub struct Pubkey {
     pub id: i32,
     pub client_id: String,
@@ -50,8 +50,8 @@ pub struct PubkeyInput {
     pub updated: DateTime<Utc>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl Pubkey {
-    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
         client_id: String,
@@ -126,8 +126,8 @@ pub struct IdPInput {
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>
 }
+#[allow(clippy::too_many_arguments)]
 impl IdPInput {
-    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: String,
         name: String,
@@ -151,7 +151,7 @@ impl IdPInput {
 // clients:
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Allow dead code for debug output?
 pub struct Client {
     pub id: i32,
     pub name: String,
@@ -176,8 +176,8 @@ pub struct ClientInput {
     pub updated: DateTime<Utc>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl Client {
-    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
         name: String,
@@ -195,8 +195,8 @@ impl Client {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 impl ClientInput {
-        #[allow(dead_code, clippy::too_many_arguments)]
         pub fn new(
             name: String,
             client_id: String,
@@ -216,7 +216,7 @@ impl ClientInput {
 // rp_login:
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Allow dead code for debug output?
 pub struct RPLogin {
     pub id: i32,
     pub tms_identity: String,
@@ -248,8 +248,8 @@ pub struct RHostAccountInput {
     pub updated: DateTime<Utc>
 }
 
+#[allow(dead_code, clippy::too_many_arguments)] // Allow dead code for debug output?
 impl RPLogin {
-    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         id: i32,
         tms_identity: String,
@@ -321,25 +321,25 @@ pub struct DelegationInput {
     pub updated: DateTime<Utc>,
 }
 
-impl Delegation {
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new(
-        id: i32,
-        client_id: String,
-        tms_identity: String,
-        rp_id: String,
-        rp_account: String,
-        expires_at: DateTime<Utc>,
-        created: DateTime<Utc>,
-        updated: DateTime<Utc>,
-    )
-    -> Delegation {
-        Delegation { id, client_id, tms_identity, rp_id, rp_account, expires_at, created, updated }
-    }
-}
+// #[allow(dead_code, clippy::too_many_arguments)] // Unused?
+// impl Delegation {
+//     pub fn new(
+//         id: i32,
+//         client_id: String,
+//         tms_identity: String,
+//         rp_id: String,
+//         rp_account: String,
+//         expires_at: DateTime<Utc>,
+//         created: DateTime<Utc>,
+//         updated: DateTime<Utc>,
+//     )
+//     -> Delegation {
+//         Delegation { id, client_id, tms_identity, rp_id, rp_account, expires_at, created, updated }
+//     }
+// }
 
+#[allow(clippy::too_many_arguments)]
 impl DelegationInput {
-    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         client_id: String,
         tms_identity: String,
