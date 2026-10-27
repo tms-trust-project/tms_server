@@ -110,7 +110,7 @@ esac
 # =====================================================================================
 
 # Cleanup installed directories and files
-rm -fr $HOME/tms $HOME/tms_server $HOME/tms_local/tms-setup.out
+rm -fr $HOME/tms $HOME/tms_server $HOME/tms_local/tms-setup.out $HOME/tms_local/tms-db-env
 
 # ============================================================================================
 #  Drop the DB (idempotent)

@@ -83,13 +83,12 @@ impl GeneratedKeyObj {
 /*
  * One time initialization routine. This function panics if it cannot complete successfully.
  */
-#[allow(unused_variables)]
 pub fn init_keygen() {
     // Get the bit length any key type to force map initialization. 
     // Should never fail, but if it does fail, we abort execution.
-    let key_type = KeyType::Ed25519;
-    let bitlen = *KEY_LEN_MAP.get(&key_type)
-        .unwrap_or_else(|| panic!("Unable to determine bit length for key type {}.", key_type));
+    let _key_type = KeyType::Ed25519;
+    let _bitlen = *KEY_LEN_MAP.get(&_key_type)
+        .unwrap_or_else(|| panic!("Unable to determine bit length for key type {}.", _key_type));
 }
 
 // ---------------------------------------------------------------------------

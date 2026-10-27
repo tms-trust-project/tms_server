@@ -2,11 +2,10 @@
 
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Output, Stdio};
+use std::process::{Command, ExitStatus};
 use std::os::unix::fs::MetadataExt;
 use path_absolutize::Absolutize;
 use glob::glob;
-use execute::Execute;
 use chrono::{Utc, DateTime, SecondsFormat, FixedOffset, ParseError, Duration};
 
 use poem::Request;
@@ -175,46 +174,6 @@ pub fn timestamp_utc_secs_to_str(ts: DateTime<Utc>) -> String {
 #[allow(dead_code)]
 pub fn timestamp_str_to_datetime(ts: &str) -> Result<DateTime<FixedOffset>, ParseError> {
     DateTime::parse_from_rfc3339(ts)
-}
-
-// ---------------------------------------------------------------------------
-// run_command:
-// ---------------------------------------------------------------------------
-/** Make an operating system call and return an Output object that contains
- * the result code and stdout/stderr as vectors.  If the command cannot be run
- * or if it runs and returns a non-zero exit code, this method writes the log 
- * before returning an error.  
- * 
- * The task parameter prefixes any error message logged or returned by this
- * function.
- * 
- * The only way Ok is returned is when the command has a zero exit code.
- */
-#[allow(clippy::needless_return, dead_code)]
-pub fn run_command(mut command: Command, task: &str) -> Result<Output> {
-    // Capture all output.
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::piped());
- 
-    // Return an output object or error.
-    // Errors are logged before returning.
-    return match command.execute_output() {
-        Ok(o) => {
-            // Check for success here.
-            if o.status.success() { Ok(o) } else {
-                let msg = task.to_string() + ": " +
-                    &String::from_utf8(o.stderr)
-                        .unwrap_or(run_command_emsg(command, o.status));
-                error!("{}", msg);
-                Err(anyhow!(msg))
-            }
-        },
-        Err(e) => {
-            let msg = task.to_string() + ": " + &e.to_string();
-            error!("{}", msg);
-            Err(anyhow!(msg))
-        },
-    };
 }
 
 // ---------------------------------------------------------------------------

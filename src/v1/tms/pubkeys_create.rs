@@ -12,7 +12,7 @@ use crate::utils::db_types::PubkeyInput;
 use crate::utils::db::{insert_new_pubkey, check_rplogin_delegation, get_client_result, get_host_login_user_result};
 use crate::utils::tms_utils::{self, timestamp_utc, calc_expires_at, RequestDebug, check_tms_id_enabled};
 use crate::utils::implicit_mode::{ImplicitModeDependencyParms, create_pubkey_dependencies};
-use log::{error, info, warn};
+use log::{debug, error, trace, warn};
 use regex::regex;
 use crate::RUNTIME_CTX;
 use crate::utils::config::TmsMode;
@@ -128,7 +128,6 @@ impl NewSshKeysApi {
 //                          Request/Response Methods
 // ***************************************************************************
 impl RespNewSshKeys {
-    #[allow(clippy::too_many_arguments)]
     fn new(result_code: &str, result_msg: &str, private_key: String, public_key: String,
            host_login_user: String, public_key_fingerprint: String, key_type: String,
            key_bits: String, max_uses: String, remaining_uses: String, expires_at: DateTime<Utc>)
@@ -145,7 +144,7 @@ impl RespNewSshKeys {
     // ========================================================================================
     async fn process(http_req: &Request, req: &ReqNewSshKeys) -> Result<TmsResponse> {
         // Log the request
-        info!("DEBUG createkey process");
+        trace!("Createkey process");
         tms_utils::debug_request(http_req, req);
 
         // -------------------- Extract Headers ----------------------
@@ -154,7 +153,7 @@ impl RespNewSshKeys {
             Ok(h) => h,
             Err(e) => { return Ok(make_http_400(e.to_string())); }
         };
-        info!("DEBUG createkey got client_id {}", client_id);
+        trace!("Createkey got client_id {}", client_id);
 
         // -------------------- Check Authorization ----------------------------
         // Only the client and admin can make this call
@@ -166,7 +165,7 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_401(msg));
         }
-        info!("DEBUG createkey passed auth check");
+        trace!("Createkey passed auth check");
         // Get the client record. We will need the tms_mode and enabled flag
         let client = match get_client_result(&client_id).await {
             Ok(c) => c,
@@ -176,7 +175,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_400(msg));
             }
         };
-        info!("DEBUG createkey got client");
+        trace!("Createkey got client");
 
         // Check that client is enabled
         if !client.enabled {
@@ -184,7 +183,7 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
-        info!("DEBUG createkey client is enabled");
+        trace!("Createkey client is enabled");
 
         // Check that tms_identity is enabled
         if !check_tms_id_enabled(&req.tms_identity).await {
@@ -192,13 +191,13 @@ impl RespNewSshKeys {
             error!("{}", msg);
             return Ok(make_http_400(msg));
         }
-        info!("DEBUG createkey tms_id is enabled");
+        trace!("Createkey tms_id is enabled");
 
         // -------------------- MVP: IMPLICIT TRUST MODE ------------------------
         // If running in ImplicitTrust mode then automatically create delegation records.
         if RUNTIME_CTX.parms.config.enable_implicit && matches!(client.tms_mode, TmsMode::ImplicitTrust) {
-            info!("DEBUG createkey implicit");
-            info!("DEBUG createkey creating implicit_mode records");
+            trace!("Createkey implicit");
+            trace!("Createkey creating implicit_mode records");
             match setup_implicit_mode_records(&req, &*client_id).await {
                 Ok(_) => {}
                 Err(e) => {
@@ -209,7 +208,7 @@ impl RespNewSshKeys {
                     return Ok(make_http_400(msg));
                 }
             }
-            info!("DEBUG createkey created implicit records");
+            trace!("Createkey created implicit records");
         }
 
         // --------------------- Check Login and delegation records -----------------------
@@ -235,7 +234,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_403(msg));
             }
         }
-        info!("DEBUG createkey record check complete");
+        trace!("Createkey record check complete");
 
         // ------------------------ Generate Keys ------------------------
         // Get the provided key type or use default.
@@ -259,7 +258,7 @@ impl RespNewSshKeys {
             Err(e) => { return Err(anyhow!(e)); }
         };
 
-        info!("DEBUG createkey generated keypair");
+        trace!("Createkey generated keypair");
         // Look up the host_login_user associated with the resource
         let host_login_user = match get_host_login_user_result(&req.rp_id, &req.rp_account).await {
             Ok(hlu) => hlu,
@@ -271,7 +270,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_400(msg));
             }
         };
-        info!("DEBUG createkey got host_login_user");
+        trace!("Createkey got host_login_user");
 
         // ------------------------ Update Database --------------------
         // Interpret numeric input.
@@ -316,8 +315,7 @@ impl RespNewSshKeys {
                 return Ok(make_http_500(err_msg));
             }
         }
-
-        info!("DEBUG createkey DONE, DB updated");
+        trace!("Createkey DONE, DB updated");
 
         // Success! Zero key bits means a fixed key length.
         Ok(make_http_201(Self::new("0", "success",
@@ -346,7 +344,7 @@ async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Re
     let host_login_user: String;
     if let Some((host_login, _tms_id_domain)) = req.tms_identity.split_once('@') {
         host_login_user = host_login.to_string();
-        info!{"Found host login user: {}", host_login_user};
+        debug!{"Found host login user: {}", host_login_user};
     } else {
         return Err("Unable to extract host_login_user from TMS identity.".to_string());
     }
@@ -371,7 +369,7 @@ async fn setup_implicit_mode_records(req: &ReqNewSshKeys, client_id: &str) -> Re
     // Insert records into the resource_provider_logins and delegations tables
     match create_pubkey_dependencies(implicit_trust_inputs).await {
         Ok(inserts) => {
-            info!("ImplicitTrustMode dependency records inserted. Count: {}", inserts);
+            debug!("ImplicitTrustMode dependency records inserted. Count: {}", inserts);
             Ok(())
         },
         Err(e) => {

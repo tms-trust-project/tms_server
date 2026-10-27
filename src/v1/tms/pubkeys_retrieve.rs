@@ -201,37 +201,6 @@ impl RespPublicKey {
 // ***************************************************************************
 //                          Private Functions
 // ***************************************************************************
-// // ---------------------------------------------------------------------------
-// // get_public_key:
-// // ---------------------------------------------------------------------------
-// async fn get_public_key(req: &ReqPublicKey) -> Result<PubkeyRetrieval> {
-//     // Get a connection to the db and start a transaction.  Uncommited transactions
-//     // are automatically rolled back when they go out of scope.
-//     // See https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html.
-//     let mut tx = RUNTIME_CTX.db.begin().await?;
-//
-//     // Create the insert statement.
-//     let result = sqlx::query(SELECT_PUBKEY)
-//         .bind(&req.user)
-//         .bind(&req.host)
-//         .bind(&req.public_key_fingerprint)
-//         .fetch_optional(&mut *tx)
-//         .await?;
-//
-//     // Commit the transaction.
-//     tx.commit().await?;
-//
-//     // We found the key!
-//     match result {
-//         Some(row) => {
-//             Ok(PubkeyRetrieval::new(row.get(0), row.get(1), row.get(2)))
-//         },
-//         None => {
-//             Err(anyhow!("NOT_FOUND"))
-//         },
-//     }
-// }
-//
 // get_full_pubkey_result:
 // Fetch the full public key record using the fingerprint, host and host_user
 // ---------------------------------------------------------------------------

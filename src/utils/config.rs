@@ -59,8 +59,6 @@ pub const TEST_TAPIS_CLIENT_SECRET : &str = "tapis-test-secret1";
 pub const TEST_TAPIS_APP: &str = "TapisApp";
 
 // Admin table constants.
-#[allow(dead_code)]
-pub const ADMIN_ID_PREFIX  : &str = "~~"; // literal value repeated in next line
 pub const DEFAULT_ADMIN_ID : &str = concat!("~~", "admin"); // admin ids always start with prefix
 pub const PERM_ADMIN       : &str = "PERM_ADMIN";
 
@@ -123,7 +121,7 @@ pub enum TmsMode { ExplicitTrust, ImplicitTrust }
 // TmsDirs:
 // ---------------------------------------------------------------------------
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Allow dead code for debug output during startup
 pub struct TmsDirs {
     pub root_dir: String,
     pub migrations_dir: String,
@@ -180,7 +178,7 @@ pub struct TmsCmdArgs {
 // Parms:
 // ---------------------------------------------------------------------------
 #[derive(Debug)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Allow dead code for debug output during startup
 pub struct Parms {
     pub config_file: String,
     pub config: Config,
@@ -229,7 +227,6 @@ pub struct Config {
 }
 
 impl Config {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Config::default()
     }
