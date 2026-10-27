@@ -73,7 +73,7 @@ LOCAL_DIR="$HOME/tms_local"
 # Set backup directory
 BAK_DIR="$HOME/tms_backups"
 DB_ENV_FILE="tms-db-env"
-DB_ENV_PATH="$ROOT_DIR/${DB_ENV_FILE}"
+DB_ENV_PATH="$LOCAL_DIR/${DB_ENV_FILE}"
 
 # Make sure rust and psql are installed.
 rustc --version
@@ -178,6 +178,7 @@ $SRC_DIR/deployment/postgres/tms_init_db.sh
 #  NOTE: We could get fancy and put these in a list, process in a loop and check exit code
 # ============================================================================================
 mkdir -p $SERVER_DIR
+mkdir -p $LOCAL_DIR
 mkdir -p $BAK_DIR/scripts
 # Copy initial resources directory to server directory. This is used during initial server startup.
 cp -pr $SRC_DIR/resources $SERVER_DIR/resources_src
