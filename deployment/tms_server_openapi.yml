@@ -186,6 +186,11 @@ paths:
               schema:
                 type: string
                 const: no-cache
+            Vary:
+              description: Accept-Encoding when the server compresses responses, so that caches keep compressed and uncompressed copies apart. Omitted otherwise.
+              schema:
+                type: string
+              example: Accept-Encoding
           content:
             application/json:
               schema:
@@ -217,7 +222,7 @@ paths:
           description: Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No body is returned.
           headers:
             ETag:
-              description: Entity tag for the current list, which matched one the client sent.
+              description: Entity tag for the current list.
               required: true
               schema:
                 type: string
@@ -228,6 +233,11 @@ paths:
               schema:
                 type: string
                 const: no-cache
+            Vary:
+              description: Same value as on a 200 response, as RFC 9110 requires for 304.
+              schema:
+                type: string
+              example: Accept-Encoding
         '500':
           description: Server error, including invalid institution data.
           content:
@@ -405,7 +415,9 @@ components:
           description: Human-readable outcome message.
         data_version:
           type: string
-          description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes.
+          minLength: 1
+          pattern: '^[\x21\x23-\x7E]+$'
+          description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes, so it is limited to printable ASCII other than space and double quote (RFC 9110 etagc).
         institutions:
           type: array
           description: Approved institutions. An empty array means no sign-in options are configured.
@@ -427,11 +439,13 @@ components:
       properties:
         id:
           type: string
+          maxLength: 64
           pattern: '^[a-z0-9][a-z0-9-]*$'
           description: Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500). Lower-case letters, digits and hyphens, starting with a letter or digit.
         name:
           type: string
           minLength: 1
+          maxLength: 256
           description: Display name.
         provider:
           $ref: '#/components/schemas/ProviderTypeEnum'
@@ -478,3 +492,6 @@ components:
             - globus
             - tacc_tapis
         - type: string
+      x-extensible-enum:
+        - globus
+        - tacc_tapis
