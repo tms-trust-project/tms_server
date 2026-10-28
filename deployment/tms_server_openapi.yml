@@ -156,7 +156,8 @@ paths:
         - Institutions
       summary: List approved institutions
       description: |
-        Return the approved institutions a user can sign in through. Unapproved entries are never returned.
+        Return the approved institutions a user can sign in through. Unapproved entries are never returned. Entries are
+        in display order, and clients should present them in the order given.
 
         Each Globus entry may carry a redirect_idp_domain, which the client passes unchanged as the redirect_idp_domain
         parameter of the Globus Auth authorize request so that Globus sends the user straight to that institution's IdP.
@@ -256,7 +257,9 @@ paths:
                 type: string
               example: Accept-Encoding
         '500':
-          description: Server error, including invalid institution data.
+          description: >-
+            Server error, including invalid institution data. The message is generic; details are logged on the server
+            and never returned, since the endpoint is public.
           headers:
             Cache-Control:
               description: Always no-store, so that neither the client nor an intermediary caches the error.
@@ -274,7 +277,7 @@ paths:
                   summary: Institution data failed validation
                   value:
                     result_code: '500'
-                    result_msg: 'Invalid institution data: duplicate id "utexas".'
+                    result_msg: Institution data is invalid.
         '503':
           description: Institution data is temporarily unavailable. The client may retry later.
           headers:
@@ -463,7 +466,9 @@ components:
             etagc).
         institutions:
           type: array
-          description: Approved institutions. An empty array means no sign-in options are configured.
+          description: >-
+            Approved institutions, in the display order set by the server's institution data. Clients should present
+            them in this order. An empty array means no sign-in options are configured.
           items:
             $ref: '#/components/schemas/Institution'
 
