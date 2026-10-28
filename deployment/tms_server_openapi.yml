@@ -2,7 +2,8 @@ openapi: 3.0.3
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) credential server provides for management of credentials requested by application clients.
+    The Trust Manager System (TMS) credential server provides for management of credentials requested by application
+    clients.
   version: '0.4.0'
   termsOfService: "https://tapis-project.org"
   contact:
@@ -27,7 +28,7 @@ tags:
     description: Approved institutions and the identity providers they sign in through
 
 # ------------------------------------------------------------------------------
-# --- Paths -------------------------------------------------------------------
+# --- Paths --------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 paths:
 
@@ -76,7 +77,9 @@ paths:
       tags:
         - Credentials
       description: |
-        Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes and key type. All values are required except for key type, which defaults to ED25519. Supported values for key type (case insensitive): ED25519, ECDSA, RSA.
+        Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes and
+        key type. All values are required except for key type, which defaults to ED25519. Supported values for key type
+        (case insensitive): ED25519, ECDSA, RSA.
 
         Setting the number of uses or TTL minutes to a negative value results in maximum limits.
         If both are negative this effectively creates a keypair with no limits.
@@ -114,9 +117,11 @@ paths:
       tags:
         - Credentials
       description: |
-        Retrieve public key using provided values for user, host and public key fingerprint. Values may also be provided for user UID and key type, but these are only used for writing to the server side log.
+        Retrieve public key using provided values for user, host and public key fingerprint. Values may also be provided
+        for user UID and key type, but these are only used for writing to the server side log.
 
-        The user and host must match the host account and host provided when the keypair was generated. If a match is found the public key is returned as part of the result.
+        The user and host must match the host account and host provided when the keypair was generated. If a match is
+        found the public key is returned as part of the result.
       operationId: retrievePubKey
       requestBody:
         required: true
@@ -154,18 +159,23 @@ paths:
       description: |
         Return the approved institutions a user can sign in through. Unapproved entries are never returned.
 
-        Each Globus entry may carry a redirect_idp_domain, which the client passes unchanged as the redirect_idp_domain parameter of the Globus Auth authorize request so that Globus sends the user straight to that institution's IdP. A Globus entry with no domain shows Globus Auth's own organization picker. A tacc_tapis entry signs in through Tapis OAuth2 and never has a domain.
+        Each Globus entry may carry a redirect_idp_domain, which the client passes unchanged as the redirect_idp_domain
+        parameter of the Globus Auth authorize request so that Globus sends the user straight to that institution's IdP.
+        A Globus entry with no domain shows Globus Auth's own organization picker. A tacc_tapis entry signs in through
+        Tapis OAuth2 and never has a domain.
 
         The list is public and requires no authorization.
 
-        Every 200 response carries an ETag. A client that caches the list can send that value back in If-None-Match and receives 304 with no body when the list has not changed.
+        Every 200 response carries an ETag. A client that caches the list can send that value back in If-None-Match and
+        receives 304 with no body when the list has not changed.
       operationId: listInstitutions
       security: []
       parameters:
         - name: If-None-Match
           in: header
           description: |
-            One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2). If any listed tag matches the current list under weak comparison, or the value is *, the server returns 304.
+            One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2). If any
+            listed tag matches the current list under weak comparison, or the value is *, the server returns 304.
           schema:
             type: string
           example: '"2026-10-28.1"'
@@ -174,19 +184,25 @@ paths:
           description: Success.
           headers:
             ETag:
-              description: Quoted strong entity tag for the current list. Its value is data_version wrapped in double quotes, so it changes whenever the list changes.
+              description: >-
+                Quoted strong entity tag for the current list. Its value is data_version wrapped in double quotes, so it
+                changes whenever the list changes.
               required: true
               schema:
                 type: string
               example: '"2026-10-28.1"'
             Cache-Control:
-              description: Always no-cache. Clients may store the list but must revalidate it with If-None-Match before reuse.
+              description: >-
+                Always no-cache. Clients may store the list but must revalidate it with If-None-Match before reuse.
               required: true
               schema:
                 type: string
-                enum: [no-cache]
+                enum:
+                  - no-cache
             Vary:
-              description: Accept-Encoding when the server compresses responses, so that caches keep compressed and uncompressed copies apart. Omitted otherwise.
+              description: >-
+                Accept-Encoding when the server compresses responses, so that caches keep compressed and uncompressed
+                copies apart. Omitted otherwise.
               schema:
                 type: string
               example: Accept-Encoding
@@ -218,7 +234,9 @@ paths:
                         redirect_idp_domain: null
                         idp_logout_url: null
         '304':
-          description: Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No body is returned.
+          description: >-
+            Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No
+            body is returned.
           headers:
             ETag:
               description: Quoted strong entity tag for the current list. Same value a 200 response would carry.
@@ -231,7 +249,8 @@ paths:
               required: true
               schema:
                 type: string
-                enum: [no-cache]
+                enum:
+                  - no-cache
             Vary:
               description: Same value as on a 200 response, as RFC 9110 requires for 304.
               schema:
@@ -245,7 +264,8 @@ paths:
               required: true
               schema:
                 type: string
-                enum: [no-store]
+                enum:
+                  - no-store
           content:
             application/json:
               schema:
@@ -264,9 +284,12 @@ paths:
               required: true
               schema:
                 type: string
-                enum: [no-store]
+                enum:
+                  - no-store
             Retry-After:
-              description: Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can estimate when the data will be available again.
+              description: >-
+                Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can
+                estimate when the data will be available again.
               schema:
                 type: integer
                 minimum: 0
@@ -435,7 +458,10 @@ components:
           type: string
           minLength: 1
           pattern: '^[\x21\x23-\x7E]+$'
-          description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes, so it is limited to printable ASCII other than space and double quote (RFC 9110 etagc).
+          description: >-
+            Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without
+            its surrounding quotes, so it is limited to printable ASCII other than space and double quote (RFC 9110
+            etagc).
         institutions:
           type: array
           description: Approved institutions. An empty array means no sign-in options are configured.
@@ -447,7 +473,9 @@ components:
     # -------------------------------------------------------------------------
     Institution:
       type: object
-      description: An approved sign-in option. New properties may be added without a major version change; clients must ignore properties they do not recognize.
+      description: >-
+        An approved sign-in option. New properties may be added without a major version change; clients must ignore
+        properties they do not recognize.
       required:
         - id
         - name
@@ -459,7 +487,9 @@ components:
           type: string
           maxLength: 64
           pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
-          description: Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500). Lower-case letters and digits, optionally separated by single hyphens; no leading or trailing hyphen.
+          description: >-
+            Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500).
+            Lower-case letters and digits, optionally separated by single hyphens; no leading or trailing hyphen.
         name:
           type: string
           minLength: 1
@@ -474,14 +504,17 @@ components:
           maxLength: 253
           pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
           description: |
-            Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
+            Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize
+            parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
         idp_logout_url:
           type: string
           nullable: true
           format: uri
           maxLength: 2048
           pattern: '^https://[^\s/?#]+[^\s]*$'
-          description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any provider, including tacc_tapis.
+          description: >-
+            HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any
+            provider, including tacc_tapis.
 
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
@@ -497,7 +530,8 @@ components:
       type: string
       description: |
         Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
-        New values may be added without a major version change. Clients must skip entries whose provider they do not support rather than reject the response.
+        New values may be added without a major version change. Clients must skip entries whose provider they do not
+        support rather than reject the response.
       # Known values are listed once here and reused by x-extensible-enum via the
       # YAML alias below; add new providers to this list only.
       anyOf:
