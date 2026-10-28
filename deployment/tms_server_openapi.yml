@@ -18,7 +18,6 @@ externalDocs:
 servers:
   - url: 'http://localhost:3000'
     description: Local test environment
-    variables: {}
 tags:
   - name: General
     description: General service health and readiness
