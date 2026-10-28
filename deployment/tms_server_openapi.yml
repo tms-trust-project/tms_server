@@ -2,14 +2,13 @@ openapi: 3.0.3
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) credential server provides for management of credentials requested by application
-    clients.
+    The Trust Manager System (TMS) credential server manages credentials requested by application clients.
   version: '0.4.0'
-  termsOfService: "https://tapis-project.org"
+  termsOfService: 'https://tapis-project.org'
   contact:
-    name: "TMS Server - CICSupport"
-    url: "https://tapis-project.org"
-    email: "cicsupport@tacc.utexas.edu"
+    name: 'TMS Server - CICSupport'
+    url: 'https://tapis-project.org'
+    email: 'cicsupport@tacc.utexas.edu'
   license:
     name: 3-Clause BSD License
     url: 'https://opensource.org/licenses/BSD-3-Clause'
