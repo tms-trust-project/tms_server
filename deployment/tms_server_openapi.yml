@@ -221,6 +221,7 @@ paths:
               required: true
               schema:
                 type: string
+              example: '"2026-10-28.1"'
             Cache-Control:
               description: Same value as on a 200 response, as RFC 9110 requires for 304.
               required: true
@@ -236,6 +237,12 @@ paths:
         '503':
           description: Institution data is temporarily unavailable. The client may retry later.
           headers:
+            Cache-Control:
+              description: Always no-store, so that neither the client nor an intermediary caches the error.
+              required: true
+              schema:
+                type: string
+                const: no-store
             Retry-After:
               description: Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can estimate when the data will be available again.
               schema:
@@ -418,7 +425,7 @@ components:
         id:
           type: string
           pattern: '^[a-z0-9][a-z0-9-]*$'
-          description: Stable identifier of the entry, unique within the list. Lower-case letters, digits and hyphens, starting with a letter or digit.
+          description: Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500). Lower-case letters, digits and hyphens, starting with a letter or digit.
         name:
           type: string
           minLength: 1
@@ -429,7 +436,7 @@ components:
           type: [string, 'null']
           format: hostname
           maxLength: 253
-          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+          pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
           description: |
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
         idp_logout_url:
@@ -463,6 +470,8 @@ components:
       description: |
         Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
         New values may be added without a major version change. Clients must skip entries whose provider they do not support rather than reject the response.
-      x-extensible-enum:
-        - globus
-        - tacc_tapis
+      anyOf:
+        - enum:
+            - globus
+            - tacc_tapis
+        - type: string
