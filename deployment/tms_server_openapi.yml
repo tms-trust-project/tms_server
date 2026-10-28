@@ -354,12 +354,24 @@ components:
         redirect_idp_domain:
           type: [string, 'null']
           format: hostname
+          pattern: '^[a-z0-9.-]+$'
           description: |
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
         idp_logout_url:
           type: [string, 'null']
           format: uri
+          pattern: '^https://'
           description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none.
+      if:
+        required:
+          - provider
+        properties:
+          provider:
+            const: tacc_tapis
+      then:
+        properties:
+          redirect_idp_domain:
+            type: 'null'
 
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
