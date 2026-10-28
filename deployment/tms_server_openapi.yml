@@ -165,6 +165,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RespInstitutions'
+              examples:
+                mixedProviders:
+                  summary: Globus entries with and without a domain, plus a Tapis entry
+                  value:
+                    result_code: '0'
+                    result_msg: Success.
+                    data_version: '2026-10-28.1'
+                    num_institutions: 3
+                    institutions:
+                      - id: utexas
+                        name: The University of Texas at Austin
+                        provider: globus
+                        redirect_idp_domain: utexas.edu
+                        idp_logout_url: 'https://enterprise.login.utexas.edu/idp/profile/Logout'
+                      - id: globus-other
+                        name: Other institution (choose in Globus)
+                        provider: globus
+                        redirect_idp_domain: null
+                        idp_logout_url: null
+                      - id: tacc
+                        name: Texas Advanced Computing Center
+                        provider: tacc_tapis
+                        redirect_idp_domain: null
+                        idp_logout_url: null
         '500':
           description: Server error, including invalid or unavailable institution data.
           content:
