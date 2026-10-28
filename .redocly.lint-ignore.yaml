@@ -1,0 +1,7 @@
+# This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
+# See https://redoc.ly/docs/cli/ for more information.
+deployment/tms_server_openapi.yml:
+  # listInstitutions takes no request body or required parameters, and a
+  # malformed If-None-Match is ignored rather than rejected, so it has no 4xx.
+  operation-4xx-response:
+    - '#/paths/~1tms~1institutions/get/responses'

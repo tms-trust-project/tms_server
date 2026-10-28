@@ -494,11 +494,11 @@ components:
       description: |
         Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
         New values may be added without a major version change. Clients must skip entries whose provider they do not support rather than reject the response.
+      # Known values are listed once here and reused by x-extensible-enum via the
+      # YAML alias below; add new providers to this list only.
       anyOf:
-        - enum:
+        - enum: &providerTypeValues
             - globus
             - tacc_tapis
         - type: string
-      x-extensible-enum:
-        - globus
-        - tacc_tapis
+      x-extensible-enum: *providerTypeValues
