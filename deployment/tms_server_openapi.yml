@@ -1,4 +1,4 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: Trust Manager System (TMS) Server
   description: |
@@ -184,7 +184,7 @@ paths:
               required: true
               schema:
                 type: string
-                const: no-cache
+                enum: [no-cache]
             Vary:
               description: Accept-Encoding when the server compresses responses, so that caches keep compressed and uncompressed copies apart. Omitted otherwise.
               schema:
@@ -231,7 +231,7 @@ paths:
               required: true
               schema:
                 type: string
-                const: no-cache
+                enum: [no-cache]
             Vary:
               description: Same value as on a 200 response, as RFC 9110 requires for 304.
               schema:
@@ -245,7 +245,7 @@ paths:
               required: true
               schema:
                 type: string
-                const: no-store
+                enum: [no-store]
           content:
             application/json:
               schema:
@@ -258,7 +258,7 @@ paths:
               required: true
               schema:
                 type: string
-                const: no-store
+                enum: [no-store]
             Retry-After:
               description: Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can estimate when the data will be available again.
               schema:
@@ -456,28 +456,20 @@ components:
         provider:
           $ref: '#/components/schemas/ProviderTypeEnum'
         redirect_idp_domain:
-          type: [string, 'null']
+          type: string
+          nullable: true
           format: hostname
           maxLength: 253
           pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
           description: |
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
         idp_logout_url:
-          type: [string, 'null']
+          type: string
+          nullable: true
           format: uri
           maxLength: 2048
           pattern: '^https://[^\s/?#]+[^\s]*$'
           description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any provider, including tacc_tapis.
-      if:
-        required:
-          - provider
-        properties:
-          provider:
-            const: tacc_tapis
-      then:
-        properties:
-          redirect_idp_domain:
-            type: 'null'
 
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
