@@ -162,7 +162,7 @@ paths:
         Each Globus entry may carry a redirect_idp_domain, which the client passes unchanged as the redirect_idp_domain
         parameter of the Globus Auth authorize request so that Globus sends the user straight to that institution's IdP.
         A Globus entry with no domain shows Globus Auth's own organization picker. A tacc_tapis entry signs in through
-        Tapis OAuth2 and never has a domain.
+        Tapis OAuth2 and never has a domain. Optional properties with no value are omitted, never sent as null.
 
         The list is public and requires no authorization.
 
@@ -227,13 +227,9 @@ paths:
                       - id: globus-other
                         name: Other institution (choose in Globus)
                         provider: globus
-                        redirect_idp_domain: null
-                        idp_logout_url: null
                       - id: tacc
                         name: Texas Advanced Computing Center
                         provider: tacc_tapis
-                        redirect_idp_domain: null
-                        idp_logout_url: null
         '304':
           description: >-
             Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No
@@ -485,8 +481,6 @@ components:
         - id
         - name
         - provider
-        - redirect_idp_domain
-        - idp_logout_url
       properties:
         id:
           type: string
@@ -504,22 +498,20 @@ components:
           $ref: '#/components/schemas/ProviderTypeEnum'
         redirect_idp_domain:
           type: string
-          nullable: true
           format: hostname
           maxLength: 253
           pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
           description: >-
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize
-            parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
+            parameter. Omitted when there is no IdP to steer to, and always omitted for tacc_tapis.
         idp_logout_url:
           type: string
-          nullable: true
           format: uri
           maxLength: 2048
           pattern: '^https://[^\s/?#]+[^\s]*$'
           description: >-
-            HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any
-            provider, including tacc_tapis.
+            HTTPS sign-out URL of the institution's own IdP. Omitted when there is none. May be set for any provider,
+            including tacc_tapis.
 
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
@@ -537,11 +529,8 @@ components:
         Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
         New values may be added without a major version change. Clients must skip entries whose provider they do not
         support rather than reject the response.
-      # Known values are listed once here and reused by x-extensible-enum via the
-      # YAML alias below; add new providers to this list only.
       anyOf:
-        - enum: &providerTypeValues
+        - enum:
             - globus
             - tacc_tapis
         - type: string
-      x-extensible-enum: *providerTypeValues
