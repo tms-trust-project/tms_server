@@ -198,7 +198,6 @@ paths:
                     result_code: '0'
                     result_msg: Success.
                     data_version: '2026-10-28.1'
-                    num_institutions: 3
                     institutions:
                       - id: utexas
                         name: The University of Texas at Austin
@@ -391,7 +390,6 @@ components:
         - result_code
         - result_msg
         - data_version
-        - num_institutions
         - institutions
       properties:
         result_code:
@@ -401,11 +399,6 @@ components:
         data_version:
           type: string
           description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes.
-        num_institutions:
-          type: integer
-          format: int32
-          minimum: 0
-          description: Number of entries in institutions.
         institutions:
           type: array
           items:
@@ -429,6 +422,7 @@ components:
           description: Stable identifier of the entry, unique within the list. Lower-case letters, digits and hyphens, starting with a letter or digit.
         name:
           type: string
+          minLength: 1
           description: Display name.
         provider:
           $ref: '#/components/schemas/ProviderTypeEnum'
