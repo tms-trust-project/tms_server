@@ -239,6 +239,13 @@ paths:
               example: Accept-Encoding
         '500':
           description: Server error, including invalid institution data.
+          headers:
+            Cache-Control:
+              description: Always no-store, so that neither the client nor an intermediary caches the error.
+              required: true
+              schema:
+                type: string
+                const: no-store
           content:
             application/json:
               schema:
@@ -439,8 +446,8 @@ components:
         id:
           type: string
           maxLength: 64
-          pattern: '^[a-z0-9][a-z0-9-]*$'
-          description: Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500). Lower-case letters, digits and hyphens, starting with a letter or digit.
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+          description: Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500). Lower-case letters and digits, optionally separated by single hyphens; no leading or trailing hyphen.
         name:
           type: string
           minLength: 1
@@ -458,7 +465,8 @@ components:
         idp_logout_url:
           type: [string, 'null']
           format: uri
-          pattern: '^https://'
+          maxLength: 2048
+          pattern: '^https://[^\s/?#]+'
           description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any provider, including tacc_tapis.
       if:
         required:

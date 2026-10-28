@@ -1,0 +1,10 @@
+extends:
+  - recommended
+
+rules:
+  # Redocly injects unevaluatedProperties: false into every subschema when
+  # checking examples, including if/then branches, which falsely rejects valid
+  # examples (e.g. Institution's tacc_tapis conditional).
+  no-invalid-media-type-examples:
+    severity: warn
+    allowAdditionalProperties: true
