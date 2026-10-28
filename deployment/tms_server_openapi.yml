@@ -166,7 +166,8 @@ paths:
         - name: If-None-Match
           in: header
           required: false
-          description: ETag from a previous 200 response. If it still matches the current list, the server returns 304.
+          description: |
+            One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2). If any listed tag matches the current list under weak comparison, or the value is *, the server returns 304.
           schema:
             type: string
           example: '"2026-10-28.1"'
@@ -180,6 +181,12 @@ paths:
               schema:
                 type: string
               example: '"2026-10-28.1"'
+            Cache-Control:
+              description: Always no-cache. Clients may store the list but must revalidate it with If-None-Match before reuse.
+              required: true
+              schema:
+                type: string
+                const: no-cache
           content:
             application/json:
               schema:
@@ -212,10 +219,16 @@ paths:
           description: Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No body is returned.
           headers:
             ETag:
-              description: Entity tag for the current list, the same value the client sent.
+              description: Entity tag for the current list, which matched one the client sent.
               required: true
               schema:
                 type: string
+            Cache-Control:
+              description: Same value as on a 200 response, as RFC 9110 requires for 304.
+              required: true
+              schema:
+                type: string
+                const: no-cache
         '500':
           description: Server error, including invalid institution data.
           content:
@@ -224,6 +237,14 @@ paths:
                 $ref: '#/components/schemas/HttpResult'
         '503':
           description: Institution data is temporarily unavailable. The client may retry later.
+          headers:
+            Retry-After:
+              description: Seconds the client should wait before retrying. Sent when the server can estimate when the data will be available again.
+              required: false
+              schema:
+                type: integer
+                minimum: 0
+              example: 30
           content:
             application/json:
               schema:
@@ -369,6 +390,7 @@ components:
       required:
         - result_code
         - result_msg
+        - data_version
         - num_institutions
         - institutions
       properties:
@@ -378,7 +400,7 @@ components:
           type: string
         data_version:
           type: string
-          description: Revision of the institution data. Changes whenever the list changes.
+          description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes.
         num_institutions:
           type: integer
           format: int32
@@ -403,7 +425,8 @@ components:
       properties:
         id:
           type: string
-          description: Stable identifier of the entry, unique within the list.
+          pattern: '^[a-z0-9][a-z0-9-]*$'
+          description: Stable identifier of the entry, unique within the list. Lower-case letters, digits and hyphens, starting with a letter or digit.
         name:
           type: string
           description: Display name.
@@ -412,7 +435,7 @@ components:
         redirect_idp_domain:
           type: [string, 'null']
           format: hostname
-          pattern: '^[a-z0-9.-]+$'
+          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
           description: |
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
         idp_logout_url:
