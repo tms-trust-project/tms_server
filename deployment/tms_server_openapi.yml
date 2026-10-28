@@ -221,7 +221,7 @@ paths:
           description: Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No body is returned.
           headers:
             ETag:
-              description: Entity tag for the current list.
+              description: Quoted strong entity tag for the current list. Same value a 200 response would carry.
               required: true
               schema:
                 type: string
@@ -250,6 +250,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HttpResult'
+              examples:
+                invalidData:
+                  summary: Institution data failed validation
+                  value:
+                    result_code: '500'
+                    result_msg: 'Invalid institution data: duplicate id "utexas".'
         '503':
           description: Institution data is temporarily unavailable. The client may retry later.
           headers:
@@ -269,6 +275,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HttpResult'
+              examples:
+                unavailable:
+                  summary: Institution data could not be loaded
+                  value:
+                    result_code: '503'
+                    result_msg: Institution data is temporarily unavailable.
 
 # ------------------------------------------------------------------------------
 # --- Components ---------------------------------------------------------------
