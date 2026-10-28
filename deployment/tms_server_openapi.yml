@@ -165,7 +165,6 @@ paths:
       parameters:
         - name: If-None-Match
           in: header
-          required: false
           description: |
             One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2). If any listed tag matches the current list under weak comparison, or the value is *, the server returns 304.
           schema:
@@ -238,8 +237,7 @@ paths:
           description: Institution data is temporarily unavailable. The client may retry later.
           headers:
             Retry-After:
-              description: Seconds the client should wait before retrying. Sent when the server can estimate when the data will be available again.
-              required: false
+              description: Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can estimate when the data will be available again.
               schema:
                 type: integer
                 minimum: 0
@@ -430,6 +428,7 @@ components:
         redirect_idp_domain:
           type: [string, 'null']
           format: hostname
+          maxLength: 253
           pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
           description: |
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
@@ -437,7 +436,7 @@ components:
           type: [string, 'null']
           format: uri
           pattern: '^https://'
-          description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none.
+          description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any provider, including tacc_tapis.
       if:
         required:
           - provider
