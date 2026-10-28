@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) credential server provides for management of credentials request by application clients.
+    The Trust Manager System (TMS) credential server provides for management of credentials requested by application clients.
   version: '0.4.0'
   termsOfService: "https://tapis-project.org"
   contact:
@@ -16,7 +16,7 @@ externalDocs:
   description: Tapis Project
   url: 'https://tapis-project.org'
 servers:
-  - url: 'http://localhost:3000/'
+  - url: 'http://localhost:3000'
     description: Local test environment
     variables: {}
 tags:
@@ -78,19 +78,19 @@ paths:
         - Credentials
       description: |
         Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes and key type. All values are required except for key type, which defaults to ED25519. Supported values for key type (case insensitive): ED25519, ECDSA, RSA.
-        
+
         Setting the number of uses or TTL minutes to a negative value results in maximum limits.
         If both are negative this effectively creates a keypair with no limits.
         If both are specified as 0 then the resulting key is not usable.
 
-        *WARNING* Note that in the current MVP implementation the number of uses and TTL minutes are ignored. 
+        *WARNING* Note that in the current MVP implementation the number of uses and TTL minutes are ignored.
         In a future release of TMS Server, these attributes will be honored.
       operationId: createSShKeypair
       security:
         - TmsClientAuth: []
       requestBody:
         required: true
-        description: A JSON object providing information about the SSH keypair ot be generated.
+        description: A JSON object providing information about the SSH keypair to be generated.
         content:
           application/json:
             schema:
@@ -116,7 +116,7 @@ paths:
         - Credentials
       description: |
         Retrieve public key using provided values for user, host and public key fingerprint. Values may also be provided for user UID and key type, but these are only used for writing to the server side log.
-        
+
         The user and host must match the host account and host provided when the keypair was generated. If a match is found the public key is returned as part of the result.
       operationId: retrievePubKey
       requestBody:
@@ -176,7 +176,7 @@ paths:
           description: Success.
           headers:
             ETag:
-              description: Opaque, quoted entity tag for the current list. Changes whenever the list changes.
+              description: Opaque, quoted strong entity tag for the current list. Changes whenever the list changes.
               required: true
               schema:
                 type: string
@@ -401,6 +401,7 @@ components:
           description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes.
         institutions:
           type: array
+          description: Approved institutions. An empty array means no sign-in options are configured.
           items:
             $ref: '#/components/schemas/Institution'
 
