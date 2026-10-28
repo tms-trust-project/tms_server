@@ -176,6 +176,7 @@ paths:
           description: |
             One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2). If any
             listed tag matches the current list under weak comparison, or the value is *, the server returns 304.
+            A malformed value is ignored rather than rejected, and the server returns 200 with the full list.
           schema:
             type: string
           example: '"2026-10-28.1"'
@@ -215,7 +216,7 @@ paths:
                   summary: Globus entries with and without a domain, plus a Tapis entry
                   value:
                     result_code: '0'
-                    result_msg: Success.
+                    result_msg: success
                     data_version: '2026-10-28.1'
                     institutions:
                       - id: utexas
@@ -507,7 +508,7 @@ components:
           format: hostname
           maxLength: 253
           pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
-          description: |
+          description: >-
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize
             parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
         idp_logout_url:
@@ -532,7 +533,7 @@ components:
         - ECDSA
     ProviderTypeEnum:
       type: string
-      description: |
+      description: >-
         Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
         New values may be added without a major version change. Clients must skip entries whose provider they do not
         support rather than reject the response.
