@@ -175,7 +175,7 @@ paths:
           description: Success.
           headers:
             ETag:
-              description: Opaque, quoted strong entity tag for the current list. Changes whenever the list changes.
+              description: Quoted strong entity tag for the current list. Its value is data_version wrapped in double quotes, so it changes whenever the list changes.
               required: true
               schema:
                 type: string
@@ -399,8 +399,10 @@ components:
       properties:
         result_code:
           type: string
+          description: Outcome code. '0' on success.
         result_msg:
           type: string
+          description: Human-readable outcome message.
         data_version:
           type: string
           description: Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without its surrounding quotes.
@@ -415,6 +417,7 @@ components:
     # -------------------------------------------------------------------------
     Institution:
       type: object
+      description: An approved sign-in option. New properties may be added without a major version change; clients must ignore properties they do not recognize.
       required:
         - id
         - name
