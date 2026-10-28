@@ -466,7 +466,7 @@ components:
           type: [string, 'null']
           format: uri
           maxLength: 2048
-          pattern: '^https://[^\s/?#]+'
+          pattern: '^https://[^\s/?#]+[^\s]*$'
           description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none. May be set for any provider, including tacc_tapis.
       if:
         required:
