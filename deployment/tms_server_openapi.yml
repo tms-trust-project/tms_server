@@ -2,8 +2,7 @@ openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) credential server provides for management of credentials request by
-    application clients.
+    The Trust Manager System (TMS) credential server provides for management of credentials request by application clients.
   version: '0.4.0'
   termsOfService: "https://tapis-project.org"
   contact:
@@ -25,6 +24,8 @@ tags:
     description: General service health and readiness
   - name: Credentials
     description: Manage access credentials
+  - name: Institutions
+    description: Approved institutions and the identity providers they sign in through
 
 # ------------------------------------------------------------------------------
 # --- Paths -------------------------------------------------------------------
@@ -76,15 +77,13 @@ paths:
       tags:
         - Credentials
       description: |
-        Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes
-        and key type. All values are required except for key type, which defaults to ED25519. Supported values for
-        key type (case insensitive): ED25519, ECDSA, RSA.
+        Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes and key type. All values are required except for key type, which defaults to ED25519. Supported values for key type (case insensitive): ED25519, ECDSA, RSA.
         
         Setting the number of uses or TTL minutes to a negative value results in maximum limits.
         If both are negative this effectively creates a keypair with no limits.
         If both are specified as 0 then the resulting key is not usable.
 
-        *WARNING* Note that in the current MVP implementation the number of uses and TTL minutes are ignored.
+        *WARNING* Note that in the current MVP implementation the number of uses and TTL minutes are ignored. 
         In a future release of TMS Server, these attributes will be honored.
       operationId: createSShKeypair
       security:
@@ -116,11 +115,9 @@ paths:
       tags:
         - Credentials
       description: |
-        Retrieve public key using provided values for user, host and public key fingerprint. Values may also be
-        provided for user UID and key type, but these are only used for writing to the server side log.
+        Retrieve public key using provided values for user, host and public key fingerprint. Values may also be provided for user UID and key type, but these are only used for writing to the server side log.
         
-        The user and host must match the host account and host provided when the keypair was generated. If a match is
-        found the public key is returned as part of the result.
+        The user and host must match the host account and host provided when the keypair was generated. If a match is found the public key is returned as part of the result.
       operationId: retrievePubKey
       requestBody:
         required: true
@@ -144,6 +141,32 @@ paths:
                 $ref: '#/components/schemas/HttpResult'
         '500':
           description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpResult'
+
+  # --- listInstitutions -------------------------------------------------------
+  '/tms/institutions':
+    get:
+      tags:
+        - Institutions
+      description: |
+        Return the approved institutions a user can sign in through. Unapproved entries are never returned.
+
+        Each Globus entry may carry a redirect_idp_domain, which the client passes unchanged as the redirect_idp_domain parameter of the Globus Auth authorize request so that Globus sends the user straight to that institution's IdP. A Globus entry with no domain shows Globus Auth's own organization picker. A tacc_tapis entry signs in through Tapis OAuth2 and never has a domain.
+
+        The list is public and requires no authorization.
+      operationId: listInstitutions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespInstitutions'
+        '500':
+          description: Server error, including invalid or unavailable institution data.
           content:
             application/json:
               schema:
@@ -284,6 +307,58 @@ components:
         public_key:
           type: string
 
+    RespInstitutions:
+      type: object
+      required:
+        - result_code
+        - result_msg
+        - num_institutions
+        - institutions
+      properties:
+        result_code:
+          type: string
+        result_msg:
+          type: string
+        data_version:
+          type: string
+          description: Revision of the institution data. Changes whenever the list changes. Optional.
+        num_institutions:
+          type: integer
+          format: int32
+          description: Number of entries in institutions.
+        institutions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Institution'
+
+    # -------------------------------------------------------------------------
+    # --- Data objects --------------------------------------------------------
+    # -------------------------------------------------------------------------
+    Institution:
+      type: object
+      required:
+        - id
+        - name
+        - provider
+      properties:
+        id:
+          type: string
+          description: Stable identifier of the entry, unique within the list.
+        name:
+          type: string
+          description: Display name.
+        provider:
+          $ref: '#/components/schemas/ProviderTypeEnum'
+        redirect_idp_domain:
+          type: [string, 'null']
+          format: hostname
+          description: |
+            Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize parameter. Always sent; null when there is no IdP to steer to, and always null for tacc_tapis.
+        idp_logout_url:
+          type: [string, 'null']
+          format: uri
+          description: HTTPS sign-out URL of the institution's own IdP. Always sent; null when there is none.
+
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -294,3 +369,11 @@ components:
         - ED25519
         - RSA
         - ECDSA
+    ProviderTypeEnum:
+      type: string
+      description: |
+        Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
+        New values may be added without a major version change. Clients must skip entries whose provider they do not support rather than reject the response.
+      enum:
+        - globus
+        - tacc_tapis
