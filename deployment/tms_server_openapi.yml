@@ -151,16 +151,35 @@ paths:
     get:
       tags:
         - Institutions
+      summary: List approved institutions
       description: |
         Return the approved institutions a user can sign in through. Unapproved entries are never returned.
 
         Each Globus entry may carry a redirect_idp_domain, which the client passes unchanged as the redirect_idp_domain parameter of the Globus Auth authorize request so that Globus sends the user straight to that institution's IdP. A Globus entry with no domain shows Globus Auth's own organization picker. A tacc_tapis entry signs in through Tapis OAuth2 and never has a domain.
 
         The list is public and requires no authorization.
+
+        Every 200 response carries an ETag. A client that caches the list can send that value back in If-None-Match and receives 304 with no body when the list has not changed.
       operationId: listInstitutions
+      security: []
+      parameters:
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag from a previous 200 response. If it still matches the current list, the server returns 304.
+          schema:
+            type: string
+          example: '"2026-10-28.1"'
       responses:
         '200':
           description: Success.
+          headers:
+            ETag:
+              description: Opaque, quoted entity tag for the current list. Changes whenever the list changes.
+              required: true
+              schema:
+                type: string
+              example: '"2026-10-28.1"'
           content:
             application/json:
               schema:
@@ -189,8 +208,22 @@ paths:
                         provider: tacc_tapis
                         redirect_idp_domain: null
                         idp_logout_url: null
+        '304':
+          description: Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No body is returned.
+          headers:
+            ETag:
+              description: Entity tag for the current list, the same value the client sent.
+              required: true
+              schema:
+                type: string
         '500':
-          description: Server error, including invalid or unavailable institution data.
+          description: Server error, including invalid institution data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpResult'
+        '503':
+          description: Institution data is temporarily unavailable. The client may retry later.
           content:
             application/json:
               schema:
@@ -345,10 +378,11 @@ components:
           type: string
         data_version:
           type: string
-          description: Revision of the institution data. Changes whenever the list changes. Optional.
+          description: Revision of the institution data. Changes whenever the list changes.
         num_institutions:
           type: integer
           format: int32
+          minimum: 0
           description: Number of entries in institutions.
         institutions:
           type: array
