@@ -340,6 +340,8 @@ components:
         - id
         - name
         - provider
+        - redirect_idp_domain
+        - idp_logout_url
       properties:
         id:
           type: string
@@ -374,6 +376,6 @@ components:
       description: |
         Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
         New values may be added without a major version change. Clients must skip entries whose provider they do not support rather than reject the response.
-      enum:
+      x-extensible-enum:
         - globus
         - tacc_tapis
