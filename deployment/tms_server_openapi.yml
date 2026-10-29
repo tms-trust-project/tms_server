@@ -458,9 +458,10 @@ components:
           minLength: 1
           pattern: '^[\x21\x23-\x7E]+$'
           description: >-
-            Revision of the institution data. Changes whenever the list changes. Equals the ETag header value without
-            its surrounding quotes, so it is limited to printable ASCII other than space and double quote (RFC 9110
-            etagc).
+            Revision of the institution data. Changes whenever the list changes. Taken from the institution data when
+            it supplies one; otherwise the server derives it as a hex-encoded hash of the approved list, so clients
+            can treat it as opaque. Equals the ETag header value without its surrounding quotes, so it is limited to
+            printable ASCII other than space and double quote (RFC 9110 etagc).
         institutions:
           type: array
           description: >-
@@ -485,10 +486,11 @@ components:
         id:
           type: string
           maxLength: 64
-          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+          pattern: '^[a-z0-9]+([_-][a-z0-9]+)*$'
           description: >-
             Stable identifier of the entry, unique within the list; the server rejects data with duplicate ids (500).
-            Lower-case letters and digits, optionally separated by single hyphens; no leading or trailing hyphen.
+            Lower-case letters and digits, optionally separated by single hyphens or underscores; no leading or
+            trailing separator.
         name:
           type: string
           minLength: 1
@@ -500,10 +502,11 @@ components:
           type: string
           format: hostname
           maxLength: 253
-          pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
+          pattern: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$'
           description: >-
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize
-            parameter. Omitted when there is no IdP to steer to, and always omitted for tacc_tapis.
+            parameter. Two or more labels; the top-level label starts with a letter, so an IP address is rejected.
+            Omitted when there is no IdP to steer to, and always omitted for tacc_tapis.
         idp_logout_url:
           type: string
           format: uri
