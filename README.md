@@ -129,4 +129,3 @@ The following algorithms can be specified in the `key_type`, with the default be
 - **RSA**
 - **ECDSA**
 - **ED25519**
-
