@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
-  description: |
+  description: >-
     The Trust Manager System (TMS) credential server provides for management of credentials request by
     application clients.
   version: '0.4.0'
@@ -77,7 +77,7 @@ paths:
     post:
       tags:
         - Credentials
-      description: |
+      description: >-
         Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes
         and key type. All values are required except for key type, which defaults to ED25519. Supported values for
         key type (case insensitive): ED25519, ECDSA, RSA.
@@ -117,7 +117,7 @@ paths:
     post:
       tags:
         - Credentials
-      description: |
+      description: >-
         Retrieve public key using provided values for user, host and public key fingerprint. Values may also be
         provided for user UID and key type, but these are only used for writing to the server side log.
         
@@ -157,7 +157,7 @@ paths:
       tags:
         - Institutions
       summary: List approved institutions
-      description: |
+      description: >-
         Return the approved institutions a user can sign in through. Unapproved entries are never returned. Entries are
         in display order, and clients should present them in the order given.
 
@@ -270,7 +270,7 @@ components:
   securitySchemes:
     TmsClientAuth:
       type: apiKey
-      description: |
+      description: >-
         Authorization for requests is handled through the use of two headers, X-TMS-CLIENT-ID and X-TMS-CLIENT-SECRET.
       name: X-TMS-CLIENT-ID
       in: header
