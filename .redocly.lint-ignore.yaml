@@ -5,3 +5,6 @@ deployment/tms_server_openapi.yml:
   # malformed If-None-Match is ignored rather than rejected, so it has no 4xx.
   operation-4xx-response:
     - '#/paths/~1tms~1institutions/get/responses'
+  # listInstitutions is public. poem-openapi has no way to emit security: [] for it.
+  security-defined:
+    - '#/paths/~1tms~1institutions/get'

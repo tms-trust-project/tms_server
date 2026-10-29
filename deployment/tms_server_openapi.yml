@@ -2,13 +2,14 @@ openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
   description: |
-    The Trust Manager System (TMS) credential server manages credentials requested by application clients.
+    The Trust Manager System (TMS) credential server provides for management of credentials request by
+    application clients.
   version: '0.4.0'
-  termsOfService: 'https://tapis-project.org'
+  termsOfService: "https://tapis-project.org"
   contact:
-    name: 'TMS Server - CICSupport'
-    url: 'https://tapis-project.org'
-    email: 'cicsupport@tacc.utexas.edu'
+    name: "TMS Server - CICSupport"
+    url: "https://tapis-project.org"
+    email: "cicsupport@tacc.utexas.edu"
   license:
     name: 3-Clause BSD License
     url: 'https://opensource.org/licenses/BSD-3-Clause'
@@ -16,8 +17,9 @@ externalDocs:
   description: Tapis Project
   url: 'https://tapis-project.org'
 servers:
-  - url: 'http://localhost:3000'
+  - url: 'http://localhost:3000/'
     description: Local test environment
+    variables: {}
 tags:
   - name: General
     description: General service health and readiness
@@ -27,7 +29,7 @@ tags:
     description: Approved institutions and the identity providers they sign in through
 
 # ------------------------------------------------------------------------------
-# --- Paths --------------------------------------------------------------------
+# --- Paths -------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 paths:
 
@@ -76,10 +78,10 @@ paths:
       tags:
         - Credentials
       description: |
-        Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes and
-        key type. All values are required except for key type, which defaults to ED25519. Supported values for key type
-        (case insensitive): ED25519, ECDSA, RSA.
-
+        Create an ssh keypair using provided values for client user, host, host account, number of uses, TTL minutes
+        and key type. All values are required except for key type, which defaults to ED25519. Supported values for
+        key type (case insensitive): ED25519, ECDSA, RSA.
+        
         Setting the number of uses or TTL minutes to a negative value results in maximum limits.
         If both are negative this effectively creates a keypair with no limits.
         If both are specified as 0 then the resulting key is not usable.
@@ -91,7 +93,7 @@ paths:
         - TmsClientAuth: []
       requestBody:
         required: true
-        description: A JSON object providing information about the SSH keypair to be generated.
+        description: A JSON object providing information about the SSH keypair ot be generated.
         content:
           application/json:
             schema:
@@ -116,9 +118,9 @@ paths:
       tags:
         - Credentials
       description: |
-        Retrieve public key using provided values for user, host and public key fingerprint. Values may also be provided
-        for user UID and key type, but these are only used for writing to the server side log.
-
+        Retrieve public key using provided values for user, host and public key fingerprint. Values may also be
+        provided for user UID and key type, but these are only used for writing to the server side log.
+        
         The user and host must match the host account and host provided when the keypair was generated. If a match is
         found the public key is returned as part of the result.
       operationId: retrievePubKey
@@ -169,136 +171,97 @@ paths:
         Every 200 response carries an ETag. A client that caches the list can send that value back in If-None-Match and
         receives 304 with no body when the list has not changed.
       operationId: listInstitutions
-      security: []
       parameters:
         - name: If-None-Match
           in: header
           description: |
-            One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2). If any
-            listed tag matches the current list under weak comparison, or the value is *, the server returns 304.
-            A malformed value is ignored rather than rejected, and the server returns 200 with the full list.
+            One or more ETags from previous 200 responses, comma-separated, or * (RFC 9110, section 13.1.2), for
+            example "2026-10-28.1". If any listed tag matches the current list under weak comparison, or the value
+            is *, the server returns 304. A malformed value is ignored rather than rejected, and the server returns 200
+            with the full list.
+          required: false
+          explode: true
           schema:
             type: string
-          example: '"2026-10-28.1"'
       responses:
         '200':
           description: Success.
           headers:
-            ETag:
+            ETAG:
               description: >-
-                Quoted strong entity tag for the current list. Its value is data_version wrapped in double quotes, so it
-                changes whenever the list changes.
+                Quoted strong entity tag for the current list, for example "2026-10-28.1". Its value is data_version
+                wrapped in double quotes, so it changes whenever the list changes.
               required: true
               schema:
                 type: string
-              example: '"2026-10-28.1"'
-            Cache-Control:
+            CACHE-CONTROL:
               description: >-
                 Always no-cache. Clients may store the list but must revalidate it with If-None-Match before reuse.
               required: true
               schema:
                 type: string
-                const: no-cache
-            Vary:
+            VARY:
               description: >-
                 Accept-Encoding when the server compresses responses, so that caches keep compressed and uncompressed
                 copies apart. Omitted otherwise.
               schema:
                 type: string
-              example: Accept-Encoding
           content:
-            application/json:
+            application/json; charset=utf-8:
               schema:
                 $ref: '#/components/schemas/RespInstitutions'
-              examples:
-                mixedProviders:
-                  summary: Globus entries with and without a domain, plus a Tapis entry
-                  value:
-                    result_code: '0'
-                    result_msg: success
-                    data_version: '2026-10-28.1'
-                    institutions:
-                      - id: utexas
-                        name: The University of Texas at Austin
-                        provider: globus
-                        redirect_idp_domain: utexas.edu
-                        idp_logout_url: 'https://enterprise.login.utexas.edu/idp/profile/Logout'
-                      - id: globus-other
-                        name: Other institution (choose in Globus)
-                        provider: globus
-                      - id: tacc
-                        name: Texas Advanced Computing Center
-                        provider: tacc_tapis
         '304':
           description: >-
             Not modified. The If-None-Match value matches the current list; the client should reuse its cached copy. No
             body is returned.
           headers:
-            ETag:
+            ETAG:
               description: Quoted strong entity tag for the current list. Same value a 200 response would carry.
               required: true
               schema:
                 type: string
-              example: '"2026-10-28.1"'
-            Cache-Control:
+            CACHE-CONTROL:
               description: Same value as on a 200 response, as RFC 9110 requires for 304.
               required: true
               schema:
                 type: string
-                const: no-cache
-            Vary:
+            VARY:
               description: Same value as on a 200 response, as RFC 9110 requires for 304.
               schema:
                 type: string
-              example: Accept-Encoding
         '500':
           description: >-
-            Server error, including invalid institution data. The message is generic; details are logged on the server
-            and never returned, since the endpoint is public.
+            Server error, including invalid institution data. The message is generic, for example "Institution data is
+            invalid."; details are logged on the server and never returned, since the endpoint is public.
           headers:
-            Cache-Control:
+            CACHE-CONTROL:
               description: Always no-store, so that neither the client nor an intermediary caches the error.
               required: true
               schema:
                 type: string
-                const: no-store
           content:
-            application/json:
+            application/json; charset=utf-8:
               schema:
                 $ref: '#/components/schemas/HttpResult'
-              examples:
-                invalidData:
-                  summary: Institution data failed validation
-                  value:
-                    result_code: '500'
-                    result_msg: Institution data is invalid.
         '503':
           description: Institution data is temporarily unavailable. The client may retry later.
           headers:
-            Cache-Control:
+            CACHE-CONTROL:
               description: Always no-store, so that neither the client nor an intermediary caches the error.
               required: true
               schema:
                 type: string
-                const: no-store
-            Retry-After:
+            RETRY-AFTER:
               description: >-
                 Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can
                 estimate when the data will be available again.
               schema:
                 type: integer
-                minimum: 0
-              example: 30
+                format: uint32
           content:
-            application/json:
+            application/json; charset=utf-8:
               schema:
                 $ref: '#/components/schemas/HttpResult'
-              examples:
-                unavailable:
-                  summary: Institution data could not be loaded
-                  value:
-                    result_code: '503'
-                    result_msg: Institution data is temporarily unavailable.
 
 # ------------------------------------------------------------------------------
 # --- Components ---------------------------------------------------------------
@@ -465,6 +428,22 @@ components:
             them in this order. An empty array means no sign-in options are configured.
           items:
             $ref: '#/components/schemas/Institution'
+      example:
+        result_code: '0'
+        result_msg: success
+        data_version: '2026-10-28.1'
+        institutions:
+          - id: utexas
+            name: The University of Texas at Austin
+            provider: globus
+            redirect_idp_domain: utexas.edu
+            idp_logout_url: 'https://enterprise.login.utexas.edu/idp/profile/Logout'
+          - id: globus-other
+            name: Other institution (choose in Globus)
+            provider: globus
+          - id: tacc
+            name: Texas Advanced Computing Center
+            provider: tacc_tapis
 
     # -------------------------------------------------------------------------
     # --- Data objects --------------------------------------------------------
@@ -493,35 +472,26 @@ components:
           maxLength: 256
           description: Display name.
         provider:
-          $ref: '#/components/schemas/ProviderTypeEnum'
+          type: string
+          description: >-
+            Login flow for the entry: globus is Globus Auth; tacc_tapis is Tapis OAuth2. New values may be added
+            without a major version change. Clients must skip entries whose provider they do not support rather than
+            reject the response.
         redirect_idp_domain:
           type: string
-          format: hostname
           maxLength: 253
           pattern: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$'
           description: >-
             Lower-case domain Globus associates with the institution's IdP, passed as the redirect_idp_domain authorize
             parameter. Two or more labels; the top-level label starts with a letter, so an IP address is rejected.
-            Omitted when there is no IdP to steer to, and always omitted for tacc_tapis.
+            Omitted when there is no IdP to steer to, and never present when provider is tacc_tapis.
         idp_logout_url:
           type: string
-          format: uri
           maxLength: 2048
           pattern: '^https://[^\s/?#]+[^\s]*$'
           description: >-
             HTTPS sign-out URL of the institution's own IdP. Omitted when there is none. May be set for any provider,
             including tacc_tapis.
-      # A tacc_tapis entry signs in through Tapis OAuth2, so it never carries a Globus IdP domain.
-      if:
-        required:
-          - provider
-        properties:
-          provider:
-            const: tacc_tapis
-      then:
-        not:
-          required:
-            - redirect_idp_domain
 
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
@@ -533,14 +503,3 @@ components:
         - ED25519
         - RSA
         - ECDSA
-    ProviderTypeEnum:
-      type: string
-      description: >-
-        Login flow for the entry. globus is Globus Auth; tacc_tapis is Tapis OAuth2.
-        New values may be added without a major version change. Clients must skip entries whose provider they do not
-        support rather than reject the response.
-      anyOf:
-        - enum:
-            - globus
-            - tacc_tapis
-        - type: string
