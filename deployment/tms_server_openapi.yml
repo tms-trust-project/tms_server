@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: Trust Manager System (TMS) Server
   description: |
@@ -198,8 +198,7 @@ paths:
               required: true
               schema:
                 type: string
-                enum:
-                  - no-cache
+                const: no-cache
             Vary:
               description: >-
                 Accept-Encoding when the server compresses responses, so that caches keep compressed and uncompressed
@@ -246,8 +245,7 @@ paths:
               required: true
               schema:
                 type: string
-                enum:
-                  - no-cache
+                const: no-cache
             Vary:
               description: Same value as on a 200 response, as RFC 9110 requires for 304.
               schema:
@@ -263,8 +261,7 @@ paths:
               required: true
               schema:
                 type: string
-                enum:
-                  - no-store
+                const: no-store
           content:
             application/json:
               schema:
@@ -283,8 +280,7 @@ paths:
               required: true
               schema:
                 type: string
-                enum:
-                  - no-store
+                const: no-store
             Retry-After:
               description: >-
                 Seconds the client should wait before retrying. Sent as delay-seconds, and only when the server can
@@ -515,6 +511,17 @@ components:
           description: >-
             HTTPS sign-out URL of the institution's own IdP. Omitted when there is none. May be set for any provider,
             including tacc_tapis.
+      # A tacc_tapis entry signs in through Tapis OAuth2, so it never carries a Globus IdP domain.
+      if:
+        required:
+          - provider
+        properties:
+          provider:
+            const: tacc_tapis
+      then:
+        not:
+          required:
+            - redirect_idp_domain
 
     # -------------------------------------------------------------------------
     # --- Enums ---------------------------------------------------------------
