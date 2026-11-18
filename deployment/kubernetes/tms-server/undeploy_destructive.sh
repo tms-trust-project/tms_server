@@ -46,7 +46,7 @@ kubectl wait --timeout=200s --for=condition=complete job/tms-drop-db
 
 # Bring down tms-portal if we have a deploy file for it
 TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
-if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
+if [ -f "$TMS_PORTAL_DEPLOY_DIR/deploy.yml" ]; then
  echo "---------------------------------------------------"
  echo " Un-deploying TMS portal"
  echo "---------------------------------------------------"

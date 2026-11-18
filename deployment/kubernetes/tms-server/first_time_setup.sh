@@ -76,9 +76,9 @@ else
   echo "File: $TMS_TMS_TEST_SQL_FILE init sql file not found."
 fi
 
-# Bring down tms-portal if we have a deploy file for it
+# Re-deploy tms-portal if we have a deploy file for it
 TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
-if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
+if [ -f "$TMS_PORTAL_DEPLOY_DIR/deploy.yml" ]; then
  echo "---------------------------------------------------"
  echo " Re-deploying TMS portal"
  echo "---------------------------------------------------"

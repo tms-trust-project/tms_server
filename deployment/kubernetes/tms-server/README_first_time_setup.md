@@ -2,10 +2,10 @@ TMS Credential Server
 =====================
 First time deployment in kubernetes
 -----------------------------------
-1. Make sure the DB is up and available and you have the host, port and postgres user password information.
+1. Make sure the DB is up and available, and that you have the host, port and postgres user password information.
 2. Generate a secure password for the TMS DB user.
 3. Create a kubernetes secret named "tms-secrets" that contains the passwords using the names "postgres-password" and
-   "postgres-tms-user-password". When bas64 encoding a secret before placing it an yml file be sure to use "echo -n".
+   "postgres-tms-user-password". When base64 encoding a secret before placing it a yml file be sure to use "echo -n".
 4. If not using the default DB host and port then update the kubernetes environment variables to also set those
    as desired. See script "first-time-init-db-sh" for the default DB host and port.
 5. Set up init data in $HOME/tms-portal/local
@@ -39,7 +39,7 @@ Example commands:
 mkdir src_github
 cd src_github
 git clone https://github.com/tms-trust-project/tms_server
-cd tms_server/deployment/kubernetes/
+cd tms_server/deployment/kubernetes/tms-server
 ./undeploy_destructive.sh
 ./first_time_setup.sh
 kubectl logs --tail 1000 -f deploy/tms-server
