@@ -21,7 +21,7 @@ kubectl delete configmap tms-first-time-init-db-configmap 2>/dev/null
 kubectl delete -f first-time-init-db.yml 2>/dev/null
 kubectl create configmap tms-first-time-init-db-configmap --from-file first-time-init-db-sh
 kubectl apply -f first-time-init-db.yml
-kubectl wait --timeout=200s --for=condition=complete job/tms-first-time-init-db
+kubectl wait --timeout=500s --for=condition=complete job/tms-first-time-init-db
 
 echo "---------------------------------------------------"
 echo " Creating PVC"
@@ -33,19 +33,35 @@ echo " Staging files in pvc"
 echo "---------------------------------------------------"
 kubectl delete -f first-time-stage.yml 2>/dev/null
 kubectl apply -f first-time-stage.yml
-kubectl wait --timeout=200s --for=condition=complete job/tms-first-time-stage
+kubectl wait --timeout=500s --for=condition=complete job/tms-first-time-stage
 
 echo "---------------------------------------------------"
 echo " Starting up server for the first time"
 echo "---------------------------------------------------"
 kubectl delete -f deploy.yml 2>/dev/null
 kubectl apply -f deploy.yml
-kubectl wait --timeout=200s --for=condition=available deploy/tms-server
+kubectl wait --timeout=500s --for=condition=available deploy/tms-server
 
 echo "---------------------------------------------------"
 echo " Setting up ingress network access"
 echo "---------------------------------------------------"
 kubectl apply -f tms-server-ingress.yml
+
+# ################################################
+# TMS Portal specific steps
+# ################################################
+TMS_PORTAL_DIR="$HOME/tms-portal"
+PORTAL_DEPLOY_DIR="$TMS_PORTAL_DIR/deployment"
+PORTAL_LOCAL_DIR="$TMS_PORTAL_DIR/local"
+
+# Apply the tms-portal ingress if file is present
+PORTAL_INGRESS="$PORTAL_DEPLOY_DIR/tms-portal-ingress.yml"
+if [ -r "$PORTAL_INGRESS" ]; then
+  echo "Applying TMS Portal Ingress"
+  kubectl apply -f "$PORTAL_INGRESS"
+else
+  echo "Skipping TMS Portal Ingress"
+fi
 
 echo "---------------------------------------------------"
 echo " Seeding initial config for tms-portal if init file present"
@@ -65,7 +81,7 @@ fi
 echo "---------------------------------------------------"
 echo " Seeding test allowed_redirects if init file present"
 echo "---------------------------------------------------"
-TMS_TEST_SQL_FILE="$HOME/tms-portal/local/init_test.sql"
+TMS_TEST_SQL_FILE="$PORTAL_LOCAL_DIR/init_test.sql"
 if [ -r "$TMS_TEST_SQL_FILE" ]; then
   cat "$TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
 else
@@ -73,13 +89,12 @@ else
   echo "File: $TMS_TMS_TEST_SQL_FILE init sql file not found."
 fi
 
-# Bring down tms-portal if we have a deploy file for it
-TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
-if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
+# Re-start tms-portal if we have a deploy file for it
+if [ -r "$PORTAL_DEPLOY_DIR/deploy.yml" ]; then
  echo "---------------------------------------------------"
  echo " Re-deploying TMS portal"
  echo "---------------------------------------------------"
-  cd ${TMS_PORTAL_DEPLOY_DIR} || exit
+  cd "${PORTAL_DEPLOY_DIR}" || exit
   ./burndown
   ./burnup
 else

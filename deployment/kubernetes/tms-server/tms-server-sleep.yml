@@ -8,7 +8,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: tms-server-sleep
-        image: tapis/tms-server:dev
+        image: tapis/tms-server:M1-stg
         imagePullPolicy: Always
         securityContext:
           runAsUser: 0
