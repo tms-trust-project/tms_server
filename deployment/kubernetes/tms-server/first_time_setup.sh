@@ -47,6 +47,22 @@ echo " Setting up ingress network access"
 echo "---------------------------------------------------"
 kubectl apply -f tms-server-ingress.yml
 
+# ################################################
+# TMS Portal specific steps
+# ################################################
+TMS_PORTAL_DIR="$HOME/tms-portal"
+PORTAL_DEPLOY_DIR="$TMS_PORTAL_DIR/deployment"
+PORTAL_LOCAL_DIR="$TMS_PORTAL_DIR/local"
+
+# Apply the tms-portal ingress if file is present
+PORTAL_INGRESS="$PORTAL_DEPLOY_DIR/tms-portal-ingress.yml"
+if [ -r "$PORTAL_INGRESS" ]; then
+  echo "Applying TMS Portal Ingress"
+  kubectl apply -f "$PORTAL_INGRESS"
+else
+  echo "Skipping TMS Portal Ingress"
+fi
+
 echo "---------------------------------------------------"
 echo " Seeding initial config for tms-portal if init file present"
 echo "---------------------------------------------------"
@@ -65,7 +81,7 @@ fi
 echo "---------------------------------------------------"
 echo " Seeding test allowed_redirects if init file present"
 echo "---------------------------------------------------"
-TMS_TEST_SQL_FILE="$HOME/tms-portal/local/init_test.sql"
+TMS_TEST_SQL_FILE="$PORTAL_LOCAL_DIR/init_test.sql"
 if [ -r "$TMS_TEST_SQL_FILE" ]; then
   cat "$TMS_TEST_SQL_FILE" | kubectl exec -i deploy/tms-postgres-18 -- psql -U tms tmsdb
 else
@@ -73,13 +89,12 @@ else
   echo "File: $TMS_TMS_TEST_SQL_FILE init sql file not found."
 fi
 
-# Bring down tms-portal if we have a deploy file for it
-TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
-if [ -d "$TMS_PORTAL_DEPLOY_DIR" ]; then
+# Re-start tms-portal if we have a deploy file for it
+if [ -r "$PORTAL_DEPLOY_DIR/deploy.yml" ]; then
  echo "---------------------------------------------------"
  echo " Re-deploying TMS portal"
  echo "---------------------------------------------------"
-  cd ${TMS_PORTAL_DEPLOY_DIR} || exit
+  cd "${PORTAL_DEPLOY_DIR}" || exit
   ./burndown
   ./burnup
 else
@@ -87,3 +102,5 @@ else
  echo " Skipping deploy of TMS portal. Directory not found. Directory: $TMS_PORTAL_DEPLOY_DIR"
  echo "---------------------------------------------------"
 fi
+
+cd $RUN_DIR
