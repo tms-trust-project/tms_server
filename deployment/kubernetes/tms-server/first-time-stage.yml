@@ -8,7 +8,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: tms-first-time-stage
-        image: tapis/tms-server:dev
+        image: tapis/tms-server:M1
         imagePullPolicy: Always
         securityContext:
           runAsUser: 0

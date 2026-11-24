@@ -42,7 +42,7 @@ kubectl delete configmap tms-drop-db-configmap
 kubectl delete -f tms-drop-db.yml 2>/dev/null
 kubectl create configmap tms-drop-db-configmap --from-file tms-drop-db-sh
 kubectl apply -f tms-drop-db.yml
-kubectl wait --timeout=200s --for=condition=complete job/tms-drop-db
+kubectl wait --timeout=500s --for=condition=complete job/tms-drop-db
 
 # Bring down tms-portal if we have a deploy file for it
 TMS_PORTAL_DEPLOY_DIR="$HOME/tms-portal/deployment"
