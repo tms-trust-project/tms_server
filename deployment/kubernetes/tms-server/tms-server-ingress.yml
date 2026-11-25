@@ -8,10 +8,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - tms-server-stg.savanna.tacc.cloud
-      secretName: tms-server-stg.savanna.tacc.cloud-tls
+        - tms-server-staging.savanna.tacc.cloud
+      secretName: tms-server-staging.savanna.tacc.cloud-tls
   rules:
-    - host: tms-server-stg.savanna.tacc.cloud
+    - host: tms-server-staging.savanna.tacc.cloud
       http:
         paths:
           - path: /
